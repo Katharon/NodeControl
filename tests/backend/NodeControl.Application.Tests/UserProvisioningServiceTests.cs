@@ -1,6 +1,7 @@
 using NodeControl.Application.Abstractions.Persistence;
 using NodeControl.Application.Abstractions.Time;
 using NodeControl.Application.Auth;
+using NodeControl.Domain.Customers;
 using NodeControl.Domain.Users;
 
 namespace NodeControl.Application.Tests;
@@ -110,6 +111,45 @@ public sealed class UserProvisioningServiceTests
             return Task.FromResult(Users.FirstOrDefault(user => user.Id == id));
         }
 
+        public Task<IReadOnlyList<Customer>> ListActiveCustomersAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<Customer>>([]);
+        }
+
+        public Task<IReadOnlyList<Customer>> ListActiveCustomersForUserAsync(
+            Guid userId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<Customer>>([]);
+        }
+
+        public Task<Customer?> FindCustomerAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Customer?>(null);
+        }
+
+        public Task<IReadOnlyList<CustomerMembership>> ListCustomerMembershipsAsync(
+            Guid customerId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<CustomerMembership>>([]);
+        }
+
+        public Task<CustomerMembership?> FindCustomerMembershipAsync(
+            Guid id,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<CustomerMembership?>(null);
+        }
+
+        public Task<CustomerMembership?> FindCustomerMembershipForUserAsync(
+            Guid customerId,
+            Guid userId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<CustomerMembership?>(null);
+        }
+
         public void AddUser(User user)
         {
             Users.Add(user);
@@ -118,6 +158,14 @@ public sealed class UserProvisioningServiceTests
         public void AddExternalIdentity(ExternalIdentity externalIdentity)
         {
             ExternalIdentities.Add(externalIdentity);
+        }
+
+        public void AddCustomer(Customer customer)
+        {
+        }
+
+        public void AddCustomerMembership(CustomerMembership customerMembership)
+        {
         }
 
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken)

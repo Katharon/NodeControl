@@ -20,6 +20,111 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
 
         NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+        modelBuilder.Entity("NodeControl.Domain.Customers.Customer", b =>
+        {
+            b.Property<Guid>("Id")
+                .ValueGeneratedNever()
+                .HasColumnType("uuid")
+                .HasColumnName("id");
+
+            b.Property<DateTimeOffset?>("ArchivedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("archived_at");
+
+            b.Property<DateTimeOffset>("CreatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("created_at");
+
+            b.Property<string>("Description")
+                .HasMaxLength(1000)
+                .HasColumnType("character varying(1000)")
+                .HasColumnName("description");
+
+            b.Property<string>("Name")
+                .IsRequired()
+                .HasMaxLength(200)
+                .HasColumnType("character varying(200)")
+                .HasColumnName("name");
+
+            b.Property<string>("Slug")
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasColumnType("character varying(100)")
+                .HasColumnName("slug");
+
+            b.Property<string>("Status")
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasColumnType("character varying(40)")
+                .HasColumnName("status");
+
+            b.Property<DateTimeOffset?>("UpdatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("updated_at");
+
+            b.HasKey("Id")
+                .HasName("pk_customers");
+
+            b.HasIndex("Slug")
+                .IsUnique()
+                .HasDatabaseName("ux_customers_slug");
+
+            b.ToTable("customers", (string)null);
+        });
+
+        modelBuilder.Entity("NodeControl.Domain.Customers.CustomerMembership", b =>
+        {
+            b.Property<Guid>("Id")
+                .ValueGeneratedNever()
+                .HasColumnType("uuid")
+                .HasColumnName("id");
+
+            b.Property<Guid>("CustomerId")
+                .HasColumnType("uuid")
+                .HasColumnName("customer_id");
+
+            b.Property<DateTimeOffset>("CreatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("created_at");
+
+            b.Property<DateTimeOffset?>("DeactivatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("deactivated_at");
+
+            b.Property<bool>("IsActive")
+                .HasColumnType("boolean")
+                .HasColumnName("is_active");
+
+            b.Property<string>("Role")
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasColumnType("character varying(40)")
+                .HasColumnName("role");
+
+            b.Property<DateTimeOffset?>("UpdatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("updated_at");
+
+            b.Property<Guid>("UserId")
+                .HasColumnType("uuid")
+                .HasColumnName("user_id");
+
+            b.HasKey("Id")
+                .HasName("pk_customer_memberships");
+
+            b.HasIndex("CustomerId")
+                .HasDatabaseName("ix_customer_memberships_customer_id");
+
+            b.HasIndex("UserId")
+                .HasDatabaseName("ix_customer_memberships_user_id");
+
+            b.HasIndex("CustomerId", "UserId")
+                .IsUnique()
+                .HasDatabaseName("ux_customer_memberships_customer_id_user_id");
+
+            b.ToTable("customer_memberships", (string)null);
+        });
+
         modelBuilder.Entity("NodeControl.Domain.Users.ExternalIdentity", b =>
         {
             b.Property<Guid>("Id")
@@ -138,6 +243,27 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
                 .OnDelete(DeleteBehavior.Restrict)
                 .IsRequired()
                 .HasConstraintName("fk_external_identities_users_user_id");
+
+            b.Navigation("User");
+        });
+
+        modelBuilder.Entity("NodeControl.Domain.Customers.CustomerMembership", b =>
+        {
+            b.HasOne("NodeControl.Domain.Customers.Customer", "Customer")
+                .WithMany()
+                .HasForeignKey("CustomerId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("fk_customer_memberships_customers_customer_id");
+
+            b.HasOne("NodeControl.Domain.Users.User", "User")
+                .WithMany()
+                .HasForeignKey("UserId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("fk_customer_memberships_users_user_id");
+
+            b.Navigation("Customer");
 
             b.Navigation("User");
         });

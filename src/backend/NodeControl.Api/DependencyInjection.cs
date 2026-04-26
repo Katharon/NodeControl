@@ -1,9 +1,14 @@
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Options;
 using NodeControl.Api.Auth;
+using NodeControl.Application.Abstractions.Authorization;
 using NodeControl.Application.Abstractions.Auth;
+using NodeControl.Application.Authorization;
 using NodeControl.Application.Auth;
+using NodeControl.Application.Customers;
+using NodeControl.Application.Memberships;
 using NodeControl.Infrastructure;
 
 namespace NodeControl.Api;
@@ -26,6 +31,9 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUser, CurrentUserAccessor>();
         services.AddScoped<UserProvisioningService>();
         services.AddScoped<CurrentUserService>();
+        services.AddScoped<ICustomerAuthorizationService, CustomerAuthorizationService>();
+        services.AddScoped<CustomerService>();
+        services.AddScoped<CustomerMembershipService>();
 
         services.AddNodeControlInfrastructure(configuration);
 
@@ -78,6 +86,10 @@ public static class DependencyInjection
         });
 
         services.AddAuthorization();
+        services.ConfigureHttpJsonOptions(options =>
+        {
+            options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        });
         services.AddOpenApi();
 
         return services;

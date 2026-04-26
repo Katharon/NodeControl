@@ -1,4 +1,5 @@
-import { Box, Container, Stack, Typography } from "@mui/material";
+import BusinessIcon from "@mui/icons-material/Business";
+import { Box, Button, Container, Stack, Typography } from "@mui/material";
 import { CurrentUserCard } from "@/components/auth/CurrentUserCard";
 import { AppProviders } from "@/lib/app/AppProviders";
 
@@ -14,6 +15,14 @@ export default function DashboardPage() {
               Dashboard
             </Typography>
             <CurrentUserCard />
+            <Button
+              href="/customers"
+              startIcon={<BusinessIcon />}
+              sx={{ alignSelf: "flex-start" }}
+              variant="contained"
+            >
+              Customers
+            </Button>
           </Stack>
         </Container>
       </Box>
