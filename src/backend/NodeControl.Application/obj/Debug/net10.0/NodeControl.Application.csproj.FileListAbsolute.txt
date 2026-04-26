@@ -1,0 +1,15 @@
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Application/bin/Debug/net10.0/NodeControl.Application.deps.json
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Application/bin/Debug/net10.0/NodeControl.Application.dll
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Application/bin/Debug/net10.0/NodeControl.Application.pdb
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Application/bin/Debug/net10.0/NodeControl.Domain.dll
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Application/bin/Debug/net10.0/NodeControl.Domain.pdb
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Application/obj/Debug/net10.0/NodeControl.Application.csproj.AssemblyReference.cache
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Application/obj/Debug/net10.0/NodeControl.Application.GeneratedMSBuildEditorConfig.editorconfig
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Application/obj/Debug/net10.0/NodeControl.Application.AssemblyInfoInputs.cache
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Application/obj/Debug/net10.0/NodeControl.Application.AssemblyInfo.cs
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Application/obj/Debug/net10.0/NodeControl.Application.csproj.CoreCompileInputs.cache
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Application/obj/Debug/net10.0/NodeCont.3A6C8B40.Up2Date
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Application/obj/Debug/net10.0/NodeControl.Application.dll
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Application/obj/Debug/net10.0/refint/NodeControl.Application.dll
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Application/obj/Debug/net10.0/NodeControl.Application.pdb
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Application/obj/Debug/net10.0/ref/NodeControl.Application.dll

@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: nodecontrol-postgres
+    environment:
+      POSTGRES_DB: nodecontrol
+      POSTGRES_USER: nodecontrol
+      POSTGRES_PASSWORD: nodecontrol_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - nodecontrol_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nodecontrol -d nodecontrol"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: nodecontrol-keycloak
+    command: start-dev
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports:
+      - "127.0.0.1:18080:8080"
+    volumes:
+      - nodecontrol_keycloak_data:/opt/keycloak/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  nodecontrol_postgres_data:
+  nodecontrol_keycloak_data:

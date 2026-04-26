@@ -1,0 +1,11 @@
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Domain/bin/Debug/net10.0/NodeControl.Domain.deps.json
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Domain/bin/Debug/net10.0/NodeControl.Domain.dll
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Domain/bin/Debug/net10.0/NodeControl.Domain.pdb
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Domain/obj/Debug/net10.0/NodeControl.Domain.GeneratedMSBuildEditorConfig.editorconfig
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Domain/obj/Debug/net10.0/NodeControl.Domain.AssemblyInfoInputs.cache
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Domain/obj/Debug/net10.0/NodeControl.Domain.AssemblyInfo.cs
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Domain/obj/Debug/net10.0/NodeControl.Domain.csproj.CoreCompileInputs.cache
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Domain/obj/Debug/net10.0/NodeControl.Domain.dll
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Domain/obj/Debug/net10.0/refint/NodeControl.Domain.dll
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Domain/obj/Debug/net10.0/NodeControl.Domain.pdb
+/home/luki/Schreibtisch/NodeControl/src/backend/NodeControl.Domain/obj/Debug/net10.0/ref/NodeControl.Domain.dll

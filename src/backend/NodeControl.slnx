@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="../../tests/backend/NodeControl.Api.IntegrationTests/NodeControl.Api.IntegrationTests.csproj" />
+  <Project Path="../../tests/backend/NodeControl.Application.Tests/NodeControl.Application.Tests.csproj" />
+  <Project Path="../../tests/backend/NodeControl.Domain.Tests/NodeControl.Domain.Tests.csproj" />
+  <Project Path="NodeControl.Api/NodeControl.Api.csproj" />
+  <Project Path="NodeControl.Application/NodeControl.Application.csproj" />
+  <Project Path="NodeControl.Domain/NodeControl.Domain.csproj" />
+  <Project Path="NodeControl.Infrastructure/NodeControl.Infrastructure.csproj" />
+  <Project Path="NodeControl.Worker/NodeControl.Worker.csproj" />
+</Solution>
