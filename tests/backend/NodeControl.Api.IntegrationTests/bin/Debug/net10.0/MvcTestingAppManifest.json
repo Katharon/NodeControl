@@ -1,6 +1,0 @@
-{
-  "NodeControl.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/home\/luki\/Schreibtisch\/NodeControl\/src\/backend\/NodeControl.Api",
-  "NodeControl.Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/home\/luki\/Schreibtisch\/NodeControl\/src\/backend\/NodeControl.Application",
-  "NodeControl.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/home\/luki\/Schreibtisch\/NodeControl\/src\/backend\/NodeControl.Domain",
-  "NodeControl.Infrastructure, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/home\/luki\/Schreibtisch\/NodeControl\/src\/backend\/NodeControl.Infrastructure"
-}
