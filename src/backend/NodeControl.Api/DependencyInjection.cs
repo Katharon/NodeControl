@@ -1,0 +1,107 @@
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.Extensions.Options;
+using NodeControl.Api.Auth;
+using NodeControl.Application.Abstractions.Auth;
+using NodeControl.Application.Auth;
+using NodeControl.Infrastructure;
+
+namespace NodeControl.Api;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddNodeControlApi(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        IWebHostEnvironment environment)
+    {
+        var authOptions = configuration.GetSection(AuthOptions.SectionName).Get<AuthOptions>()
+            ?? new AuthOptions();
+
+        ValidateAuthOptions(authOptions, environment);
+
+        services.Configure<AuthOptions>(configuration.GetSection(AuthOptions.SectionName));
+
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUser, CurrentUserAccessor>();
+        services.AddScoped<UserProvisioningService>();
+        services.AddScoped<CurrentUserService>();
+
+        services.AddNodeControlInfrastructure(configuration);
+
+        var authenticationBuilder = services.AddAuthentication(options =>
+        {
+            if (authOptions.UseFakeAuth)
+            {
+                options.DefaultAuthenticateScheme = FakeAuthDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = FakeAuthDefaults.AuthenticationScheme;
+            }
+            else
+            {
+                options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+            }
+        });
+
+        authenticationBuilder.AddCookie(options =>
+        {
+            options.Cookie.Name = "nodecontrol.session";
+            options.Cookie.HttpOnly = true;
+            options.Cookie.SameSite = SameSiteMode.Lax;
+            options.Cookie.SecurePolicy = environment.IsDevelopment()
+                ? CookieSecurePolicy.SameAsRequest
+                : CookieSecurePolicy.Always;
+            options.LoginPath = "/auth/login";
+            options.LogoutPath = "/auth/logout";
+            options.AccessDeniedPath = "/login";
+        });
+
+        authenticationBuilder.AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, FakeAuthHandler>(
+            FakeAuthDefaults.AuthenticationScheme,
+            _ => { });
+
+        authenticationBuilder.AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
+        {
+            options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+            options.Authority = authOptions.Oidc.Authority;
+            options.ClientId = authOptions.Oidc.ClientId;
+            options.ClientSecret = authOptions.Oidc.ClientSecret;
+            options.CallbackPath = authOptions.Oidc.CallbackPath;
+            options.ResponseType = "code";
+            options.SaveTokens = false;
+            options.GetClaimsFromUserInfoEndpoint = true;
+            options.RequireHttpsMetadata = authOptions.Oidc.RequireHttpsMetadata;
+            options.Scope.Clear();
+            options.Scope.Add("openid");
+            options.Scope.Add("profile");
+            options.Scope.Add("email");
+        });
+
+        services.AddAuthorization();
+        services.AddOpenApi();
+
+        return services;
+    }
+
+    private static void ValidateAuthOptions(AuthOptions authOptions, IWebHostEnvironment environment)
+    {
+        if (environment.IsProduction() && authOptions.UseFakeAuth)
+        {
+            throw new InvalidOperationException("Fake Auth cannot be enabled in Production.");
+        }
+
+        if (!authOptions.UseFakeAuth && !authOptions.UseOidc)
+        {
+            throw new InvalidOperationException("Auth:Mode must be either Fake or Oidc.");
+        }
+
+        if (environment.IsProduction() && authOptions.UseOidc)
+        {
+            if (string.IsNullOrWhiteSpace(authOptions.Oidc.Authority)
+                || string.IsNullOrWhiteSpace(authOptions.Oidc.ClientId))
+            {
+                throw new InvalidOperationException("Production OIDC requires Auth:Oidc:Authority and Auth:Oidc:ClientId.");
+            }
+        }
+    }
+}
