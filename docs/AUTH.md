@@ -1,0 +1,197 @@
+# Authentication and Authorization
+
+## Auth Goal
+
+NodeControl must integrate well into real companies.
+
+Many potential customers already have identity management systems such as:
+
+- Microsoft Entra ID / Azure AD
+- Okta
+- Keycloak
+- Google Workspace
+- Other OIDC providers
+- SAML providers later
+
+NodeControl must not require customers to run a specific identity provider.
+
+## Main Decision
+
+NodeControl is OIDC-first.
+
+Keycloak is allowed as a development/demo provider, but it is not a required product dependency.
+
+## Important Separation
+
+External identity and internal authorization are separate.
+
+The external identity provider answers:
+
+> Who is this user?
+
+NodeControl answers:
+
+> What is this user allowed to do inside NodeControl?
+
+## Internal Auth Model
+
+NodeControl stores:
+
+- User
+- ExternalIdentity
+- CustomerMembership
+- Role
+- Permission
+
+## User
+
+Represents a NodeControl user profile.
+
+Fields:
+
+- Id
+- DisplayName
+- Email
+- IsActive
+- CreatedAt
+- LastLoginAt
+
+## ExternalIdentity
+
+Links a NodeControl User to an external provider subject.
+
+Fields:
+
+- Id
+- UserId
+- Provider
+- Subject
+- EmailAtLogin
+- DisplayNameAtLogin
+- CreatedAt
+- LastSeenAt
+
+The pair `(Provider, Subject)` must be unique.
+
+## CustomerMembership
+
+Defines access to a customer.
+
+Fields:
+
+- Id
+- CustomerId
+- UserId
+- Role
+- IsActive
+- CreatedAt
+
+## MVP Roles
+
+Static roles:
+
+- Owner
+- Admin
+- Operator
+- Viewer
+- Auditor
+
+Dynamic roles are post-MVP.
+
+## MVP Permissions
+
+Suggested permissions:
+
+- ViewCustomer
+- ManageCustomer
+- ViewNodes
+- ManageNodes
+- ViewPlaybooks
+- ManagePlaybooks
+- RunJobs
+- ManageSchedules
+- ViewJobRuns
+- ViewAuditLogs
+- ManageMemberships
+
+## Login Flow
+
+Recommended MVP flow:
+
+```text
+1. User opens the Next.js frontend.
+2. Frontend calls GET /api/v1/me.
+3. API returns 401 if no session exists.
+4. Frontend redirects to /auth/login.
+5. API starts OIDC Authorization Code flow.
+6. External identity provider authenticates the user.
+7. API receives callback.
+8. API creates a secure HttpOnly session cookie.
+9. API creates or updates User and ExternalIdentity.
+10. Frontend can call /api/v1 endpoints with the session cookie.
+```
+
+## Token Storage Rule
+
+Do not store access tokens in browser `localStorage`.
+
+Prefer HttpOnly cookies controlled by the backend.
+
+## Local Development Modes
+
+### Keycloak Dev Mode
+
+Use Keycloak as a local OIDC provider.
+
+Example dev users:
+
+- admin@nodecontrol.local
+- operator@nodecontrol.local
+- viewer@nodecontrol.local
+
+Keycloak is only a test provider.
+
+### Fake Auth Mode
+
+Fake Auth may be used for faster local development.
+
+Rules:
+
+- Fake Auth must never run in production.
+- Production startup must fail if Fake Auth is enabled.
+- Fake Auth should provide a fixed development user.
+
+## Production Auth Configuration
+
+Production requires:
+
+- OIDC Authority
+- Client ID
+- Client Secret if applicable
+- Callback URL
+- Allowed issuer validation
+- Secure cookies
+- HTTPS
+- Production Fake Auth guard
+
+## Authorization Rules
+
+1. All customer-scoped endpoints must verify membership.
+2. Role permissions must be checked server-side.
+3. Frontend checks are usability only, not security.
+4. Cross-tenant access must be tested.
+5. Disabled users must not access the system.
+6. Disabled memberships must not grant access.
+
+## Post-MVP Auth Features
+
+Potential later features:
+
+- SAML
+- OIDC provider per customer
+- SCIM provisioning
+- Group claim mapping
+- Role mapping from external groups
+- API tokens
+- Service accounts
+- Approval workflow permissions
