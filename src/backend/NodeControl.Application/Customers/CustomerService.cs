@@ -214,6 +214,11 @@ public sealed record CustomerServiceResult<T>(T? Value, CustomerServiceError? Er
         return new CustomerServiceResult<T>(default, CustomerServiceError.Conflict);
     }
 
+    public static CustomerServiceResult<T> BadRequest()
+    {
+        return new CustomerServiceResult<T>(default, CustomerServiceError.BadRequest);
+    }
+
     public static CustomerServiceResult<T> FromAuthorization(CustomerAuthorizationResult authorization)
     {
         return authorization switch
@@ -229,5 +234,6 @@ public enum CustomerServiceError
 {
     NotFound,
     Forbidden,
-    Conflict
+    Conflict,
+    BadRequest
 }

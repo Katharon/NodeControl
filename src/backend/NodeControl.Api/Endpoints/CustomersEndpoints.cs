@@ -109,6 +109,7 @@ public static class CustomersEndpoints
             CustomerServiceError.Forbidden => Results.Forbid(),
             CustomerServiceError.Conflict => Results.Conflict(),
             CustomerServiceError.NotFound => Results.NotFound(),
+            CustomerServiceError.BadRequest => Results.BadRequest(),
             _ => Results.BadRequest()
         };
     }

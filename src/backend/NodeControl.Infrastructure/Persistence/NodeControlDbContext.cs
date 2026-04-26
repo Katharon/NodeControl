@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using NodeControl.Application.Abstractions.Persistence;
 using NodeControl.Domain.Customers;
+using NodeControl.Domain.Inventories;
+using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Users;
 
 namespace NodeControl.Infrastructure.Persistence;
@@ -15,6 +17,14 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
     public DbSet<Customer> Customers => Set<Customer>();
 
     public DbSet<CustomerMembership> CustomerMemberships => Set<CustomerMembership>();
+
+    public DbSet<ControlNode> ControlNodes => Set<ControlNode>();
+
+    public DbSet<ManagedNode> ManagedNodes => Set<ManagedNode>();
+
+    public DbSet<InventoryGroup> InventoryGroups => Set<InventoryGroup>();
+
+    public DbSet<InventoryGroupNode> InventoryGroupNodes => Set<InventoryGroupNode>();
 
     public async Task<ExternalIdentity?> FindExternalIdentityAsync(
         string provider,
@@ -94,6 +104,124 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
                 cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ControlNode>> ListActiveControlNodesAsync(
+        Guid customerId,
+        CancellationToken cancellationToken)
+    {
+        return await ControlNodes
+            .Where(controlNode => controlNode.CustomerId == customerId
+                && controlNode.Status == ControlNodeStatus.Active)
+            .OrderBy(controlNode => controlNode.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<ControlNode?> FindControlNodeAsync(
+        Guid customerId,
+        Guid controlNodeId,
+        CancellationToken cancellationToken)
+    {
+        return await ControlNodes.FirstOrDefaultAsync(
+            controlNode => controlNode.CustomerId == customerId && controlNode.Id == controlNodeId,
+            cancellationToken);
+    }
+
+    public async Task<ControlNode?> FindControlNodeByNameAsync(
+        Guid customerId,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        return await ControlNodes.FirstOrDefaultAsync(
+            controlNode => controlNode.CustomerId == customerId && controlNode.Name == name,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ManagedNode>> ListActiveManagedNodesAsync(
+        Guid customerId,
+        CancellationToken cancellationToken)
+    {
+        return await ManagedNodes
+            .Where(managedNode => managedNode.CustomerId == customerId
+                && managedNode.Status == ManagedNodeStatus.Active)
+            .OrderBy(managedNode => managedNode.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<ManagedNode?> FindManagedNodeAsync(
+        Guid customerId,
+        Guid managedNodeId,
+        CancellationToken cancellationToken)
+    {
+        return await ManagedNodes.FirstOrDefaultAsync(
+            managedNode => managedNode.CustomerId == customerId && managedNode.Id == managedNodeId,
+            cancellationToken);
+    }
+
+    public async Task<ManagedNode?> FindManagedNodeByNameAsync(
+        Guid customerId,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        return await ManagedNodes.FirstOrDefaultAsync(
+            managedNode => managedNode.CustomerId == customerId && managedNode.Name == name,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<InventoryGroup>> ListActiveInventoryGroupsAsync(
+        Guid customerId,
+        CancellationToken cancellationToken)
+    {
+        return await InventoryGroups
+            .Where(group => group.CustomerId == customerId && group.ArchivedAt == null)
+            .OrderBy(group => group.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<InventoryGroup?> FindInventoryGroupAsync(
+        Guid customerId,
+        Guid inventoryGroupId,
+        CancellationToken cancellationToken)
+    {
+        return await InventoryGroups.FirstOrDefaultAsync(
+            group => group.CustomerId == customerId && group.Id == inventoryGroupId,
+            cancellationToken);
+    }
+
+    public async Task<InventoryGroup?> FindInventoryGroupByNameAsync(
+        Guid customerId,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        return await InventoryGroups.FirstOrDefaultAsync(
+            group => group.CustomerId == customerId && group.Name == name,
+            cancellationToken);
+    }
+
+    public async Task<InventoryGroupNode?> FindInventoryGroupNodeAsync(
+        Guid inventoryGroupId,
+        Guid managedNodeId,
+        CancellationToken cancellationToken)
+    {
+        return await InventoryGroupNodes.FirstOrDefaultAsync(
+            link => link.InventoryGroupId == inventoryGroupId && link.ManagedNodeId == managedNodeId,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ManagedNode>> ListActiveManagedNodesForInventoryGroupAsync(
+        Guid inventoryGroupId,
+        CancellationToken cancellationToken)
+    {
+        return await InventoryGroupNodes
+            .Where(link => link.InventoryGroupId == inventoryGroupId)
+            .Join(
+                ManagedNodes,
+                link => link.ManagedNodeId,
+                managedNode => managedNode.Id,
+                (_, managedNode) => managedNode)
+            .Where(managedNode => managedNode.Status == ManagedNodeStatus.Active)
+            .OrderBy(managedNode => managedNode.Name)
+            .ToListAsync(cancellationToken);
+    }
+
     public void AddUser(User user)
     {
         Users.Add(user);
@@ -112,6 +240,31 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
     public void AddCustomerMembership(CustomerMembership customerMembership)
     {
         CustomerMemberships.Add(customerMembership);
+    }
+
+    public void AddControlNode(ControlNode controlNode)
+    {
+        ControlNodes.Add(controlNode);
+    }
+
+    public void AddManagedNode(ManagedNode managedNode)
+    {
+        ManagedNodes.Add(managedNode);
+    }
+
+    public void AddInventoryGroup(InventoryGroup inventoryGroup)
+    {
+        InventoryGroups.Add(inventoryGroup);
+    }
+
+    public void AddInventoryGroupNode(InventoryGroupNode inventoryGroupNode)
+    {
+        InventoryGroupNodes.Add(inventoryGroupNode);
+    }
+
+    public void RemoveInventoryGroupNode(InventoryGroupNode inventoryGroupNode)
+    {
+        InventoryGroupNodes.Remove(inventoryGroupNode);
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

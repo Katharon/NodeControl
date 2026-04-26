@@ -7,7 +7,10 @@ using NodeControl.Application.Abstractions.Authorization;
 using NodeControl.Application.Abstractions.Auth;
 using NodeControl.Application.Authorization;
 using NodeControl.Application.Auth;
+using NodeControl.Application.ControlNodes;
 using NodeControl.Application.Customers;
+using NodeControl.Application.InventoryGroups;
+using NodeControl.Application.ManagedNodes;
 using NodeControl.Application.Memberships;
 using NodeControl.Infrastructure;
 
@@ -34,6 +37,10 @@ public static class DependencyInjection
         services.AddScoped<ICustomerAuthorizationService, CustomerAuthorizationService>();
         services.AddScoped<CustomerService>();
         services.AddScoped<CustomerMembershipService>();
+        services.AddScoped<ControlNodeService>();
+        services.AddScoped<ManagedNodeService>();
+        services.AddScoped<InventoryGroupService>();
+        services.AddScoped<InventoryPreviewService>();
 
         services.AddNodeControlInfrastructure(configuration);
 

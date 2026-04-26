@@ -125,6 +125,203 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
             b.ToTable("customer_memberships", (string)null);
         });
 
+        modelBuilder.Entity("NodeControl.Domain.Inventories.InventoryGroup", b =>
+        {
+            b.Property<Guid>("Id")
+                .ValueGeneratedNever()
+                .HasColumnType("uuid")
+                .HasColumnName("id");
+
+            b.Property<DateTimeOffset?>("ArchivedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("archived_at");
+
+            b.Property<Guid>("CustomerId")
+                .HasColumnType("uuid")
+                .HasColumnName("customer_id");
+
+            b.Property<DateTimeOffset>("CreatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("created_at");
+
+            b.Property<string>("Description")
+                .HasMaxLength(1000)
+                .HasColumnType("character varying(1000)")
+                .HasColumnName("description");
+
+            b.Property<string>("Name")
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasColumnType("character varying(100)")
+                .HasColumnName("name");
+
+            b.Property<DateTimeOffset?>("UpdatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("updated_at");
+
+            b.HasKey("Id")
+                .HasName("pk_inventory_groups");
+
+            b.HasIndex("CustomerId", "Name")
+                .IsUnique()
+                .HasDatabaseName("ux_inventory_groups_customer_id_name");
+
+            b.ToTable("inventory_groups", (string)null);
+        });
+
+        modelBuilder.Entity("NodeControl.Domain.Inventories.InventoryGroupNode", b =>
+        {
+            b.Property<Guid>("InventoryGroupId")
+                .HasColumnType("uuid")
+                .HasColumnName("inventory_group_id");
+
+            b.Property<Guid>("ManagedNodeId")
+                .HasColumnType("uuid")
+                .HasColumnName("managed_node_id");
+
+            b.Property<DateTimeOffset>("CreatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("created_at");
+
+            b.HasKey("InventoryGroupId", "ManagedNodeId")
+                .HasName("pk_inventory_group_nodes");
+
+            b.HasIndex("ManagedNodeId")
+                .HasDatabaseName("ix_inventory_group_nodes_managed_node_id");
+
+            b.ToTable("inventory_group_nodes", (string)null);
+        });
+
+        modelBuilder.Entity("NodeControl.Domain.Nodes.ControlNode", b =>
+        {
+            b.Property<Guid>("Id")
+                .ValueGeneratedNever()
+                .HasColumnType("uuid")
+                .HasColumnName("id");
+
+            b.Property<DateTimeOffset?>("ArchivedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("archived_at");
+
+            b.Property<DateTimeOffset>("CreatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("created_at");
+
+            b.Property<Guid>("CustomerId")
+                .HasColumnType("uuid")
+                .HasColumnName("customer_id");
+
+            b.Property<string>("Description")
+                .HasMaxLength(1000)
+                .HasColumnType("character varying(1000)")
+                .HasColumnName("description");
+
+            b.Property<string>("Hostname")
+                .IsRequired()
+                .HasMaxLength(253)
+                .HasColumnType("character varying(253)")
+                .HasColumnName("hostname");
+
+            b.Property<string>("Name")
+                .IsRequired()
+                .HasMaxLength(200)
+                .HasColumnType("character varying(200)")
+                .HasColumnName("name");
+
+            b.Property<int>("SshPort")
+                .HasColumnType("integer")
+                .HasColumnName("ssh_port");
+
+            b.Property<string>("Status")
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasColumnType("character varying(40)")
+                .HasColumnName("status");
+
+            b.Property<DateTimeOffset?>("UpdatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("updated_at");
+
+            b.HasKey("Id")
+                .HasName("pk_control_nodes");
+
+            b.HasIndex("CustomerId", "Name")
+                .IsUnique()
+                .HasDatabaseName("ux_control_nodes_customer_id_name");
+
+            b.ToTable("control_nodes", (string)null);
+        });
+
+        modelBuilder.Entity("NodeControl.Domain.Nodes.ManagedNode", b =>
+        {
+            b.Property<Guid>("Id")
+                .ValueGeneratedNever()
+                .HasColumnType("uuid")
+                .HasColumnName("id");
+
+            b.Property<DateTimeOffset?>("ArchivedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("archived_at");
+
+            b.Property<DateTimeOffset>("CreatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("created_at");
+
+            b.Property<Guid>("CustomerId")
+                .HasColumnType("uuid")
+                .HasColumnName("customer_id");
+
+            b.Property<string>("Description")
+                .HasMaxLength(1000)
+                .HasColumnType("character varying(1000)")
+                .HasColumnName("description");
+
+            b.Property<string>("Environment")
+                .HasMaxLength(100)
+                .HasColumnType("character varying(100)")
+                .HasColumnName("environment");
+
+            b.Property<string>("Hostname")
+                .IsRequired()
+                .HasMaxLength(253)
+                .HasColumnType("character varying(253)")
+                .HasColumnName("hostname");
+
+            b.Property<string>("Name")
+                .IsRequired()
+                .HasMaxLength(200)
+                .HasColumnType("character varying(200)")
+                .HasColumnName("name");
+
+            b.Property<string>("OperatingSystem")
+                .HasMaxLength(100)
+                .HasColumnType("character varying(100)")
+                .HasColumnName("operating_system");
+
+            b.Property<int>("SshPort")
+                .HasColumnType("integer")
+                .HasColumnName("ssh_port");
+
+            b.Property<string>("Status")
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasColumnType("character varying(40)")
+                .HasColumnName("status");
+
+            b.Property<DateTimeOffset?>("UpdatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("updated_at");
+
+            b.HasKey("Id")
+                .HasName("pk_managed_nodes");
+
+            b.HasIndex("CustomerId", "Name")
+                .IsUnique()
+                .HasDatabaseName("ux_managed_nodes_customer_id_name");
+
+            b.ToTable("managed_nodes", (string)null);
+        });
+
         modelBuilder.Entity("NodeControl.Domain.Users.ExternalIdentity", b =>
         {
             b.Property<Guid>("Id")
@@ -266,6 +463,53 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
             b.Navigation("Customer");
 
             b.Navigation("User");
+        });
+
+        modelBuilder.Entity("NodeControl.Domain.Inventories.InventoryGroup", b =>
+        {
+            b.HasOne("NodeControl.Domain.Customers.Customer", null)
+                .WithMany()
+                .HasForeignKey("CustomerId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("fk_inventory_groups_customers_customer_id");
+        });
+
+        modelBuilder.Entity("NodeControl.Domain.Inventories.InventoryGroupNode", b =>
+        {
+            b.HasOne("NodeControl.Domain.Inventories.InventoryGroup", null)
+                .WithMany()
+                .HasForeignKey("InventoryGroupId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("fk_inventory_group_nodes_inventory_groups_inventory_group_id");
+
+            b.HasOne("NodeControl.Domain.Nodes.ManagedNode", null)
+                .WithMany()
+                .HasForeignKey("ManagedNodeId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("fk_inventory_group_nodes_managed_nodes_managed_node_id");
+        });
+
+        modelBuilder.Entity("NodeControl.Domain.Nodes.ControlNode", b =>
+        {
+            b.HasOne("NodeControl.Domain.Customers.Customer", null)
+                .WithMany()
+                .HasForeignKey("CustomerId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("fk_control_nodes_customers_customer_id");
+        });
+
+        modelBuilder.Entity("NodeControl.Domain.Nodes.ManagedNode", b =>
+        {
+            b.HasOne("NodeControl.Domain.Customers.Customer", null)
+                .WithMany()
+                .HasForeignKey("CustomerId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("fk_managed_nodes_customers_customer_id");
         });
     }
 }

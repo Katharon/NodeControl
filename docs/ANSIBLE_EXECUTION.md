@@ -145,6 +145,14 @@ all:
 
 Do not overbuild dynamic inventory in the MVP.
 
+Slice 3 implements target structure and a read-only inventory preview only.
+
+- Control Nodes are modeled as customer-scoped records, but NodeControl does not test SSH connectivity in this slice.
+- Managed Nodes are modeled as customer-scoped records and can be linked to Inventory Groups.
+- Inventory Groups generate a YAML preview from active Managed Nodes.
+- Archived Managed Nodes are excluded from preview output.
+- The API still must not execute Ansible; execution remains a later Worker concern.
+
 ## Variable Sets
 
 VariableSets may be stored as YAML or JSON content.

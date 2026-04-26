@@ -1,6 +1,7 @@
 "use client";
 
 import GroupsIcon from "@mui/icons-material/Groups";
+import HubIcon from "@mui/icons-material/Hub";
 import {
   Alert,
   Button,
@@ -52,6 +53,7 @@ export function CustomerDetailsCard({ customerId }: CustomerDetailsCardProps) {
   const customer = customerQuery.data;
   const canManageCustomer = hasPermission(customer.permissions, "ManageCustomer");
   const canManageMemberships = hasPermission(customer.permissions, "ManageMemberships");
+  const canViewNodes = hasPermission(customer.permissions, "ViewNodes");
 
   return (
     <Paper sx={{ p: 3 }}>
@@ -67,15 +69,22 @@ export function CustomerDetailsCard({ customerId }: CustomerDetailsCardProps) {
             <Typography color="text.secondary">{customer.slug}</Typography>
             {customer.description ? <Typography>{customer.description}</Typography> : null}
           </Stack>
-          {canManageMemberships ? (
-            <Button
-              startIcon={<GroupsIcon />}
-              href={`/customers/${customer.id}/memberships`}
-              variant="outlined"
-            >
-              Memberships
-            </Button>
-          ) : null}
+          <Stack direction="row" sx={{ gap: 1 }}>
+            {canViewNodes ? (
+              <Button startIcon={<HubIcon />} href={`/customers/${customer.id}/nodes`} variant="outlined">
+                Nodes
+              </Button>
+            ) : null}
+            {canManageMemberships ? (
+              <Button
+                startIcon={<GroupsIcon />}
+                href={`/customers/${customer.id}/memberships`}
+                variant="outlined"
+              >
+                Memberships
+              </Button>
+            ) : null}
+          </Stack>
         </Stack>
 
         {canManageCustomer ? (
