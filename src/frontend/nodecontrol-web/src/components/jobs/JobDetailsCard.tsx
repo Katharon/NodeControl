@@ -31,11 +31,11 @@ export function JobDetailsCard({ customerId, jobId }: JobDetailsCardProps) {
   }
 
   if (customerQuery.isError) {
-    return <Alert severity="error">This job could not be loaded.</Alert>;
+    return <Alert severity="error">Diese Action konnte nicht geladen werden.</Alert>;
   }
 
   if (!canViewJobs) {
-    return <Alert severity="warning">You do not have permission to view jobs for this customer.</Alert>;
+    return <Alert severity="warning">Du hast keine Berechtigung, Actions für diesen Kunden anzusehen.</Alert>;
   }
 
   if (jobQuery.isPending) {
@@ -43,7 +43,7 @@ export function JobDetailsCard({ customerId, jobId }: JobDetailsCardProps) {
   }
 
   if (jobQuery.isError) {
-    return <Alert severity="error">This job could not be loaded.</Alert>;
+    return <Alert severity="error">Diese Action konnte nicht geladen werden.</Alert>;
   }
 
   const canManageJobs = hasPermission(customerQuery.data.permissions, "ManagePlaybooks");
@@ -67,8 +67,8 @@ export function JobDetailsCard({ customerId, jobId }: JobDetailsCardProps) {
             submitLabel="Save job"
           />
         ) : (
-          <Button href={`/customers/${customerId}/job-runs`} sx={{ alignSelf: "flex-start" }} variant="outlined">
-            Job runs
+          <Button href={`/customers/${customerId}/runs`} sx={{ alignSelf: "flex-start" }} variant="outlined">
+            Runs
           </Button>
         )}
       </Stack>

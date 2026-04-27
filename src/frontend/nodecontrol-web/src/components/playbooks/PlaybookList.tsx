@@ -78,7 +78,7 @@ export function PlaybookList({ customerId, canManagePlaybooks }: PlaybookListPro
                   </Stack>
                 </Stack>
                 <Stack direction="row" sx={{ gap: 1 }}>
-                  <Button endIcon={<OpenInNewIcon />} href={`/customers/${customerId}/playbooks/${playbook.id}`} variant="outlined">Open</Button>
+                  <Button endIcon={<OpenInNewIcon />} href={`/customers/${customerId}/playbooks/${playbook.id}`} variant="outlined">Öffnen</Button>
                   {canManagePlaybooks ? (
                     <Button color="warning" disabled={archiveMutation.isPending} onClick={() => archiveMutation.mutate(playbook.id)} startIcon={<ArchiveIcon />} variant="outlined">
                       Archive

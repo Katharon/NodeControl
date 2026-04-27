@@ -18,13 +18,13 @@ export function RetryJobRunButton({ customerId, jobRunId }: RetryJobRunButtonPro
     mutationFn: () => retryJobRun(customerId, jobRunId),
     onSuccess: async (jobRun) => {
       await queryClient.invalidateQueries({ queryKey: ["job-runs", customerId] });
-      router.push(`/customers/${customerId}/job-runs/${jobRun.id}`);
+      router.push(`/customers/${customerId}/runs/${jobRun.id}`);
     },
   });
 
   return (
     <Button disabled={mutation.isPending} onClick={() => mutation.mutate()} startIcon={<ReplayIcon />} variant="contained">
-      Retry
+      Retry run
     </Button>
   );
 }

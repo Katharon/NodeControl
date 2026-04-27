@@ -6,6 +6,17 @@ The project is designed for IT service providers, managed service providers, sys
 
 NodeControl is not intended to replace Ansible. It acts as a control plane around Ansible: customer separation, permissions, inventory management, playbook execution, scheduled jobs, job history, logs, and auditability.
 
+## Product Terminology
+
+The backend keeps the pragmatic domain names used by the execution model, while the frontend presents product-facing labels:
+
+- `Job` is shown as **Action**.
+- `JobRun` is shown as **Run**.
+- `ManagedNode` is shown as **Host**.
+- `ControlNode` is shown as **Control Host**.
+- `InventoryGroup` is shown as **Inventar**.
+- `Customer` is shown as **Kunde** where the UI uses German labels.
+
 ## Product Goal
 
 NodeControl should become a product-grade portfolio project and a realistic self-hosted B2B product.

@@ -52,7 +52,7 @@ export function JobScheduleForm({ customerId, schedule, submitLabel, onSubmit }:
   }
 
   if (jobsQuery.isError) {
-    return <Alert severity="error">Schedule form data could not be loaded.</Alert>;
+    return <Alert severity="error">Schedule-Formulardaten konnten nicht geladen werden.</Alert>;
   }
 
   return (
@@ -73,7 +73,7 @@ export function JobScheduleForm({ customerId, schedule, submitLabel, onSubmit }:
       <TextField error={Boolean(errors.name)} helperText={errors.name?.message} label="Name" {...register("name")} />
       <TextField error={Boolean(errors.slug)} helperText={errors.slug?.message} label="Slug" {...register("slug")} />
       <TextField label="Description" minRows={2} multiline {...register("description")} />
-      <TextField error={Boolean(errors.jobId)} helperText={errors.jobId?.message} label="Job" select {...register("jobId")}>
+      <TextField error={Boolean(errors.jobId)} helperText={errors.jobId?.message} label="Action" select {...register("jobId")}>
         {jobsQuery.data.map((job) => <MenuItem key={job.id} value={job.id}>{job.name}</MenuItem>)}
       </TextField>
       <TextField

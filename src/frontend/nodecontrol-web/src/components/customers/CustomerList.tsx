@@ -58,7 +58,7 @@ export function CustomerList() {
       customersQuery.error instanceof ApiError && customersQuery.error.status === 401;
     return (
       <Alert severity={unauthorized ? "info" : "error"}>
-        {unauthorized ? "Sign in to view customers." : "Customers could not be loaded."}
+        {unauthorized ? "Melde dich an, um Kunden zu sehen." : "Kunden konnten nicht geladen werden."}
       </Alert>
     );
   }
@@ -73,21 +73,21 @@ export function CustomerList() {
       >
         <Box>
           <Typography component="h1" variant="h4">
-            Customers
+            Kunden
           </Typography>
           <Typography color="text.secondary">
-            Customer spaces available to your account.
+            Kundenbereiche, auf die dein Account Zugriff hat.
           </Typography>
         </Box>
         {canCreate ? (
           <Button startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} variant="contained">
-            New customer
+            Neuer Kunde
           </Button>
         ) : null}
       </Stack>
 
       {customersQuery.data.length === 0 ? (
-        <Alert severity="info">No customers are available for your account.</Alert>
+        <Alert severity="info">Für deinen Account sind keine Kunden verfügbar.</Alert>
       ) : (
         <Paper>
           <Stack divider={<Divider />}>
@@ -116,7 +116,7 @@ export function CustomerList() {
                   href={`/customers/${customer.id}`}
                   variant="outlined"
                 >
-                  Open
+                  Öffnen
                 </Button>
               </Stack>
             ))}
@@ -125,13 +125,13 @@ export function CustomerList() {
       )}
 
       <Dialog fullWidth maxWidth="sm" onClose={() => setCreateOpen(false)} open={createOpen}>
-        <DialogTitle>Create customer</DialogTitle>
+        <DialogTitle>Neuer Kunde</DialogTitle>
         <DialogContent>
           <CustomerForm
             onSubmit={async (input) => {
               await createMutation.mutateAsync(input);
             }}
-            submitLabel="Create customer"
+            submitLabel="Kunde anlegen"
           />
         </DialogContent>
       </Dialog>

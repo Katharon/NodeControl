@@ -55,7 +55,7 @@ export function JobList({ customerId }: JobListProps) {
   }
 
   if (!canViewJobs) {
-    return <Alert severity="warning">You do not have permission to view jobs for this customer.</Alert>;
+    return <Alert severity="warning">Du hast keine Berechtigung, Actions für diesen Kunden anzusehen.</Alert>;
   }
 
   if (jobsQuery.isPending) {
@@ -63,7 +63,7 @@ export function JobList({ customerId }: JobListProps) {
   }
 
   if (jobsQuery.isError) {
-    return <Alert severity="error">Jobs could not be loaded.</Alert>;
+    return <Alert severity="error">Actions konnten nicht geladen werden.</Alert>;
   }
 
   const canManageJobs = hasPermission(customerQuery.data.permissions, "ManagePlaybooks");
@@ -72,14 +72,19 @@ export function JobList({ customerId }: JobListProps) {
   return (
     <Stack sx={{ gap: 2 }}>
       <Stack direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
-        <Typography component="h1" variant="h4">Jobs</Typography>
+        <Stack>
+          <Typography component="h1" variant="h4">Actions</Typography>
+          <Typography color="text.secondary">
+            Wiederverwendbare Ausführungsdefinitionen für Runs.
+          </Typography>
+        </Stack>
         {canManageJobs ? (
-          <Button startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} variant="contained">New job</Button>
+          <Button startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} variant="contained">Neue Action</Button>
         ) : null}
       </Stack>
 
       {jobsQuery.data.length === 0 ? (
-        <Alert severity="info">No jobs are defined.</Alert>
+        <Alert severity="info">Noch keine Actions definiert.</Alert>
       ) : (
         <Paper>
           <Stack divider={<Divider />}>
@@ -93,7 +98,7 @@ export function JobList({ customerId }: JobListProps) {
                   </Stack>
                 </Stack>
                 <Stack direction="row" sx={{ gap: 1 }}>
-                  <Button endIcon={<OpenInNewIcon />} href={`/customers/${customerId}/jobs/${job.id}`} variant="outlined">Open</Button>
+                  <Button endIcon={<OpenInNewIcon />} href={`/customers/${customerId}/actions/${job.id}`} variant="outlined">Öffnen</Button>
                   {canRunJobs ? <RunJobButton customerId={customerId} jobId={job.id} /> : null}
                   {canManageJobs ? (
                     <Button color="warning" disabled={archiveMutation.isPending} onClick={() => archiveMutation.mutate(job.id)} startIcon={<ArchiveIcon />} variant="outlined">
@@ -108,12 +113,12 @@ export function JobList({ customerId }: JobListProps) {
       )}
 
       <Dialog fullWidth maxWidth="md" onClose={() => setCreateOpen(false)} open={createOpen}>
-        <DialogTitle>Create job</DialogTitle>
+        <DialogTitle>Neue Action</DialogTitle>
         <DialogContent>
           <JobForm
             customerId={customerId}
             onSubmit={async (input) => { await createMutation.mutateAsync(input); }}
-            submitLabel="Create job"
+            submitLabel="Action anlegen"
           />
         </DialogContent>
       </Dialog>

@@ -27,9 +27,10 @@ import {
 type ManagedNodeListProps = {
   customerId: string;
   canManageNodes: boolean;
+  showCreateButton?: boolean;
 };
 
-export function ManagedNodeList({ customerId, canManageNodes }: ManagedNodeListProps) {
+export function ManagedNodeList({ customerId, canManageNodes, showCreateButton = true }: ManagedNodeListProps) {
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const managedNodesQuery = useQuery({
@@ -57,24 +58,24 @@ export function ManagedNodeList({ customerId, canManageNodes }: ManagedNodeListP
   }
 
   if (managedNodesQuery.isError) {
-    return <Alert severity="error">Managed nodes could not be loaded.</Alert>;
+    return <Alert severity="error">Hosts konnten nicht geladen werden.</Alert>;
   }
 
   return (
     <Stack sx={{ gap: 2 }}>
       <Stack direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
         <Typography component="h2" variant="h5">
-          Managed Nodes
+          Hosts
         </Typography>
-        {canManageNodes ? (
+        {canManageNodes && showCreateButton ? (
           <Button startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} variant="contained">
-            New managed node
+            Neuer Host
           </Button>
         ) : null}
       </Stack>
 
       {managedNodesQuery.data.length === 0 ? (
-        <Alert severity="info">No managed nodes are defined.</Alert>
+        <Alert severity="info">Noch keine Hosts definiert.</Alert>
       ) : (
         <Paper>
           <Stack divider={<Divider />}>
@@ -89,13 +90,11 @@ export function ManagedNodeList({ customerId, canManageNodes }: ManagedNodeListP
                   <Stack>
                     <Typography sx={{ fontWeight: 700 }}>{managedNode.name}</Typography>
                     <Typography color="text.secondary" variant="body2">
-                      {managedNode.hostname}:{managedNode.sshPort}
+                      Hostname: {managedNode.hostname}:{managedNode.sshPort}
                     </Typography>
-                    {managedNode.environment ? (
-                      <Typography color="text.secondary" variant="body2">
-                        {managedNode.environment}
-                      </Typography>
-                    ) : null}
+                    <Typography color="text.secondary" variant="body2">
+                      Typ: Host · Plattform: {managedNode.operatingSystem ?? "Nicht gesetzt"} · Status: {managedNode.status}
+                    </Typography>
                   </Stack>
                 </Stack>
                 {canManageNodes ? (
@@ -116,13 +115,13 @@ export function ManagedNodeList({ customerId, canManageNodes }: ManagedNodeListP
       )}
 
       <Dialog fullWidth maxWidth="sm" onClose={() => setCreateOpen(false)} open={createOpen}>
-        <DialogTitle>Create managed node</DialogTitle>
+        <DialogTitle>Neuer Host</DialogTitle>
         <DialogContent>
           <ManagedNodeForm
             onSubmit={async (input) => {
               await createMutation.mutateAsync(input);
             }}
-            submitLabel="Create managed node"
+            submitLabel="Host anlegen"
           />
         </DialogContent>
       </Dialog>

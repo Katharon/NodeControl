@@ -70,12 +70,12 @@ export function VariableSetForm({ variableSet, submitLabel, onSubmit }: Variable
       </TextField>
       <FormControlLabel
         control={<Switch checked={Boolean(containsSensitiveValues)} {...register("containsSensitiveValues")} />}
-        label="Contains sensitive values"
+        label="Enthält sensible Werte"
       />
       <TextField
         error={Boolean(errors.content)}
         helperText={errors.content?.message}
-        label="Content"
+        label="Inhalt"
         minRows={14}
         multiline
         {...register("content")}

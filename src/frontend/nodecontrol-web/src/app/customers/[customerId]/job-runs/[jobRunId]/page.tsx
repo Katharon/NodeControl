@@ -1,7 +1,7 @@
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import { Box, Button, Container, Stack } from "@mui/material";
+import { Button, Stack } from "@mui/material";
 import { JobRunDetailsCard } from "@/components/jobRuns/JobRunDetailsCard";
-import { AppProviders } from "@/lib/app/AppProviders";
+import { AppPage } from "@/components/layout/AppPage";
 
 export const dynamic = "force-dynamic";
 
@@ -16,22 +16,18 @@ export default async function JobRunDetailsPage({ params }: JobRunDetailsPagePro
   const { customerId, jobRunId } = await params;
 
   return (
-    <AppProviders>
-      <Box component="main" sx={{ minHeight: "100vh", py: 6 }}>
-        <Container maxWidth="lg">
-          <Stack sx={{ gap: 2 }}>
-            <Button
-              href={`/customers/${customerId}/job-runs`}
-              startIcon={<ArrowBackIcon />}
-              sx={{ alignSelf: "flex-start" }}
-              variant="text"
-            >
-              Job Runs
-            </Button>
-            <JobRunDetailsCard customerId={customerId} jobRunId={jobRunId} />
-          </Stack>
-        </Container>
-      </Box>
-    </AppProviders>
+    <AppPage>
+      <Stack sx={{ gap: 2 }}>
+        <Button
+          href={`/customers/${customerId}/runs`}
+          startIcon={<ArrowBackIcon />}
+          sx={{ alignSelf: "flex-start" }}
+          variant="text"
+        >
+          Runs
+        </Button>
+        <JobRunDetailsCard customerId={customerId} jobRunId={jobRunId} />
+      </Stack>
+    </AppPage>
   );
 }

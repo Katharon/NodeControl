@@ -53,7 +53,7 @@ export function MembershipList({ customerId }: MembershipListProps) {
       <Paper sx={{ p: 3 }}>
         <Stack direction="row" sx={{ alignItems: "center", gap: 2 }}>
           <CircularProgress size={22} />
-          <Typography>Loading memberships</Typography>
+          <Typography>Lade Benutzer</Typography>
         </Stack>
       </Paper>
     );
@@ -65,8 +65,8 @@ export function MembershipList({ customerId }: MembershipListProps) {
     return (
       <Alert severity={forbidden ? "warning" : "error"}>
         {forbidden
-          ? "You do not have permission to manage memberships for this customer."
-          : "Memberships could not be loaded."}
+          ? "Du hast keine Berechtigung, Benutzer für diesen Kunden zu verwalten."
+          : "Benutzer konnten nicht geladen werden."}
       </Alert>
     );
   }
@@ -76,7 +76,7 @@ export function MembershipList({ customerId }: MembershipListProps) {
       <Paper sx={{ p: 3 }}>
         <Stack sx={{ gap: 2 }}>
           <Typography component="h1" variant="h4">
-            Memberships
+            Benutzer
           </Typography>
           <MembershipForm
             onSubmit={async (input) => {

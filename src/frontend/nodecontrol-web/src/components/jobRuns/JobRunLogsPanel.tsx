@@ -27,7 +27,7 @@ export function JobRunLogsPanel({ customerId, jobRunId, status }: JobRunLogsPane
         <Stack direction={{ xs: "column", sm: "row" }} sx={{ alignItems: { sm: "center" }, justifyContent: "space-between", gap: 1.5 }}>
           <Stack>
             <Typography component="h2" variant="h5">Logs</Typography>
-            <Typography color="text.secondary" variant="body2">Latest persisted JobRun log entries</Typography>
+            <Typography color="text.secondary" variant="body2">Latest persisted run log entries</Typography>
           </Stack>
           <Button
             disabled={logsQuery.isFetching}

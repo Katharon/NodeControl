@@ -20,7 +20,7 @@ export function InventoryPreviewCard({ customerId, inventoryGroupId }: Inventory
   }
 
   if (previewQuery.isError) {
-    return <Alert severity="error">Inventory preview could not be loaded.</Alert>;
+    return <Alert severity="error">Inventarvorschau konnte nicht geladen werden.</Alert>;
   }
 
   return (

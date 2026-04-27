@@ -1,7 +1,7 @@
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import { Box, Button, Container, Stack } from "@mui/material";
+import { Button, Stack } from "@mui/material";
 import { JobRunList } from "@/components/jobRuns/JobRunList";
-import { AppProviders } from "@/lib/app/AppProviders";
+import { AppPage } from "@/components/layout/AppPage";
 
 export const dynamic = "force-dynamic";
 
@@ -15,22 +15,18 @@ export default async function JobRunsPage({ params }: JobRunsPageProps) {
   const { customerId } = await params;
 
   return (
-    <AppProviders>
-      <Box component="main" sx={{ minHeight: "100vh", py: 6 }}>
-        <Container maxWidth="lg">
-          <Stack sx={{ gap: 2 }}>
-            <Button
-              href={`/customers/${customerId}`}
-              startIcon={<ArrowBackIcon />}
-              sx={{ alignSelf: "flex-start" }}
-              variant="text"
-            >
-              Customer
-            </Button>
-            <JobRunList customerId={customerId} />
-          </Stack>
-        </Container>
-      </Box>
-    </AppProviders>
+    <AppPage>
+      <Stack sx={{ gap: 2 }}>
+        <Button
+          href={`/customers/${customerId}`}
+          startIcon={<ArrowBackIcon />}
+          sx={{ alignSelf: "flex-start" }}
+          variant="text"
+        >
+          Kunde
+        </Button>
+        <JobRunList customerId={customerId} />
+      </Stack>
+    </AppPage>
   );
 }

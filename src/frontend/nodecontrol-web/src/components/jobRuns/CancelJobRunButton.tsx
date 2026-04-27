@@ -30,7 +30,7 @@ export function CancelJobRunButton({ customerId, jobRunId, status }: CancelJobRu
       startIcon={<CancelIcon />}
       variant="outlined"
     >
-      {status === "Cancelling" ? "Cancelling" : "Cancel"}
+      {status === "Cancelling" ? "Cancelling" : "Cancel run"}
     </Button>
   );
 }

@@ -62,7 +62,7 @@ export function JobForm({ customerId, job, submitLabel, onSubmit }: JobFormProps
   }
 
   if (controlNodesQuery.isError || inventoryGroupsQuery.isError || playbooksQuery.isError || variableSetsQuery.isError) {
-    return <Alert severity="error">Job form data could not be loaded.</Alert>;
+    return <Alert severity="error">Action-Formulardaten konnten nicht geladen werden.</Alert>;
   }
 
   return (
@@ -85,16 +85,16 @@ export function JobForm({ customerId, job, submitLabel, onSubmit }: JobFormProps
       <TextField error={Boolean(errors.name)} helperText={errors.name?.message} label="Name" {...register("name")} />
       <TextField error={Boolean(errors.slug)} helperText={errors.slug?.message} label="Slug" {...register("slug")} />
       <TextField label="Description" minRows={2} multiline {...register("description")} />
-      <TextField error={Boolean(errors.controlNodeId)} helperText={errors.controlNodeId?.message} label="Control node" select {...register("controlNodeId")}>
+      <TextField error={Boolean(errors.controlNodeId)} helperText={errors.controlNodeId?.message} label="Control Host" select {...register("controlNodeId")}>
         {controlNodesQuery.data.map((controlNode) => <MenuItem key={controlNode.id} value={controlNode.id}>{controlNode.name}</MenuItem>)}
       </TextField>
-      <TextField error={Boolean(errors.inventoryGroupId)} helperText={errors.inventoryGroupId?.message} label="Inventory group" select {...register("inventoryGroupId")}>
+      <TextField error={Boolean(errors.inventoryGroupId)} helperText={errors.inventoryGroupId?.message} label="Inventar" select {...register("inventoryGroupId")}>
         {inventoryGroupsQuery.data.map((group) => <MenuItem key={group.id} value={group.id}>{group.name}</MenuItem>)}
       </TextField>
       <TextField error={Boolean(errors.playbookId)} helperText={errors.playbookId?.message} label="Playbook" select {...register("playbookId")}>
         {playbooksQuery.data.map((playbook) => <MenuItem key={playbook.id} value={playbook.id}>{playbook.name}</MenuItem>)}
       </TextField>
-      <TextField label="Variable set" select {...register("variableSetId")}>
+      <TextField label="Variablen" select {...register("variableSetId")}>
         <MenuItem value="">None</MenuItem>
         {variableSetsQuery.data.map((variableSet) => <MenuItem key={variableSet.id} value={variableSet.id}>{variableSet.name}</MenuItem>)}
       </TextField>

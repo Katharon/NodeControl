@@ -59,7 +59,7 @@ export function InventoryGroupList({ customerId, canManageNodes }: InventoryGrou
   }
 
   if (groupsQuery.isError) {
-    return <Alert severity="error">Inventory groups could not be loaded.</Alert>;
+    return <Alert severity="error">Inventare konnten nicht geladen werden.</Alert>;
   }
 
   const selectedGroup =
@@ -69,17 +69,17 @@ export function InventoryGroupList({ customerId, canManageNodes }: InventoryGrou
     <Stack sx={{ gap: 2 }}>
       <Stack direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
         <Typography component="h2" variant="h5">
-          Inventory Groups
+          Inventare
         </Typography>
         {canManageNodes ? (
           <Button startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} variant="contained">
-            New group
+            Neues Inventar
           </Button>
         ) : null}
       </Stack>
 
       {groupsQuery.data.length === 0 ? (
-        <Alert severity="info">No inventory groups are defined.</Alert>
+        <Alert severity="info">Noch keine Inventare definiert.</Alert>
       ) : (
         <Paper>
           <Stack divider={<Divider />}>
@@ -94,13 +94,13 @@ export function InventoryGroupList({ customerId, canManageNodes }: InventoryGrou
                   <Stack>
                     <Typography sx={{ fontWeight: 700 }}>{group.name}</Typography>
                     <Typography color="text.secondary" variant="body2">
-                      {group.managedNodeIds.length} managed nodes
+                      {group.managedNodeIds.length} Hosts
                     </Typography>
                   </Stack>
                 </Stack>
                 <Stack direction="row" sx={{ gap: 1 }}>
                   <Button onClick={() => setSelectedGroupId(group.id)} variant="outlined">
-                    Preview
+                    Vorschau
                   </Button>
                   {canManageNodes ? (
                     <Button
@@ -129,13 +129,13 @@ export function InventoryGroupList({ customerId, canManageNodes }: InventoryGrou
       ) : null}
 
       <Dialog fullWidth maxWidth="sm" onClose={() => setCreateOpen(false)} open={createOpen}>
-        <DialogTitle>Create inventory group</DialogTitle>
+        <DialogTitle>Neues Inventar</DialogTitle>
         <DialogContent>
           <InventoryGroupForm
             onSubmit={async (input) => {
               await createMutation.mutateAsync(input);
             }}
-            submitLabel="Create group"
+            submitLabel="Inventar anlegen"
           />
         </DialogContent>
       </Dialog>

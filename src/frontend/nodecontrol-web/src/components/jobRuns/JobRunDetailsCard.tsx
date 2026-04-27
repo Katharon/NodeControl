@@ -25,11 +25,11 @@ export function JobRunDetailsCard({ customerId, jobRunId }: JobRunDetailsCardPro
   }
 
   if (customerQuery.isError) {
-    return <Alert severity="error">This job run could not be loaded.</Alert>;
+    return <Alert severity="error">Dieser Run konnte nicht geladen werden.</Alert>;
   }
 
   if (!canViewJobRuns) {
-    return <Alert severity="warning">You do not have permission to view job runs for this customer.</Alert>;
+    return <Alert severity="warning">Du hast keine Berechtigung, Runs für diesen Kunden anzusehen.</Alert>;
   }
 
   if (jobRunQuery.isPending) {
@@ -37,7 +37,7 @@ export function JobRunDetailsCard({ customerId, jobRunId }: JobRunDetailsCardPro
   }
 
   if (jobRunQuery.isError) {
-    return <Alert severity="error">This job run could not be loaded.</Alert>;
+    return <Alert severity="error">Dieser Run konnte nicht geladen werden.</Alert>;
   }
 
   const jobRun = jobRunQuery.data;
@@ -57,7 +57,7 @@ export function JobRunDetailsCard({ customerId, jobRunId }: JobRunDetailsCardPro
         <Stack sx={{ gap: 2 }}>
           <Stack direction={{ xs: "column", sm: "row" }} sx={{ justifyContent: "space-between", gap: 2 }}>
             <Stack>
-              <Typography component="h1" variant="h4">Job Run</Typography>
+              <Typography component="h1" variant="h4">Run</Typography>
               <Typography color="text.secondary">{jobRun.id}</Typography>
             </Stack>
             <Stack direction="row" sx={{ alignItems: "center", gap: 1 }}>
@@ -73,7 +73,7 @@ export function JobRunDetailsCard({ customerId, jobRunId }: JobRunDetailsCardPro
           <Typography>Started: {jobRun.startedAt ? new Date(jobRun.startedAt).toLocaleString() : "Not started"}</Typography>
           <Typography>Finished: {jobRun.finishedAt ? new Date(jobRun.finishedAt).toLocaleString() : "Not finished"}</Typography>
           <Typography>Exit code: {jobRun.exitCode ?? "Not available"}</Typography>
-          <Typography>Job: {jobRun.jobId}</Typography>
+          <Typography>Action: {jobRun.jobId}</Typography>
           {jobRun.triggeredByUserId ? <Typography>Triggered by: {jobRun.triggeredByUserId}</Typography> : null}
           {jobRun.cancellationRequestedAtUtc ? (
             <Typography>Cancellation requested: {new Date(jobRun.cancellationRequestedAtUtc).toLocaleString()}</Typography>

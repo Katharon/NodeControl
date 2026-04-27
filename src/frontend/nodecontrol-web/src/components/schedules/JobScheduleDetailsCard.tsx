@@ -111,9 +111,9 @@ export function JobScheduleDetailsCard({ customerId, scheduleId }: JobScheduleDe
         </Stack>
 
         <Stack>
-          <Typography color="text.secondary" variant="body2">Last JobRun</Typography>
+          <Typography color="text.secondary" variant="body2">Last run</Typography>
           {schedule.lastJobRunId ? (
-            <Button href={`/customers/${customerId}/job-runs/${schedule.lastJobRunId}`} sx={{ alignSelf: "flex-start", px: 0 }} variant="text">
+            <Button href={`/customers/${customerId}/runs/${schedule.lastJobRunId}`} sx={{ alignSelf: "flex-start", px: 0 }} variant="text">
               {schedule.lastJobRunId}
             </Button>
           ) : (
@@ -128,7 +128,7 @@ export function JobScheduleDetailsCard({ customerId, scheduleId }: JobScheduleDe
               customerId={customerId}
               onSubmit={async (input) => { await updateMutation.mutateAsync(input); }}
               schedule={schedule}
-              submitLabel="Save schedule"
+              submitLabel="Schedule speichern"
             />
           </>
         ) : null}

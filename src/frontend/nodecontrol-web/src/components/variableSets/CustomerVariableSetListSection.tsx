@@ -27,7 +27,7 @@ export function CustomerVariableSetListSection({ customerId }: CustomerVariableS
   const canViewPlaybooks = hasPermission(customerQuery.data.permissions, "ViewPlaybooks");
 
   if (!canViewPlaybooks) {
-    return <Alert severity="warning">You do not have permission to view variable sets for this customer.</Alert>;
+    return <Alert severity="warning">Du hast keine Berechtigung, Variablen für diesen Kunden anzusehen.</Alert>;
   }
 
   return (

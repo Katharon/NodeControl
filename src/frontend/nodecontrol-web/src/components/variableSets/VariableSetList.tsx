@@ -47,19 +47,19 @@ export function VariableSetList({ customerId, canManagePlaybooks }: VariableSetL
   }
 
   if (variableSetsQuery.isError) {
-    return <Alert severity="error">Variable sets could not be loaded.</Alert>;
+    return <Alert severity="error">Variablen konnten nicht geladen werden.</Alert>;
   }
 
   return (
     <Stack sx={{ gap: 2 }}>
       <Stack direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
-        <Typography component="h1" variant="h4">Variable Sets</Typography>
+        <Typography component="h1" variant="h4">Variablen</Typography>
         {canManagePlaybooks ? (
-          <Button startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} variant="contained">New variable set</Button>
+          <Button startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} variant="contained">Neue Variablen</Button>
         ) : null}
       </Stack>
       {variableSetsQuery.data.length === 0 ? (
-        <Alert severity="info">No variable sets are defined.</Alert>
+        <Alert severity="info">Noch keine Variablen definiert.</Alert>
       ) : (
         <Paper>
           <Stack divider={<Divider />}>
@@ -73,7 +73,7 @@ export function VariableSetList({ customerId, canManagePlaybooks }: VariableSetL
                   </Stack>
                 </Stack>
                 <Stack direction="row" sx={{ gap: 1 }}>
-                  <Button endIcon={<OpenInNewIcon />} href={`/customers/${customerId}/variable-sets/${variableSet.id}`} variant="outlined">Open</Button>
+                  <Button endIcon={<OpenInNewIcon />} href={`/customers/${customerId}/variables/${variableSet.id}`} variant="outlined">Öffnen</Button>
                   {canManagePlaybooks ? (
                     <Button color="warning" disabled={archiveMutation.isPending} onClick={() => archiveMutation.mutate(variableSet.id)} startIcon={<ArchiveIcon />} variant="outlined">
                       Archive
@@ -86,9 +86,9 @@ export function VariableSetList({ customerId, canManagePlaybooks }: VariableSetL
         </Paper>
       )}
       <Dialog fullWidth maxWidth="md" onClose={() => setCreateOpen(false)} open={createOpen}>
-        <DialogTitle>Create variable set</DialogTitle>
+        <DialogTitle>Neue Variablen</DialogTitle>
         <DialogContent>
-          <VariableSetForm onSubmit={async (input) => { await createMutation.mutateAsync(input); }} submitLabel="Create variable set" />
+          <VariableSetForm onSubmit={async (input) => { await createMutation.mutateAsync(input); }} submitLabel="Variablen anlegen" />
         </DialogContent>
       </Dialog>
     </Stack>

@@ -77,12 +77,12 @@ export function JobScheduleList({ customerId }: JobScheduleListProps) {
       <Stack direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
         <Typography component="h1" variant="h4">Schedules</Typography>
         {canManageSchedules ? (
-          <Button startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} variant="contained">New schedule</Button>
+          <Button startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} variant="contained">Neuer Schedule</Button>
         ) : null}
       </Stack>
 
       {schedulesQuery.data.length === 0 ? (
-        <Alert severity="info">No schedules are defined.</Alert>
+        <Alert severity="info">Noch keine Schedules definiert.</Alert>
       ) : (
         <Paper>
           <Stack divider={<Divider />}>
@@ -100,7 +100,7 @@ export function JobScheduleList({ customerId }: JobScheduleListProps) {
                   </Stack>
                 </Stack>
                 <Stack direction="row" sx={{ gap: 1 }}>
-                  <Button endIcon={<OpenInNewIcon />} href={`/customers/${customerId}/schedules/${schedule.id}`} variant="outlined">Open</Button>
+                  <Button endIcon={<OpenInNewIcon />} href={`/customers/${customerId}/schedules/${schedule.id}`} variant="outlined">Öffnen</Button>
                   {canManageSchedules ? (
                     <Button color="warning" disabled={archiveMutation.isPending} onClick={() => archiveMutation.mutate(schedule.id)} startIcon={<ArchiveIcon />} variant="outlined">
                       Archive
@@ -114,12 +114,12 @@ export function JobScheduleList({ customerId }: JobScheduleListProps) {
       )}
 
       <Dialog fullWidth maxWidth="md" onClose={() => setCreateOpen(false)} open={createOpen}>
-        <DialogTitle>Create schedule</DialogTitle>
+        <DialogTitle>Neuer Schedule</DialogTitle>
         <DialogContent>
           <JobScheduleForm
             customerId={customerId}
             onSubmit={async (input) => { await createMutation.mutateAsync(input); }}
-            submitLabel="Create schedule"
+            submitLabel="Schedule anlegen"
           />
         </DialogContent>
       </Dialog>

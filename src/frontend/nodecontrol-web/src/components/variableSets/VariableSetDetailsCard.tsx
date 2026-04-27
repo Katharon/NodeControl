@@ -40,7 +40,7 @@ export function VariableSetDetailsCard({ customerId, variableSetId, canManagePla
   }
 
   if (variableSetQuery.isError) {
-    return <Alert severity="error">This variable set could not be loaded.</Alert>;
+    return <Alert severity="error">Diese Variablen konnten nicht geladen werden.</Alert>;
   }
 
   return (
@@ -52,7 +52,7 @@ export function VariableSetDetailsCard({ customerId, variableSetId, canManagePla
             <Typography color="text.secondary">{variableSetQuery.data.slug}</Typography>
           </Stack>
           <Button disabled={validateMutation.isPending} onClick={() => validateMutation.mutate()} startIcon={<CheckIcon />} variant="outlined">
-            Validate
+            Validieren
           </Button>
         </Stack>
         <VariableSetValidationResult result={validationResult} />
@@ -60,7 +60,7 @@ export function VariableSetDetailsCard({ customerId, variableSetId, canManagePla
           <VariableSetForm
             variableSet={variableSetQuery.data}
             onSubmit={async (input) => { await updateMutation.mutateAsync(input); }}
-            submitLabel="Save variable set"
+            submitLabel="Variablen speichern"
           />
         ) : null}
       </Stack>

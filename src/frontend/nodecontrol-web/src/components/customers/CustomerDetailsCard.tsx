@@ -79,18 +79,18 @@ export function CustomerDetailsCard({ customerId }: CustomerDetailsCardProps) {
           </Stack>
           <Stack direction="row" sx={{ gap: 1 }}>
             {canViewNodes ? (
-              <Button startIcon={<HubIcon />} href={`/customers/${customer.id}/nodes`} variant="outlined">
-                Nodes
+              <Button startIcon={<HubIcon />} href={`/customers/${customer.id}/hosts`} variant="outlined">
+                Hosts
               </Button>
             ) : null}
             {canViewJobs ? (
-              <Button startIcon={<WorkIcon />} href={`/customers/${customer.id}/jobs`} variant="outlined">
-                Jobs
+              <Button startIcon={<WorkIcon />} href={`/customers/${customer.id}/actions`} variant="outlined">
+                Actions
               </Button>
             ) : null}
             {canViewJobRuns ? (
-              <Button startIcon={<ReceiptLongIcon />} href={`/customers/${customer.id}/job-runs`} variant="outlined">
-                Job Runs
+              <Button startIcon={<ReceiptLongIcon />} href={`/customers/${customer.id}/runs`} variant="outlined">
+                Runs
               </Button>
             ) : null}
             {canViewSchedules ? (
@@ -109,7 +109,7 @@ export function CustomerDetailsCard({ customerId }: CustomerDetailsCardProps) {
                 href={`/customers/${customer.id}/memberships`}
                 variant="outlined"
               >
-                Memberships
+                Benutzer
               </Button>
             ) : null}
           </Stack>
@@ -123,7 +123,7 @@ export function CustomerDetailsCard({ customerId }: CustomerDetailsCardProps) {
               onSubmit={async (input) => {
                 await updateMutation.mutateAsync(input);
               }}
-              submitLabel="Save customer"
+              submitLabel="Kunde speichern"
             />
           </>
         ) : null}

@@ -62,7 +62,7 @@ export function InventoryGroupDetails({
   });
 
   if (managedNodesQuery.isError) {
-    return <Alert severity="error">Managed nodes could not be loaded for this group.</Alert>;
+    return <Alert severity="error">Hosts konnten für dieses Inventar nicht geladen werden.</Alert>;
   }
 
   const managedNodes = managedNodesQuery.data ?? [];
@@ -80,9 +80,9 @@ export function InventoryGroupDetails({
         {canManageNodes ? (
           <Stack direction={{ xs: "column", sm: "row" }} sx={{ gap: 1.5 }}>
             <FormControl fullWidth size="small">
-              <InputLabel id={`${inventoryGroup.id}-node-label`}>Managed node</InputLabel>
+              <InputLabel id={`${inventoryGroup.id}-node-label`}>Host</InputLabel>
               <Select
-                label="Managed node"
+                label="Host"
                 labelId={`${inventoryGroup.id}-node-label`}
                 onChange={(event) => setManagedNodeId(event.target.value)}
                 value={managedNodeId}
@@ -107,7 +107,7 @@ export function InventoryGroupDetails({
 
         <Stack sx={{ gap: 1 }}>
           {linkedNodes.length === 0 ? (
-            <Alert severity="info">No managed nodes are linked to this group.</Alert>
+            <Alert severity="info">Diesem Inventar sind noch keine Hosts zugeordnet.</Alert>
           ) : (
             linkedNodes.map((node) => (
               <Stack

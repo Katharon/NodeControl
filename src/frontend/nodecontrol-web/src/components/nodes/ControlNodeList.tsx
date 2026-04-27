@@ -27,9 +27,10 @@ import {
 type ControlNodeListProps = {
   customerId: string;
   canManageNodes: boolean;
+  showCreateButton?: boolean;
 };
 
-export function ControlNodeList({ customerId, canManageNodes }: ControlNodeListProps) {
+export function ControlNodeList({ customerId, canManageNodes, showCreateButton = true }: ControlNodeListProps) {
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const controlNodesQuery = useQuery({
@@ -56,24 +57,24 @@ export function ControlNodeList({ customerId, canManageNodes }: ControlNodeListP
   }
 
   if (controlNodesQuery.isError) {
-    return <Alert severity="error">Control nodes could not be loaded.</Alert>;
+    return <Alert severity="error">Control Hosts konnten nicht geladen werden.</Alert>;
   }
 
   return (
     <Stack sx={{ gap: 2 }}>
       <Stack direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
         <Typography component="h2" variant="h5">
-          Control Nodes
+          Control Hosts
         </Typography>
-        {canManageNodes ? (
+        {canManageNodes && showCreateButton ? (
           <Button startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} variant="contained">
-            New control node
+            Neuer Control Host
           </Button>
         ) : null}
       </Stack>
 
       {controlNodesQuery.data.length === 0 ? (
-        <Alert severity="info">No control nodes are defined.</Alert>
+        <Alert severity="info">Noch keine Control Hosts definiert.</Alert>
       ) : (
         <Paper>
           <Stack divider={<Divider />}>
@@ -88,7 +89,10 @@ export function ControlNodeList({ customerId, canManageNodes }: ControlNodeListP
                   <Stack>
                     <Typography sx={{ fontWeight: 700 }}>{controlNode.name}</Typography>
                     <Typography color="text.secondary" variant="body2">
-                      {controlNode.hostname}:{controlNode.sshPort}
+                      Hostname: {controlNode.hostname}:{controlNode.sshPort}
+                    </Typography>
+                    <Typography color="text.secondary" variant="body2">
+                      Typ: Control Host · Plattform: Ansible Control · Status: {controlNode.status}
                     </Typography>
                   </Stack>
                 </Stack>
@@ -110,13 +114,13 @@ export function ControlNodeList({ customerId, canManageNodes }: ControlNodeListP
       )}
 
       <Dialog fullWidth maxWidth="sm" onClose={() => setCreateOpen(false)} open={createOpen}>
-        <DialogTitle>Create control node</DialogTitle>
+        <DialogTitle>Neuer Control Host</DialogTitle>
         <DialogContent>
           <ControlNodeForm
             onSubmit={async (input) => {
               await createMutation.mutateAsync(input);
             }}
-            submitLabel="Create control node"
+            submitLabel="Control Host anlegen"
           />
         </DialogContent>
       </Dialog>

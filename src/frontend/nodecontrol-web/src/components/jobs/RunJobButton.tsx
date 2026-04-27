@@ -19,7 +19,7 @@ export function RunJobButton({ customerId, jobId, disabled = false }: RunJobButt
     mutationFn: () => runJob(customerId, jobId),
     onSuccess: async (jobRun) => {
       await queryClient.invalidateQueries({ queryKey: ["job-runs", customerId] });
-      router.push(`/customers/${customerId}/job-runs/${jobRun.id}`);
+      router.push(`/customers/${customerId}/runs/${jobRun.id}`);
     },
   });
 
@@ -30,7 +30,7 @@ export function RunJobButton({ customerId, jobId, disabled = false }: RunJobButt
       startIcon={<PlayArrowIcon />}
       variant="contained"
     >
-      Run job
+      Run action
     </Button>
   );
 }
