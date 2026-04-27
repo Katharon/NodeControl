@@ -154,6 +154,20 @@ public interface INodeControlDbContext
         throw new NotSupportedException();
     }
 
+    Task<long> GetNextJobRunLogSequenceAsync(Guid jobRunId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<IReadOnlyList<JobRunLogEntry>> ListJobRunLogEntriesAsync(
+        Guid jobRunId,
+        long? afterSequence,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
     void AddUser(User user);
 
     void AddExternalIdentity(ExternalIdentity externalIdentity);
@@ -203,6 +217,11 @@ public interface INodeControlDbContext
     }
 
     void AddJobRun(JobRun jobRun)
+    {
+        throw new NotSupportedException();
+    }
+
+    void AddJobRunLogEntry(JobRunLogEntry jobRunLogEntry)
     {
         throw new NotSupportedException();
     }

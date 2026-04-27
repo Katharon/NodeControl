@@ -37,6 +37,8 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
 
     public DbSet<JobRun> JobRuns => Set<JobRun>();
 
+    public DbSet<JobRunLogEntry> JobRunLogEntries => Set<JobRunLogEntry>();
+
     public async Task<ExternalIdentity?> FindExternalIdentityAsync(
         string provider,
         string subject,
@@ -352,6 +354,29 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<long> GetNextJobRunLogSequenceAsync(Guid jobRunId, CancellationToken cancellationToken)
+    {
+        var currentMax = await JobRunLogEntries
+            .Where(entry => entry.JobRunId == jobRunId)
+            .Select(entry => (long?)entry.Sequence)
+            .MaxAsync(cancellationToken);
+        return (currentMax ?? 0) + 1;
+    }
+
+    public async Task<IReadOnlyList<JobRunLogEntry>> ListJobRunLogEntriesAsync(
+        Guid jobRunId,
+        long? afterSequence,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        return await JobRunLogEntries
+            .Where(entry => entry.JobRunId == jobRunId
+                && (afterSequence == null || entry.Sequence > afterSequence))
+            .OrderBy(entry => entry.Sequence)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+    }
+
     public void AddUser(User user)
     {
         Users.Add(user);
@@ -415,6 +440,11 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
     public void AddJobRun(JobRun jobRun)
     {
         JobRuns.Add(jobRun);
+    }
+
+    public void AddJobRunLogEntry(JobRunLogEntry jobRunLogEntry)
+    {
+        JobRunLogEntries.Add(jobRunLogEntry);
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

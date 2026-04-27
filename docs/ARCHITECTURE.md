@@ -235,6 +235,9 @@ The MVP Worker polls queued JobRuns from the database and processes the oldest q
 Ansible execution remains local to the Worker process until remote control-node dispatch is introduced in a
 later slice.
 
+JobRun logs are persisted by the Worker as ordered entries. The API provides read-only access to those logs
+through customer-scoped authorization and never starts Ansible execution.
+
 ## Data Flow: Scheduled Job
 
 ```text

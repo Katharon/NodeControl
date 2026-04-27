@@ -35,6 +35,8 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
 
     public List<JobRun> JobRuns { get; } = [];
 
+    public List<JobRunLogEntry> JobRunLogEntries { get; } = [];
+
     public List<JobRunStatus[]> SavedJobRunStatuses { get; } = [];
 
     public Task<ExternalIdentity?> FindExternalIdentityAsync(
@@ -292,6 +294,30 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
             .FirstOrDefault());
     }
 
+    public Task<long> GetNextJobRunLogSequenceAsync(Guid jobRunId, CancellationToken cancellationToken)
+    {
+        var currentMax = JobRunLogEntries
+            .Where(entry => entry.JobRunId == jobRunId)
+            .Select(entry => (long?)entry.Sequence)
+            .Max();
+        return Task.FromResult((currentMax ?? 0) + 1);
+    }
+
+    public Task<IReadOnlyList<JobRunLogEntry>> ListJobRunLogEntriesAsync(
+        Guid jobRunId,
+        long? afterSequence,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        return Task.FromResult<IReadOnlyList<JobRunLogEntry>>(
+            JobRunLogEntries
+                .Where(entry => entry.JobRunId == jobRunId
+                    && (afterSequence == null || entry.Sequence > afterSequence))
+                .OrderBy(entry => entry.Sequence)
+                .Take(limit)
+                .ToArray());
+    }
+
     public void AddUser(User user)
     {
         Users.Add(user);
@@ -355,6 +381,11 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     public void AddJobRun(JobRun jobRun)
     {
         JobRuns.Add(jobRun);
+    }
+
+    public void AddJobRunLogEntry(JobRunLogEntry jobRunLogEntry)
+    {
+        JobRunLogEntries.Add(jobRunLogEntry);
     }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken)

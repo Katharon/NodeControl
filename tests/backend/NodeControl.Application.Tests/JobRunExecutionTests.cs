@@ -212,6 +212,34 @@ public sealed class JobRunExecutionTests
     }
 
     [Fact]
+    public async Task JobRunExecutionService_persists_system_stdout_and_stderr_log_entries()
+    {
+        using var fixture = ExecutionFixture.Create();
+        var service = fixture.CreateExecutionService(new FakeAnsibleRunner(
+            _ => new AnsiblePlaybookRunResult(1, false, "playbook failed"),
+            StdoutLines: ["ok: [web-01]"],
+            StderrLines: ["fatal: [web-01]"]));
+
+        await service.ExecuteAsync(fixture.JobRun);
+
+        Assert.Contains(fixture.Db.JobRunLogEntries, entry =>
+            entry.Stream == JobRunLogStream.System
+            && entry.Level == JobRunLogLevel.Info
+            && entry.Message == "JobRun processing started.");
+        Assert.Contains(fixture.Db.JobRunLogEntries, entry =>
+            entry.Stream == JobRunLogStream.StdOut
+            && entry.Level == JobRunLogLevel.Info
+            && entry.Message == "ok: [web-01]");
+        Assert.Contains(fixture.Db.JobRunLogEntries, entry =>
+            entry.Stream == JobRunLogStream.StdErr
+            && entry.Level == JobRunLogLevel.Error
+            && entry.Message == "fatal: [web-01]");
+        Assert.Equal(
+            fixture.Db.JobRunLogEntries.Select(entry => entry.Sequence).Order().ToArray(),
+            fixture.Db.JobRunLogEntries.Select(entry => entry.Sequence).ToArray());
+    }
+
+    [Fact]
     public async Task QueuedJobRunWorker_ignores_when_no_queued_job_runs_exist()
     {
         using var fixture = ExecutionFixture.Create(addJobRun: false);
@@ -249,17 +277,36 @@ public sealed class JobRunExecutionTests
 
     private static DateTimeOffset TestTime => new(2026, 4, 27, 10, 0, 0, TimeSpan.Zero);
 
-    private sealed class FakeAnsibleRunner(Func<AnsiblePlaybookRunRequest, AnsiblePlaybookRunResult> handler)
+    private sealed class FakeAnsibleRunner(
+        Func<AnsiblePlaybookRunRequest, AnsiblePlaybookRunResult> handler,
+        string[]? StdoutLines = null,
+        string[]? StderrLines = null)
         : IAnsiblePlaybookRunner
     {
         public List<AnsiblePlaybookRunRequest> Requests { get; } = [];
 
-        public Task<AnsiblePlaybookRunResult> RunAsync(
+        public async Task<AnsiblePlaybookRunResult> RunAsync(
             AnsiblePlaybookRunRequest request,
             CancellationToken cancellationToken = default)
         {
             Requests.Add(request);
-            return Task.FromResult(handler(request));
+            foreach (var line in StdoutLines ?? [])
+            {
+                if (request.OnStdoutLine is not null)
+                {
+                    await request.OnStdoutLine(line, cancellationToken);
+                }
+            }
+
+            foreach (var line in StderrLines ?? [])
+            {
+                if (request.OnStderrLine is not null)
+                {
+                    await request.OnStderrLine(line, cancellationToken);
+                }
+            }
+
+            return handler(request);
         }
     }
 

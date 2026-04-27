@@ -52,11 +52,16 @@ public sealed class AnsiblePlaybookRunner(IOptions<ExecutionOptions> options) : 
             return new AnsibleExecutionResult(null, false, $"ansible-playbook could not be started: {exception.Message}");
         }
 
-        await using var stdoutStream = File.Create(request.StdoutLogPath);
-        await using var stderrStream = File.Create(request.StderrLogPath);
-
-        var stdoutCopy = process.StandardOutput.BaseStream.CopyToAsync(stdoutStream, cancellationToken);
-        var stderrCopy = process.StandardError.BaseStream.CopyToAsync(stderrStream, cancellationToken);
+        var stdoutCopy = CaptureLinesAsync(
+            process.StandardOutput,
+            request.StdoutLogPath,
+            request.OnStdoutLine,
+            cancellationToken);
+        var stderrCopy = CaptureLinesAsync(
+            process.StandardError,
+            request.StderrLogPath,
+            request.OnStderrLine,
+            cancellationToken);
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(request.Timeout);
@@ -98,6 +103,26 @@ public sealed class AnsiblePlaybookRunner(IOptions<ExecutionOptions> options) : 
         }
         catch (OperationCanceledException)
         {
+        }
+    }
+
+    private static async Task CaptureLinesAsync(
+        StreamReader reader,
+        string logPath,
+        Func<string, CancellationToken, Task>? onLine,
+        CancellationToken cancellationToken)
+    {
+        await using var fileStream = File.Create(logPath);
+        await using var writer = new StreamWriter(fileStream);
+
+        while (await reader.ReadLineAsync(cancellationToken) is { } line)
+        {
+            await writer.WriteLineAsync(line.AsMemory(), cancellationToken);
+            await writer.FlushAsync(cancellationToken);
+            if (!string.IsNullOrWhiteSpace(line) && onLine is not null)
+            {
+                await onLine(line, cancellationToken);
+            }
         }
     }
 }

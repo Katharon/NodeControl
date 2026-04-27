@@ -12,7 +12,9 @@ public sealed record AnsiblePlaybookRunRequest(
     string VariableFileName,
     string StdoutLogPath,
     string StderrLogPath,
-    TimeSpan Timeout);
+    TimeSpan Timeout,
+    Func<string, CancellationToken, Task>? OnStdoutLine = null,
+    Func<string, CancellationToken, Task>? OnStderrLine = null);
 
 public sealed record AnsiblePlaybookRunResult(
     int? ExitCode,

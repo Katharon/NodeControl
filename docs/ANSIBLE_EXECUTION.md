@@ -121,6 +121,10 @@ For every JobRun, capture:
 - TriggeredByUserId if manual
 - ScheduleId if scheduled
 
+Slice 7 adds persisted JobRun log entries. The Worker writes System, StdOut, and StdErr entries while a run
+is processed. The API exposes these entries read-only for authorized customer users; it does not execute or
+resume JobRuns.
+
 ## JobRun Statuses
 
 Initial statuses:
@@ -214,6 +218,9 @@ MVP captures:
 - exit code
 - final status
 - duration
+
+Stdout and stderr are also stored as ordered log entries for display. NodeControl still treats these as text
+lines rather than parsing Ansible task semantics.
 
 Post-MVP may add:
 

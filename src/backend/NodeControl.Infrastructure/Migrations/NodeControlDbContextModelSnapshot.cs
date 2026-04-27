@@ -373,6 +373,53 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
             b.ToTable("job_runs", (string)null);
         });
 
+        modelBuilder.Entity("NodeControl.Domain.Jobs.JobRunLogEntry", b =>
+        {
+            b.Property<Guid>("Id")
+                .ValueGeneratedNever()
+                .HasColumnType("uuid")
+                .HasColumnName("id");
+
+            b.Property<Guid>("JobRunId")
+                .HasColumnType("uuid")
+                .HasColumnName("job_run_id");
+
+            b.Property<string>("Level")
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasColumnType("character varying(40)")
+                .HasColumnName("level");
+
+            b.Property<string>("Message")
+                .IsRequired()
+                .HasMaxLength(16000)
+                .HasColumnType("character varying(16000)")
+                .HasColumnName("message");
+
+            b.Property<long>("Sequence")
+                .HasColumnType("bigint")
+                .HasColumnName("sequence");
+
+            b.Property<string>("Stream")
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasColumnType("character varying(40)")
+                .HasColumnName("stream");
+
+            b.Property<DateTimeOffset>("TimestampUtc")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("timestamp_utc");
+
+            b.HasKey("Id")
+                .HasName("pk_job_run_log_entries");
+
+            b.HasIndex("JobRunId", "Sequence")
+                .IsUnique()
+                .HasDatabaseName("ux_job_run_log_entries_job_run_id_sequence");
+
+            b.ToTable("job_run_log_entries", (string)null);
+        });
+
         modelBuilder.Entity("NodeControl.Domain.Nodes.ControlNode", b =>
         {
             b.Property<Guid>("Id")
@@ -875,6 +922,18 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
                 .HasForeignKey("TriggeredByUserId")
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_job_runs_users_triggered_by_user_id");
+        });
+
+        modelBuilder.Entity("NodeControl.Domain.Jobs.JobRunLogEntry", b =>
+        {
+            b.HasOne("NodeControl.Domain.Jobs.JobRun", "JobRun")
+                .WithMany()
+                .HasForeignKey("JobRunId")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired()
+                .HasConstraintName("fk_job_run_log_entries_job_runs_job_run_id");
+
+            b.Navigation("JobRun");
         });
 
         modelBuilder.Entity("NodeControl.Domain.Nodes.ControlNode", b =>

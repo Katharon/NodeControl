@@ -51,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<VariableSetService>();
         services.AddScoped<JobService>();
         services.AddScoped<JobRunService>();
+        services.AddScoped<JobRunLogService>();
 
         services.AddNodeControlInfrastructure(configuration);
 

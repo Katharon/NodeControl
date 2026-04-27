@@ -149,6 +149,128 @@ public sealed class JobsAndJobRunsEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Get_job_run_logs_allows_authorized_customer_member()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Viewer);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        var jobRun = factory.Db.AddJobRunForCustomer(seeded.Customer.Id, seeded.User.Id);
+        factory.Db.AddJobRunLogEntry(JobRunLogEntry.Create(
+            jobRun,
+            1,
+            TestTime,
+            JobRunLogStream.System,
+            JobRunLogLevel.Info,
+            "JobRun processing started."));
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/job-runs/{jobRun.Id}/logs");
+        var logs = await response.Content.ReadFromJsonAsync<JobRunLogsResponse>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Single(logs!.Items);
+        Assert.Equal("System", logs.Items[0].Stream);
+        Assert.Equal("Info", logs.Items[0].Level);
+    }
+
+    [Fact]
+    public async Task Get_job_run_logs_rejects_cross_tenant_access()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Owner);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        var otherCustomer = Customer.Create("Other Customer", "other-customer", null, TestTime);
+        factory.Db.AddCustomer(otherCustomer);
+        var otherRun = factory.Db.AddJobRunForCustomer(otherCustomer.Id, seeded.User.Id, suffix: "other");
+        factory.Db.AddJobRunLogEntry(JobRunLogEntry.Create(
+            otherRun,
+            1,
+            TestTime,
+            JobRunLogStream.System,
+            JobRunLogLevel.Info,
+            "other customer log"));
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/job-runs/{otherRun.Id}/logs");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_job_run_logs_returns_logs_ordered_by_sequence()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Viewer);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        var jobRun = factory.Db.AddJobRunForCustomer(seeded.Customer.Id, seeded.User.Id);
+        factory.Db.AddJobRunLogEntry(JobRunLogEntry.Create(jobRun, 3, TestTime, JobRunLogStream.StdOut, JobRunLogLevel.Info, "third"));
+        factory.Db.AddJobRunLogEntry(JobRunLogEntry.Create(jobRun, 1, TestTime, JobRunLogStream.System, JobRunLogLevel.Info, "first"));
+        factory.Db.AddJobRunLogEntry(JobRunLogEntry.Create(jobRun, 2, TestTime, JobRunLogStream.StdErr, JobRunLogLevel.Error, "second"));
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/job-runs/{jobRun.Id}/logs");
+        var logs = await response.Content.ReadFromJsonAsync<JobRunLogsResponse>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal([1, 2, 3], logs!.Items.Select(item => item.Sequence).ToArray());
+    }
+
+    [Fact]
+    public async Task Get_job_run_logs_filters_after_sequence()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Viewer);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        var jobRun = factory.Db.AddJobRunForCustomer(seeded.Customer.Id, seeded.User.Id);
+        factory.Db.AddJobRunLogEntry(JobRunLogEntry.Create(jobRun, 1, TestTime, JobRunLogStream.System, JobRunLogLevel.Info, "first"));
+        factory.Db.AddJobRunLogEntry(JobRunLogEntry.Create(jobRun, 2, TestTime, JobRunLogStream.StdOut, JobRunLogLevel.Info, "second"));
+        factory.Db.AddJobRunLogEntry(JobRunLogEntry.Create(jobRun, 3, TestTime, JobRunLogStream.StdErr, JobRunLogLevel.Error, "third"));
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/job-runs/{jobRun.Id}/logs?afterSequence=1");
+        var logs = await response.Content.ReadFromJsonAsync<JobRunLogsResponse>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal([2, 3], logs!.Items.Select(item => item.Sequence).ToArray());
+    }
+
+    [Fact]
+    public async Task Get_job_run_logs_respects_limit()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Viewer);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        var jobRun = factory.Db.AddJobRunForCustomer(seeded.Customer.Id, seeded.User.Id);
+        factory.Db.AddJobRunLogEntry(JobRunLogEntry.Create(jobRun, 1, TestTime, JobRunLogStream.System, JobRunLogLevel.Info, "first"));
+        factory.Db.AddJobRunLogEntry(JobRunLogEntry.Create(jobRun, 2, TestTime, JobRunLogStream.StdOut, JobRunLogLevel.Info, "second"));
+        factory.Db.AddJobRunLogEntry(JobRunLogEntry.Create(jobRun, 3, TestTime, JobRunLogStream.StdErr, JobRunLogLevel.Error, "third"));
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/job-runs/{jobRun.Id}/logs?limit=2");
+        var logs = await response.Content.ReadFromJsonAsync<JobRunLogsResponse>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal([1, 2], logs!.Items.Select(item => item.Sequence).ToArray());
+    }
+
+    [Fact]
+    public async Task Get_job_run_logs_does_not_trigger_worker_execution()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Viewer);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        var jobRun = factory.Db.AddJobRunForCustomer(seeded.Customer.Id, seeded.User.Id);
+        factory.Db.AddJobRunLogEntry(JobRunLogEntry.Create(jobRun, 1, TestTime, JobRunLogStream.System, JobRunLogLevel.Info, "queued"));
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/job-runs/{jobRun.Id}/logs");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(JobRunStatus.Queued, jobRun.Status);
+        Assert.Null(jobRun.StartedAt);
+    }
+
     private static CreateJobRequest ValidJobRequest(string slug, DefinitionResources resources)
     {
         return new CreateJobRequest(
@@ -262,6 +384,8 @@ public sealed class JobsAndJobRunsEndpointTests
         public List<Job> Jobs { get; } = [];
 
         public List<JobRun> JobRuns { get; } = [];
+
+        public List<JobRunLogEntry> JobRunLogEntries { get; } = [];
 
         public DefinitionResources AddDefinitionResources(Guid customerId, string suffix)
         {
@@ -449,6 +573,36 @@ public sealed class JobsAndJobRunsEndpointTests
             }
         }
 
+        public Task<long> GetNextJobRunLogSequenceAsync(Guid jobRunId, CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                var currentMax = JobRunLogEntries
+                    .Where(entry => entry.JobRunId == jobRunId)
+                    .Select(entry => (long?)entry.Sequence)
+                    .Max();
+                return Task.FromResult((currentMax ?? 0) + 1);
+            }
+        }
+
+        public Task<IReadOnlyList<JobRunLogEntry>> ListJobRunLogEntriesAsync(
+            Guid jobRunId,
+            long? afterSequence,
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult<IReadOnlyList<JobRunLogEntry>>(
+                    JobRunLogEntries
+                        .Where(entry => entry.JobRunId == jobRunId
+                            && (afterSequence == null || entry.Sequence > afterSequence))
+                        .OrderBy(entry => entry.Sequence)
+                        .Take(limit)
+                        .ToArray());
+            }
+        }
+
         public void AddUser(User user)
         {
             lock (syncRoot)
@@ -532,6 +686,36 @@ public sealed class JobsAndJobRunsEndpointTests
             lock (syncRoot)
             {
                 JobRuns.Add(jobRun);
+            }
+        }
+
+        public JobRun AddJobRunForCustomer(Guid customerId, Guid userId, string suffix = "a")
+        {
+            lock (syncRoot)
+            {
+                var resources = AddDefinitionResources(customerId, suffix);
+                var job = AddJob(Job.Create(
+                    customerId,
+                    $"Deploy {suffix}",
+                    $"deploy-{suffix}",
+                    null,
+                    resources.ControlNode.Id,
+                    resources.InventoryGroup.Id,
+                    resources.Playbook.Id,
+                    resources.VariableSet.Id,
+                    1800,
+                    TestTime));
+                var jobRun = JobRun.CreateManual(job, userId, TestTime);
+                JobRuns.Add(jobRun);
+                return jobRun;
+            }
+        }
+
+        public void AddJobRunLogEntry(JobRunLogEntry jobRunLogEntry)
+        {
+            lock (syncRoot)
+            {
+                JobRunLogEntries.Add(jobRunLogEntry);
             }
         }
 

@@ -35,6 +35,27 @@ public static class JobRunsEndpoints
                 : CustomersEndpoints.ToResult(await jobRunService.GetAsync(currentUser, customerId, jobRunId, cancellationToken));
         });
 
+        group.MapGet("/{jobRunId:guid}/logs", async (
+            Guid customerId,
+            Guid jobRunId,
+            long? afterSequence,
+            int? limit,
+            CurrentUserService currentUserService,
+            JobRunLogService jobRunLogService,
+            CancellationToken cancellationToken) =>
+        {
+            var currentUser = await currentUserService.GetCurrentUserAsync(cancellationToken);
+            return currentUser is null
+                ? Results.Unauthorized()
+                : CustomersEndpoints.ToResult(await jobRunLogService.ListAsync(
+                    currentUser,
+                    customerId,
+                    jobRunId,
+                    afterSequence,
+                    limit,
+                    cancellationToken));
+        });
+
         return endpoints;
     }
 }

@@ -14,6 +14,8 @@ public sealed class JobRunExecutionService(
     IAnsiblePlaybookRunner ansibleRunner,
     IClock clock)
 {
+    private readonly SemaphoreSlim logWriteLock = new(1, 1);
+
     public async Task<bool> ProcessOldestQueuedAsync(CancellationToken cancellationToken = default)
     {
         var jobRun = await dbContext.FindOldestQueuedJobRunAsync(cancellationToken);
@@ -35,17 +37,21 @@ public sealed class JobRunExecutionService(
 
         jobRun.MarkRunning(clock.UtcNow);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Info, "JobRun processing started.", cancellationToken);
 
         try
         {
+            await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Info, "Loading execution inputs.", cancellationToken);
             var executionContext = await LoadExecutionContextAsync(jobRun, cancellationToken);
             if (!executionContext.Succeeded)
             {
+                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, executionContext.ErrorMessage!, cancellationToken);
                 jobRun.MarkFailed(null, executionContext.ErrorMessage!, clock.UtcNow);
                 await dbContext.SaveChangesAsync(cancellationToken);
                 return;
             }
 
+            await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Info, "Creating execution workspace.", cancellationToken);
             var buildResult = await workspaceBuilder.BuildAsync(
                 jobRun,
                 executionContext.Job!,
@@ -58,7 +64,9 @@ public sealed class JobRunExecutionService(
 
             if (!buildResult.Succeeded)
             {
-                jobRun.MarkFailed(null, buildResult.ErrorMessage ?? "Execution workspace could not be created.", clock.UtcNow);
+                var errorMessage = buildResult.ErrorMessage ?? "Execution workspace could not be created.";
+                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken);
+                jobRun.MarkFailed(null, errorMessage, clock.UtcNow);
                 await dbContext.SaveChangesAsync(cancellationToken);
                 return;
             }
@@ -66,28 +74,36 @@ public sealed class JobRunExecutionService(
             var workspace = buildResult.Workspace!;
             jobRun.SetExecutionPaths(workspace.WorkspacePath, workspace.StdoutLogPath, workspace.StderrLogPath);
             await dbContext.SaveChangesAsync(cancellationToken);
+            await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Info, "Execution workspace created.", cancellationToken);
 
+            await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Info, "Starting ansible-playbook.", cancellationToken);
             var runResult = await ansibleRunner.RunAsync(
                 new AnsiblePlaybookRunRequest(
                     workspace.WorkspacePath,
                     workspace.VariableFileName,
                     workspace.StdoutLogPath,
                     workspace.StderrLogPath,
-                    TimeSpan.FromSeconds(executionContext.Job!.DefaultTimeoutSeconds)),
+                    TimeSpan.FromSeconds(executionContext.Job!.DefaultTimeoutSeconds),
+                    (line, token) => AppendLogAsync(jobRun, JobRunLogStream.StdOut, JobRunLogLevel.Info, line, token),
+                    (line, token) => AppendLogAsync(jobRun, JobRunLogStream.StdErr, JobRunLogLevel.Error, line, token)),
                 cancellationToken);
 
             if (runResult.TimedOut)
             {
-                jobRun.MarkTimedOut(runResult.ExitCode, runResult.ErrorMessage ?? "ansible-playbook execution timed out.", clock.UtcNow);
+                var errorMessage = runResult.ErrorMessage ?? "ansible-playbook execution timed out.";
+                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken);
+                jobRun.MarkTimedOut(runResult.ExitCode, errorMessage, clock.UtcNow);
             }
             else if (runResult.ExitCode == 0)
             {
+                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Info, "ansible-playbook exited with code 0.", cancellationToken);
                 jobRun.MarkSucceeded(runResult.ExitCode.Value, clock.UtcNow);
             }
             else
             {
                 var errorMessage = runResult.ErrorMessage
                     ?? $"ansible-playbook exited with code {runResult.ExitCode?.ToString() ?? "unknown"}.";
+                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken);
                 jobRun.MarkFailed(runResult.ExitCode, errorMessage, clock.UtcNow);
             }
 
@@ -99,8 +115,34 @@ public sealed class JobRunExecutionService(
         }
         catch (Exception exception)
         {
+            await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, exception.Message, CancellationToken.None);
             jobRun.MarkFailed(null, $"Execution setup failed: {exception.Message}", clock.UtcNow);
             await dbContext.SaveChangesAsync(CancellationToken.None);
+        }
+    }
+
+    private async Task AppendLogAsync(
+        JobRun jobRun,
+        JobRunLogStream stream,
+        JobRunLogLevel level,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        await logWriteLock.WaitAsync(cancellationToken);
+        try
+        {
+            var sequence = await dbContext.GetNextJobRunLogSequenceAsync(jobRun.Id, cancellationToken);
+            dbContext.AddJobRunLogEntry(JobRunLogEntry.Create(jobRun, sequence, clock.UtcNow, stream, level, message));
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        finally
+        {
+            logWriteLock.Release();
         }
     }
 
