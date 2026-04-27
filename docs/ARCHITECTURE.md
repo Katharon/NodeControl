@@ -71,6 +71,7 @@ Examples:
 - JobRun
 - Schedule
 - AuditLog
+- Secret
 
 The Domain project must not depend on ASP.NET Core, EF Core, Quartz, or Ansible execution code.
 
@@ -199,6 +200,13 @@ Variables passed to an Ansible job.
 A customer-scoped reusable text/Jinja2/config/script template. Slice 12 manages templates as plain text
 resources only: NodeControl validates simple structure, stores metadata/content, and audits create/update/archive
 operations. Templates are not executed, rendered, uploaded to hosts, or wired into JobRun execution in this slice.
+
+### Secret
+
+A customer-scoped protected value such as a password, API token, SSH private key, certificate, or connection
+string. Slice 13a exposes secret metadata only through the API. Plaintext values are accepted on create/rotate,
+protected before persistence, never returned in API responses, and not connected to Templates, Variables, Actions,
+or Worker execution yet.
 
 ### Job
 

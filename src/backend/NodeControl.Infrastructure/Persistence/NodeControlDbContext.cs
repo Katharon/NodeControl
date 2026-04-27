@@ -7,6 +7,7 @@ using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Playbooks;
+using NodeControl.Domain.Secrets;
 using NodeControl.Domain.Templates;
 using NodeControl.Domain.Users;
 using NodeControl.Domain.VariableSets;
@@ -37,6 +38,8 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
     public DbSet<VariableSet> VariableSets => Set<VariableSet>();
 
     public DbSet<Template> Templates => Set<Template>();
+
+    public DbSet<Secret> Secrets => Set<Secret>();
 
     public DbSet<Job> Jobs => Set<Job>();
 
@@ -334,6 +337,36 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Secret>> ListActiveSecretsAsync(
+        Guid customerId,
+        CancellationToken cancellationToken)
+    {
+        return await Secrets
+            .Where(secret => secret.CustomerId == customerId && secret.Status == SecretStatus.Active)
+            .OrderBy(secret => secret.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<Secret?> FindSecretAsync(
+        Guid customerId,
+        Guid secretId,
+        CancellationToken cancellationToken)
+    {
+        return await Secrets.FirstOrDefaultAsync(
+            secret => secret.CustomerId == customerId && secret.Id == secretId,
+            cancellationToken);
+    }
+
+    public async Task<Secret?> FindSecretBySlugAsync(
+        Guid customerId,
+        string slug,
+        CancellationToken cancellationToken)
+    {
+        return await Secrets.FirstOrDefaultAsync(
+            secret => secret.CustomerId == customerId && secret.Slug == slug,
+            cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Job>> ListActiveJobsAsync(
         Guid customerId,
         CancellationToken cancellationToken)
@@ -605,6 +638,11 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
     public void AddTemplate(Template template)
     {
         Templates.Add(template);
+    }
+
+    public void AddSecret(Secret secret)
+    {
+        Secrets.Add(secret);
     }
 
     public void AddJob(Job job)

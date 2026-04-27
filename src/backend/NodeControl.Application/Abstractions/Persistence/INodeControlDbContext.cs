@@ -6,6 +6,7 @@ using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Playbooks;
+using NodeControl.Domain.Secrets;
 using NodeControl.Domain.Templates;
 using NodeControl.Domain.VariableSets;
 
@@ -138,6 +139,21 @@ public interface INodeControlDbContext
     }
 
     Task<Template?> FindTemplateBySlugAsync(Guid customerId, string slug, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<IReadOnlyList<Secret>> ListActiveSecretsAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<Secret?> FindSecretAsync(Guid customerId, Guid secretId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<Secret?> FindSecretBySlugAsync(Guid customerId, string slug, CancellationToken cancellationToken)
     {
         throw new NotSupportedException();
     }
@@ -280,6 +296,11 @@ public interface INodeControlDbContext
     }
 
     void AddTemplate(Template template)
+    {
+        throw new NotSupportedException();
+    }
+
+    void AddSecret(Secret secret)
     {
         throw new NotSupportedException();
     }

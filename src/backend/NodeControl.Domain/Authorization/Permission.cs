@@ -17,5 +17,7 @@ public enum Permission
     ManageSchedules = 13,
     ViewAuditLogs = 14,
     ViewTemplates = 15,
-    ManageTemplates = 16
+    ManageTemplates = 16,
+    ViewSecrets = 17,
+    ManageSecrets = 18
 }

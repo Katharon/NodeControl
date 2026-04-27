@@ -18,6 +18,7 @@ using NodeControl.Application.ManagedNodes;
 using NodeControl.Application.Memberships;
 using NodeControl.Application.Playbooks;
 using NodeControl.Application.Schedules;
+using NodeControl.Application.Secrets;
 using NodeControl.Application.Templates;
 using NodeControl.Application.Validation;
 using NodeControl.Application.VariableSets;
@@ -57,6 +58,7 @@ public static class DependencyInjection
         services.AddScoped<VariableSetService>();
         services.AddScoped<TemplateValidationService>();
         services.AddScoped<TemplateService>();
+        services.AddScoped<SecretService>();
         services.AddScoped<JobService>();
         services.AddScoped<JobRunService>();
         services.AddScoped<JobRunLogService>();

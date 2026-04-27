@@ -191,6 +191,13 @@ template content as plain text only. The API and Application layer do not render
 invoke Python/Jinja runtimes, or pass template content into JobRun execution. Future slices may connect
 templates to playbook artifacts or deployment flows, but Worker execution remains unchanged here.
 
+## Secrets
+
+Secrets are customer-scoped protected values managed through metadata-only API responses. Slice 13a accepts
+plaintext values only on create and rotate, protects them before persistence, and never returns plaintext or
+protected payloads from API responses. Secrets are not resolved during JobRun execution and are not integrated
+with Templates, VariableSets, Jobs, or Worker workspaces yet.
+
 ## Dangerous Execution Concerns
 
 Ansible can change real systems.

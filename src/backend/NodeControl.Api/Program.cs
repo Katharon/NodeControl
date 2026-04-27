@@ -26,6 +26,7 @@ app.MapInventoryGroupsEndpoints();
 app.MapPlaybooksEndpoints();
 app.MapVariableSetsEndpoints();
 app.MapTemplatesEndpoints();
+app.MapSecretsEndpoints();
 app.MapJobsEndpoints();
 app.MapJobRunsEndpoints();
 app.MapSchedulesEndpoints();

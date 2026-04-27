@@ -6,6 +6,7 @@ using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Playbooks;
+using NodeControl.Domain.Secrets;
 using NodeControl.Domain.Templates;
 using NodeControl.Domain.Users;
 using NodeControl.Domain.VariableSets;
@@ -35,6 +36,8 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     public List<VariableSet> VariableSets { get; } = [];
 
     public List<Template> Templates { get; } = [];
+
+    public List<Secret> Secrets { get; } = [];
 
     public List<Job> Jobs { get; } = [];
 
@@ -277,6 +280,26 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     {
         return Task.FromResult(Templates.FirstOrDefault(template =>
             template.CustomerId == customerId && template.Slug == slug));
+    }
+
+    public Task<IReadOnlyList<Secret>> ListActiveSecretsAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult<IReadOnlyList<Secret>>(
+            Secrets
+                .Where(secret => secret.CustomerId == customerId && secret.Status == SecretStatus.Active)
+                .ToArray());
+    }
+
+    public Task<Secret?> FindSecretAsync(Guid customerId, Guid secretId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(Secrets.FirstOrDefault(secret =>
+            secret.CustomerId == customerId && secret.Id == secretId));
+    }
+
+    public Task<Secret?> FindSecretBySlugAsync(Guid customerId, string slug, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(Secrets.FirstOrDefault(secret =>
+            secret.CustomerId == customerId && secret.Slug == slug));
     }
 
     public Task<IReadOnlyList<Job>> ListActiveJobsAsync(Guid customerId, CancellationToken cancellationToken)
@@ -527,6 +550,11 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     public void AddTemplate(Template template)
     {
         Templates.Add(template);
+    }
+
+    public void AddSecret(Secret secret)
+    {
+        Secrets.Add(secret);
     }
 
     public void AddJob(Job job)

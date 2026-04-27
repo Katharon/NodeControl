@@ -166,6 +166,10 @@ Current implementation note: Templates are available as customer-scoped reusable
 resources. They can be listed, created, viewed, updated, archived, and safely validated with lightweight
 plain-text checks. Templates are not rendered, executed, uploaded, or connected to JobRun execution yet.
 
+Current implementation note: Secrets backend/API support is available as a metadata-only customer-scoped
+resource. Secret values are protected before persistence, can be rotated, and are never returned by API
+responses. Secrets are not connected to execution or template rendering yet.
+
 ## Phase 8: Security and Hardening
 
 Goal:
