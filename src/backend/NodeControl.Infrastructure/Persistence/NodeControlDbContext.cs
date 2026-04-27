@@ -7,6 +7,7 @@ using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Playbooks;
+using NodeControl.Domain.Templates;
 using NodeControl.Domain.Users;
 using NodeControl.Domain.VariableSets;
 
@@ -34,6 +35,8 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
     public DbSet<Playbook> Playbooks => Set<Playbook>();
 
     public DbSet<VariableSet> VariableSets => Set<VariableSet>();
+
+    public DbSet<Template> Templates => Set<Template>();
 
     public DbSet<Job> Jobs => Set<Job>();
 
@@ -298,6 +301,36 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
     {
         return await VariableSets.FirstOrDefaultAsync(
             variableSet => variableSet.CustomerId == customerId && variableSet.Slug == slug,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Template>> ListActiveTemplatesAsync(
+        Guid customerId,
+        CancellationToken cancellationToken)
+    {
+        return await Templates
+            .Where(template => template.CustomerId == customerId && template.Status == TemplateStatus.Active)
+            .OrderBy(template => template.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<Template?> FindTemplateAsync(
+        Guid customerId,
+        Guid templateId,
+        CancellationToken cancellationToken)
+    {
+        return await Templates.FirstOrDefaultAsync(
+            template => template.CustomerId == customerId && template.Id == templateId,
+            cancellationToken);
+    }
+
+    public async Task<Template?> FindTemplateBySlugAsync(
+        Guid customerId,
+        string slug,
+        CancellationToken cancellationToken)
+    {
+        return await Templates.FirstOrDefaultAsync(
+            template => template.CustomerId == customerId && template.Slug == slug,
             cancellationToken);
     }
 
@@ -567,6 +600,11 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
     public void AddVariableSet(VariableSet variableSet)
     {
         VariableSets.Add(variableSet);
+    }
+
+    public void AddTemplate(Template template)
+    {
+        Templates.Add(template);
     }
 
     public void AddJob(Job job)

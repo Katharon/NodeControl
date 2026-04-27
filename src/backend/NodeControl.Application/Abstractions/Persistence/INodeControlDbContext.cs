@@ -6,6 +6,7 @@ using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Playbooks;
+using NodeControl.Domain.Templates;
 using NodeControl.Domain.VariableSets;
 
 namespace NodeControl.Application.Abstractions.Persistence;
@@ -122,6 +123,21 @@ public interface INodeControlDbContext
     }
 
     Task<VariableSet?> FindVariableSetBySlugAsync(Guid customerId, string slug, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<IReadOnlyList<Template>> ListActiveTemplatesAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<Template?> FindTemplateAsync(Guid customerId, Guid templateId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<Template?> FindTemplateBySlugAsync(Guid customerId, string slug, CancellationToken cancellationToken)
     {
         throw new NotSupportedException();
     }
@@ -259,6 +275,11 @@ public interface INodeControlDbContext
     }
 
     void AddVariableSet(VariableSet variableSet)
+    {
+        throw new NotSupportedException();
+    }
+
+    void AddTemplate(Template template)
     {
         throw new NotSupportedException();
     }

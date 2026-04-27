@@ -34,6 +34,13 @@ public sealed class RolePermissionMapTests
     }
 
     [Fact]
+    public void Viewer_can_view_templates_but_cannot_manage_templates()
+    {
+        Assert.True(RolePermissionMap.HasPermission(CustomerRole.Viewer, Permission.ViewTemplates));
+        Assert.False(RolePermissionMap.HasPermission(CustomerRole.Viewer, Permission.ManageTemplates));
+    }
+
+    [Fact]
     public void Auditor_can_view_audit_logs_but_cannot_manage_customer()
     {
         Assert.True(RolePermissionMap.HasPermission(CustomerRole.Auditor, Permission.ViewAuditLogs));

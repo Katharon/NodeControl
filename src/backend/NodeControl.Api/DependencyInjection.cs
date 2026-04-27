@@ -18,6 +18,7 @@ using NodeControl.Application.ManagedNodes;
 using NodeControl.Application.Memberships;
 using NodeControl.Application.Playbooks;
 using NodeControl.Application.Schedules;
+using NodeControl.Application.Templates;
 using NodeControl.Application.Validation;
 using NodeControl.Application.VariableSets;
 using NodeControl.Infrastructure;
@@ -54,6 +55,8 @@ public static class DependencyInjection
         services.AddScoped<YamlJsonValidationService>();
         services.AddScoped<PlaybookService>();
         services.AddScoped<VariableSetService>();
+        services.AddScoped<TemplateValidationService>();
+        services.AddScoped<TemplateService>();
         services.AddScoped<JobService>();
         services.AddScoped<JobRunService>();
         services.AddScoped<JobRunLogService>();

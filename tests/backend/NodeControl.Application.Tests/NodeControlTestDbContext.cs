@@ -6,6 +6,7 @@ using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Playbooks;
+using NodeControl.Domain.Templates;
 using NodeControl.Domain.Users;
 using NodeControl.Domain.VariableSets;
 
@@ -32,6 +33,8 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     public List<Playbook> Playbooks { get; } = [];
 
     public List<VariableSet> VariableSets { get; } = [];
+
+    public List<Template> Templates { get; } = [];
 
     public List<Job> Jobs { get; } = [];
 
@@ -254,6 +257,26 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     {
         return Task.FromResult(VariableSets.FirstOrDefault(variableSet =>
             variableSet.CustomerId == customerId && variableSet.Slug == slug));
+    }
+
+    public Task<IReadOnlyList<Template>> ListActiveTemplatesAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult<IReadOnlyList<Template>>(
+            Templates
+                .Where(template => template.CustomerId == customerId && template.Status == TemplateStatus.Active)
+                .ToArray());
+    }
+
+    public Task<Template?> FindTemplateAsync(Guid customerId, Guid templateId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(Templates.FirstOrDefault(template =>
+            template.CustomerId == customerId && template.Id == templateId));
+    }
+
+    public Task<Template?> FindTemplateBySlugAsync(Guid customerId, string slug, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(Templates.FirstOrDefault(template =>
+            template.CustomerId == customerId && template.Slug == slug));
     }
 
     public Task<IReadOnlyList<Job>> ListActiveJobsAsync(Guid customerId, CancellationToken cancellationToken)
@@ -499,6 +522,11 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     public void AddVariableSet(VariableSet variableSet)
     {
         VariableSets.Add(variableSet);
+    }
+
+    public void AddTemplate(Template template)
+    {
+        Templates.Add(template);
     }
 
     public void AddJob(Job job)

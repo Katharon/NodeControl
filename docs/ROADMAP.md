@@ -162,6 +162,10 @@ Current implementation note: customer-scoped audit logging is available for core
 Jobs, manual/scheduled JobRuns, cancellation/retry, and Schedules. Audit logs are read through a dedicated
 customer-scoped Activity Trail and remain separate from technical JobRun logs.
 
+Current implementation note: Templates are available as customer-scoped reusable text/Jinja2/config/script
+resources. They can be listed, created, viewed, updated, archived, and safely validated with lightweight
+plain-text checks. Templates are not rendered, executed, uploaded, or connected to JobRun execution yet.
+
 ## Phase 8: Security and Hardening
 
 Goal:

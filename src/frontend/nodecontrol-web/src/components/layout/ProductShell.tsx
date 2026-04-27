@@ -80,7 +80,7 @@ const navigationGroups: NavigationGroup[] = [
       { label: "Variablen", href: "/variables", icon: StorageIcon, scopedSegment: "variables" },
       { label: "Cloud-Provider", href: "/cloud-providers", icon: CloudIcon },
       { label: "Inventare", href: "/inventories", icon: InventoryIcon, scopedSegment: "inventories" },
-      { label: "Templates", href: "/templates", icon: AccountTreeIcon },
+      { label: "Templates", href: "/templates", icon: AccountTreeIcon, scopedSegment: "templates" },
     ],
   },
   {
@@ -118,6 +118,7 @@ const scopedPathBySegment: Record<string, string> = {
   playbooks: "playbooks",
   runs: "runs",
   schedules: "schedules",
+  templates: "templates",
   variables: "variables",
 };
 

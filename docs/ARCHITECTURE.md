@@ -66,6 +66,7 @@ Examples:
 - InventoryGroup
 - Playbook
 - VariableSet
+- Template
 - Job
 - JobRun
 - Schedule
@@ -192,6 +193,12 @@ A reusable automation definition.
 ### VariableSet
 
 Variables passed to an Ansible job.
+
+### Template
+
+A customer-scoped reusable text/Jinja2/config/script template. Slice 12 manages templates as plain text
+resources only: NodeControl validates simple structure, stores metadata/content, and audits create/update/archive
+operations. Templates are not executed, rendered, uploaded to hosts, or wired into JobRun execution in this slice.
 
 ### Job
 

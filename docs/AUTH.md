@@ -116,6 +116,8 @@ Suggested permissions:
 - ViewSchedules
 - ManageSchedules
 - ViewAuditLogs
+- ViewTemplates
+- ManageTemplates
 
 ## Static MVP Role Map
 
@@ -123,8 +125,8 @@ Slice 2 uses a static role-to-permission map. Dynamic role editing is intentiona
 
 - Owner has all MVP permissions.
 - Admin has all MVP permissions except ManageMemberships.
-- Operator has ViewCustomer, ViewNodes, ViewPlaybooks, RunJobs, RetryJobRuns, ViewJobRuns, and ViewSchedules.
-- Viewer has ViewCustomer, ViewNodes, ViewPlaybooks, ViewJobRuns, and ViewSchedules.
+- Operator has ViewCustomer, ViewNodes, ViewPlaybooks, ViewTemplates, RunJobs, RetryJobRuns, ViewJobRuns, and ViewSchedules.
+- Viewer has ViewCustomer, ViewNodes, ViewPlaybooks, ViewTemplates, ViewJobRuns, and ViewSchedules.
 - Auditor has ViewCustomer, ViewJobRuns, and ViewAuditLogs.
 
 Platform admins can access and manage every customer. Normal users can access only active customers where they have an active CustomerMembership, and inactive memberships grant no permissions.

@@ -838,6 +838,85 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
             b.ToTable("playbooks", (string)null);
         });
 
+        modelBuilder.Entity("NodeControl.Domain.Templates.Template", b =>
+        {
+            b.Property<Guid>("Id")
+                .ValueGeneratedNever()
+                .HasColumnType("uuid")
+                .HasColumnName("id");
+
+            b.Property<DateTimeOffset?>("ArchivedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("archived_at");
+
+            b.Property<string>("Content")
+                .IsRequired()
+                .HasMaxLength(200000)
+                .HasColumnType("character varying(200000)")
+                .HasColumnName("content");
+
+            b.Property<DateTimeOffset>("CreatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("created_at");
+
+            b.Property<Guid>("CustomerId")
+                .HasColumnType("uuid")
+                .HasColumnName("customer_id");
+
+            b.Property<string>("Description")
+                .HasMaxLength(1000)
+                .HasColumnType("character varying(1000)")
+                .HasColumnName("description");
+
+            b.Property<string>("Language")
+                .HasMaxLength(100)
+                .HasColumnType("character varying(100)")
+                .HasColumnName("language");
+
+            b.Property<string>("Name")
+                .IsRequired()
+                .HasMaxLength(200)
+                .HasColumnType("character varying(200)")
+                .HasColumnName("name");
+
+            b.Property<string>("Slug")
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasColumnType("character varying(100)")
+                .HasColumnName("slug");
+
+            b.Property<string>("Status")
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasColumnType("character varying(40)")
+                .HasColumnName("status");
+
+            b.Property<string>("TemplateType")
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasColumnType("character varying(40)")
+                .HasColumnName("template_type");
+
+            b.Property<DateTimeOffset?>("UpdatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("updated_at");
+
+            b.HasKey("Id")
+                .HasName("pk_templates");
+
+            b.HasIndex("CustomerId", "Status")
+                .HasDatabaseName("ix_templates_customer_id_status");
+
+            b.HasIndex("CustomerId", "TemplateType")
+                .HasDatabaseName("ix_templates_customer_id_template_type");
+
+            b.HasIndex("CustomerId", "Slug")
+                .IsUnique()
+                .HasDatabaseName("ux_templates_customer_id_slug");
+
+            b.ToTable("templates", (string)null);
+        });
+
         modelBuilder.Entity("NodeControl.Domain.Users.ExternalIdentity", b =>
         {
             b.Property<Guid>("Id")
@@ -1217,6 +1296,16 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
                 .OnDelete(DeleteBehavior.Restrict)
                 .IsRequired()
                 .HasConstraintName("fk_playbooks_customers_customer_id");
+        });
+
+        modelBuilder.Entity("NodeControl.Domain.Templates.Template", b =>
+        {
+            b.HasOne("NodeControl.Domain.Customers.Customer", null)
+                .WithMany()
+                .HasForeignKey("CustomerId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("fk_templates_customers_customer_id");
         });
 
         modelBuilder.Entity("NodeControl.Domain.VariableSets.VariableSet", b =>

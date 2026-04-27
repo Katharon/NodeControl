@@ -17,6 +17,7 @@ public static class RolePermissionMap
         Permission.ViewCustomer,
         Permission.ViewNodes,
         Permission.ViewPlaybooks,
+        Permission.ViewTemplates,
         Permission.RunJobs,
         Permission.RetryJobRuns,
         Permission.ViewJobRuns,
@@ -28,6 +29,7 @@ public static class RolePermissionMap
         Permission.ViewCustomer,
         Permission.ViewNodes,
         Permission.ViewPlaybooks,
+        Permission.ViewTemplates,
         Permission.ViewJobRuns,
         Permission.ViewSchedules
     };

@@ -15,5 +15,7 @@ public enum Permission
     RetryJobRuns = 11,
     ViewSchedules = 12,
     ManageSchedules = 13,
-    ViewAuditLogs = 14
+    ViewAuditLogs = 14,
+    ViewTemplates = 15,
+    ManageTemplates = 16
 }

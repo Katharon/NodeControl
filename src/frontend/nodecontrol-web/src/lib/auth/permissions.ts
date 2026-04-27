@@ -12,7 +12,9 @@ export type Permission =
   | "RetryJobRuns"
   | "ViewSchedules"
   | "ManageSchedules"
-  | "ViewAuditLogs";
+  | "ViewAuditLogs"
+  | "ViewTemplates"
+  | "ManageTemplates";
 
 export function hasPermission(
   permissions: readonly Permission[] | undefined,

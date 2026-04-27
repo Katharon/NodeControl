@@ -184,6 +184,13 @@ MVP rule:
 - Do not expose secret variable values through API responses.
 - Prefer not implementing advanced secret storage until the execution path works.
 
+## Templates
+
+Templates are reusable customer-scoped text/Jinja2/config/script resources. Slice 12 stores and validates
+template content as plain text only. The API and Application layer do not render templates, execute scripts,
+invoke Python/Jinja runtimes, or pass template content into JobRun execution. Future slices may connect
+templates to playbook artifacts or deployment flows, but Worker execution remains unchanged here.
+
 ## Dangerous Execution Concerns
 
 Ansible can change real systems.
