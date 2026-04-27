@@ -4,7 +4,10 @@ import { PlaceholderProductPage } from "@/components/layout/PlaceholderProductPa
 export default function CloudProvidersPage() {
   return (
     <AppPage>
-      <PlaceholderProductPage title="Cloud-Provider" />
+      <PlaceholderProductPage
+        description="Cloud-Provider werden später als Quelle für Hosts und Inventardaten angebunden."
+        title="Cloud-Provider"
+      />
     </AppPage>
   );
 }

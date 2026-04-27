@@ -4,7 +4,10 @@ import { PlaceholderProductPage } from "@/components/layout/PlaceholderProductPa
 export default function HostHealthPage() {
   return (
     <AppPage>
-      <PlaceholderProductPage title="Hostzustand" />
+      <PlaceholderProductPage
+        description="Hier entsteht eine Übersicht für Erreichbarkeit, letzte Ausführungssignale und Betriebszustand von Hosts."
+        title="Hostzustand"
+      />
     </AppPage>
   );
 }

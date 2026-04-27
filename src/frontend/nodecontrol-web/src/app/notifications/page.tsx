@@ -4,7 +4,10 @@ import { PlaceholderProductPage } from "@/components/layout/PlaceholderProductPa
 export default function NotificationsPage() {
   return (
     <AppPage>
-      <PlaceholderProductPage title="Benachrichtigungen" />
+      <PlaceholderProductPage
+        description="Benachrichtigungen werden später über Run-Ergebnisse, Fehler und wichtige Systemereignisse informieren."
+        title="Benachrichtigungen"
+      />
     </AppPage>
   );
 }

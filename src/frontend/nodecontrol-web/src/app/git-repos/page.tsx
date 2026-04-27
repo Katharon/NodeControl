@@ -4,7 +4,10 @@ import { PlaceholderProductPage } from "@/components/layout/PlaceholderProductPa
 export default function GitReposPage() {
   return (
     <AppPage>
-      <PlaceholderProductPage title="Git-Repos" />
+      <PlaceholderProductPage
+        description="Git-Repos sind für spätere playbook- und artifact-basierte Workflows vorgesehen."
+        title="Git-Repos"
+      />
     </AppPage>
   );
 }

@@ -4,7 +4,10 @@ import { PlaceholderProductPage } from "@/components/layout/PlaceholderProductPa
 export default function ImportPage() {
   return (
     <AppPage>
-      <PlaceholderProductPage title="Import" />
+      <PlaceholderProductPage
+        description="Import wird später bestehende Hosts, Inventare und Automationsdefinitionen kontrolliert übernehmen."
+        title="Import"
+      />
     </AppPage>
   );
 }

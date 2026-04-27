@@ -4,7 +4,10 @@ import { PlaceholderProductPage } from "@/components/layout/PlaceholderProductPa
 export default function SecurityPage() {
   return (
     <AppPage>
-      <PlaceholderProductPage title="Sicherheit" />
+      <PlaceholderProductPage
+        description="Sicherheit bündelt später Härtung, Auth-Konfiguration und sicherheitsrelevante Betriebseinstellungen."
+        title="Sicherheit"
+      />
     </AppPage>
   );
 }

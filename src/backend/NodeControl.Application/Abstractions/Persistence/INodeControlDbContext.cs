@@ -21,6 +21,11 @@ public interface INodeControlDbContext
 
     Task<User?> FindUserAsync(Guid id, CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<User>> SearchUsersAsync(string? query, int limit, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
     Task<IReadOnlyList<Customer>> ListActiveCustomersAsync(CancellationToken cancellationToken);
 
     Task<IReadOnlyList<Customer>> ListActiveCustomersForUserAsync(Guid userId, CancellationToken cancellationToken);

@@ -4,7 +4,10 @@ import { PlaceholderProductPage } from "@/components/layout/PlaceholderProductPa
 export default function UsersPage() {
   return (
     <AppPage>
-      <PlaceholderProductPage title="Benutzer" />
+      <PlaceholderProductPage
+        description="Benutzerverwaltung und Einladungen folgen später. Aktuell entstehen Benutzer über die OIDC-Anmeldung."
+        title="Benutzer"
+      />
     </AppPage>
   );
 }

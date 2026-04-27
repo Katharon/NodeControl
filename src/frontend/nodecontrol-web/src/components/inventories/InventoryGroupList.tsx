@@ -19,6 +19,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { InventoryGroupDetails } from "@/components/inventories/InventoryGroupDetails";
 import { InventoryGroupForm } from "@/components/inventories/InventoryGroupForm";
+import { InventoryPreviewCard } from "@/components/inventories/InventoryPreviewCard";
 import {
   archiveInventoryGroup,
   createInventoryGroup,
@@ -34,6 +35,7 @@ export function InventoryGroupList({ customerId, canManageNodes }: InventoryGrou
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [previewGroupId, setPreviewGroupId] = useState<string | null>(null);
   const groupsQuery = useQuery({
     queryKey: ["inventory-groups", customerId],
     queryFn: () => getInventoryGroups(customerId),
@@ -64,6 +66,7 @@ export function InventoryGroupList({ customerId, canManageNodes }: InventoryGrou
 
   const selectedGroup =
     groupsQuery.data.find((group) => group.id === selectedGroupId) ?? groupsQuery.data[0];
+  const previewGroup = groupsQuery.data.find((group) => group.id === previewGroupId) ?? null;
 
   return (
     <Stack sx={{ gap: 2 }}>
@@ -99,7 +102,13 @@ export function InventoryGroupList({ customerId, canManageNodes }: InventoryGrou
                   </Stack>
                 </Stack>
                 <Stack direction="row" sx={{ gap: 1 }}>
-                  <Button onClick={() => setSelectedGroupId(group.id)} variant="outlined">
+                  <Button
+                    onClick={() => {
+                      setSelectedGroupId(group.id);
+                      setPreviewGroupId(group.id);
+                    }}
+                    variant="outlined"
+                  >
                     Vorschau
                   </Button>
                   {canManageNodes ? (
@@ -137,6 +146,20 @@ export function InventoryGroupList({ customerId, canManageNodes }: InventoryGrou
             }}
             submitLabel="Inventar anlegen"
           />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        fullWidth
+        maxWidth="md"
+        onClose={() => setPreviewGroupId(null)}
+        open={Boolean(previewGroup)}
+      >
+        <DialogTitle>Inventarvorschau{previewGroup ? `: ${previewGroup.name}` : ""}</DialogTitle>
+        <DialogContent>
+          {previewGroup ? (
+            <InventoryPreviewCard customerId={customerId} inventoryGroupId={previewGroup.id} />
+          ) : null}
         </DialogContent>
       </Dialog>
     </Stack>

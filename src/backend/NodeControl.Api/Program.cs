@@ -20,6 +20,7 @@ app.MapAuthEndpoints();
 app.MapMeEndpoints();
 app.MapCustomersEndpoints();
 app.MapCustomerMembershipsEndpoints();
+app.MapCustomerUserLookupEndpoints();
 app.MapControlNodesEndpoints();
 app.MapManagedNodesEndpoints();
 app.MapInventoryGroupsEndpoints();

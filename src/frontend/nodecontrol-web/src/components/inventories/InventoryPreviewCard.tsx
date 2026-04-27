@@ -16,30 +16,46 @@ export function InventoryPreviewCard({ customerId, inventoryGroupId }: Inventory
   });
 
   if (previewQuery.isPending) {
-    return <CircularProgress size={22} />;
+    return (
+      <Paper variant="outlined" sx={{ bgcolor: "background.paper", p: 2 }}>
+        <Stack direction="row" sx={{ alignItems: "center", gap: 2 }}>
+          <CircularProgress size={22} />
+          <Typography color="text.secondary">Inventarvorschau wird geladen.</Typography>
+        </Stack>
+      </Paper>
+    );
   }
 
   if (previewQuery.isError) {
     return <Alert severity="error">Inventarvorschau konnte nicht geladen werden.</Alert>;
   }
 
+  const content = previewQuery.data.content.trim();
+
+  if (!content) {
+    return <Alert severity="info">Diese Inventarvorschau enthält noch keine Hosts.</Alert>;
+  }
+
   return (
-    <Paper variant="outlined" sx={{ bgcolor: "grey.950", color: "grey.100", p: 2 }}>
+    <Paper variant="outlined" sx={{ bgcolor: "background.paper", color: "text.primary", p: 2 }}>
       <Stack sx={{ gap: 1 }}>
-        <Typography color="grey.400" variant="body2">
+        <Typography color="text.secondary" variant="body2">
           {previewQuery.data.format}
         </Typography>
         <Typography
           component="pre"
           sx={{
+            bgcolor: "action.hover",
+            borderRadius: 1,
             fontFamily: "monospace",
             fontSize: 14,
             m: 0,
             overflow: "auto",
+            p: 2,
             whiteSpace: "pre",
           }}
         >
-          {previewQuery.data.content}
+          {content}
         </Typography>
       </Stack>
     </Paper>

@@ -4,7 +4,10 @@ import { PlaceholderProductPage } from "@/components/layout/PlaceholderProductPa
 export default function CollectionsPage() {
   return (
     <AppPage>
-      <PlaceholderProductPage title="Collections" />
+      <PlaceholderProductPage
+        description="Collections werden später helfen, externe Ansible-Abhängigkeiten nachvollziehbar zu verwalten."
+        title="Collections"
+      />
     </AppPage>
   );
 }

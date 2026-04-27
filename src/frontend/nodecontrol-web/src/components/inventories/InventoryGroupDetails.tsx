@@ -15,7 +15,6 @@ import {
 } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { InventoryPreviewCard } from "@/components/inventories/InventoryPreviewCard";
 import { getManagedNodes } from "@/lib/api/managedNodes";
 import {
   addManagedNodeToInventoryGroup,
@@ -131,8 +130,6 @@ export function InventoryGroupDetails({
             ))
           )}
         </Stack>
-
-        <InventoryPreviewCard customerId={customerId} inventoryGroupId={inventoryGroup.id} />
       </Stack>
     </Paper>
   );

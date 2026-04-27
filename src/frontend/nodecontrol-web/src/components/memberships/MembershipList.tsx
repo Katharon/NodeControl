@@ -79,10 +79,18 @@ export function MembershipList({ customerId }: MembershipListProps) {
             Benutzer
           </Typography>
           <MembershipForm
+            customerId={customerId}
+            existingUserIds={membershipsQuery.data.map((membership) => membership.userId)}
             onSubmit={async (input) => {
               await createMutation.mutateAsync(input);
             }}
           />
+          {createMutation.isError ? (
+            <Alert severity="error">
+              Mitgliedschaft konnte nicht angelegt werden. Prüfe, ob der Benutzer bereits
+              Mitglied ist.
+            </Alert>
+          ) : null}
         </Stack>
       </Paper>
 

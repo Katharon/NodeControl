@@ -20,6 +20,7 @@ using NodeControl.Application.Playbooks;
 using NodeControl.Application.Schedules;
 using NodeControl.Application.Secrets;
 using NodeControl.Application.Templates;
+using NodeControl.Application.Users;
 using NodeControl.Application.Validation;
 using NodeControl.Application.VariableSets;
 using NodeControl.Infrastructure;
@@ -49,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<AuditLogService>();
         services.AddScoped<CustomerService>();
         services.AddScoped<CustomerMembershipService>();
+        services.AddScoped<UserLookupService>();
         services.AddScoped<ControlNodeService>();
         services.AddScoped<ManagedNodeService>();
         services.AddScoped<InventoryGroupService>();

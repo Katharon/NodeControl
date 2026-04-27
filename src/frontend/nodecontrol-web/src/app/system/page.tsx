@@ -4,7 +4,10 @@ import { PlaceholderProductPage } from "@/components/layout/PlaceholderProductPa
 export default function SystemPage() {
   return (
     <AppPage>
-      <PlaceholderProductPage title="System" />
+      <PlaceholderProductPage
+        description="System zeigt später technische Zustände, Versionen und Betriebsinformationen der NodeControl-Installation."
+        title="System"
+      />
     </AppPage>
   );
 }

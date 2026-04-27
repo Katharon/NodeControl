@@ -131,6 +131,111 @@ public sealed class CustomerEndpointsTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Owner_can_search_safe_user_fields_for_membership_selection()
+    {
+        await using var factory = CustomerApiFactory.ForNormalUser();
+        var user = factory.SeedCurrentUser();
+        var customer = Customer.Create("Customer A", "customer-a", null, TestTime);
+        var targetUser = User.Create("Demo Operator", "operator@nodecontrol.local", false, TestTime);
+        factory.DbContext.AddCustomer(customer);
+        factory.DbContext.AddUser(targetUser);
+        factory.DbContext.AddCustomerMembership(CustomerMembership.Create(customer, user, CustomerRole.Owner, TestTime));
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync($"/api/v1/customers/{customer.Id}/users/lookup?query=operator");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var result = document.RootElement[0];
+        Assert.Equal(targetUser.Id, result.GetProperty("id").GetGuid());
+        Assert.Equal("Demo Operator", result.GetProperty("displayName").GetString());
+        Assert.Equal("operator@nodecontrol.local", result.GetProperty("email").GetString());
+        Assert.True(result.GetProperty("isActive").GetBoolean());
+        Assert.False(result.GetProperty("isPlatformAdmin").GetBoolean());
+        Assert.False(result.TryGetProperty("normalizedEmail", out _));
+        Assert.False(result.TryGetProperty("createdAt", out _));
+        Assert.False(result.TryGetProperty("lastLoginAt", out _));
+    }
+
+    [Fact]
+    public async Task User_lookup_requires_manage_memberships_permission()
+    {
+        await using var factory = CustomerApiFactory.ForNormalUser();
+        var user = factory.SeedCurrentUser();
+        var customer = Customer.Create("Customer A", "customer-a", null, TestTime);
+        factory.DbContext.AddCustomer(customer);
+        factory.DbContext.AddCustomerMembership(CustomerMembership.Create(customer, user, CustomerRole.Admin, TestTime));
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync($"/api/v1/customers/{customer.Id}/users/lookup?query=normal");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task User_lookup_is_customer_scoped()
+    {
+        await using var factory = CustomerApiFactory.ForNormalUser();
+        var user = factory.SeedCurrentUser();
+        var customerA = Customer.Create("Customer A", "customer-a", null, TestTime);
+        var customerB = Customer.Create("Customer B", "customer-b", null, TestTime);
+        factory.DbContext.AddCustomer(customerA);
+        factory.DbContext.AddCustomer(customerB);
+        factory.DbContext.AddCustomerMembership(CustomerMembership.Create(customerA, user, CustomerRole.Owner, TestTime));
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync($"/api/v1/customers/{customerB.Id}/users/lookup?query=normal");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Owner_can_create_membership_for_selected_user()
+    {
+        await using var factory = CustomerApiFactory.ForNormalUser();
+        var user = factory.SeedCurrentUser();
+        var customer = Customer.Create("Customer A", "customer-a", null, TestTime);
+        var targetUser = User.Create("Demo Viewer", "viewer@nodecontrol.local", false, TestTime);
+        factory.DbContext.AddCustomer(customer);
+        factory.DbContext.AddUser(targetUser);
+        factory.DbContext.AddCustomerMembership(CustomerMembership.Create(customer, user, CustomerRole.Owner, TestTime));
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsJsonAsync(
+            $"/api/v1/customers/{customer.Id}/memberships",
+            new { userId = targetUser.Id, role = "Viewer" });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Contains(factory.DbContext.CustomerMemberships, membership =>
+            membership.CustomerId == customer.Id
+            && membership.UserId == targetUser.Id
+            && membership.Role == CustomerRole.Viewer);
+    }
+
+    [Fact]
+    public async Task User_without_customer_access_cannot_create_membership()
+    {
+        await using var factory = CustomerApiFactory.ForNormalUser();
+        var user = factory.SeedCurrentUser();
+        var customerA = Customer.Create("Customer A", "customer-a", null, TestTime);
+        var customerB = Customer.Create("Customer B", "customer-b", null, TestTime);
+        var targetUser = User.Create("Demo Viewer", "viewer@nodecontrol.local", false, TestTime);
+        factory.DbContext.AddCustomer(customerA);
+        factory.DbContext.AddCustomer(customerB);
+        factory.DbContext.AddUser(targetUser);
+        factory.DbContext.AddCustomerMembership(CustomerMembership.Create(customerA, user, CustomerRole.Owner, TestTime));
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsJsonAsync(
+            $"/api/v1/customers/{customerB.Id}/memberships",
+            new { userId = targetUser.Id, role = "Viewer" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.DoesNotContain(factory.DbContext.CustomerMemberships, membership =>
+            membership.CustomerId == customerB.Id && membership.UserId == targetUser.Id);
+    }
+
     private static DateTimeOffset TestTime => new(2026, 4, 27, 8, 0, 0, TimeSpan.Zero);
 
     private sealed class CustomerApiFactory(
@@ -211,6 +316,30 @@ public sealed class CustomerEndpointsTests
             lock (syncRoot)
             {
                 return Task.FromResult(Users.FirstOrDefault(user => user.Id == id));
+            }
+        }
+
+        public Task<IReadOnlyList<User>> SearchUsersAsync(
+            string? query,
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                var normalizedQuery = string.IsNullOrWhiteSpace(query)
+                    ? string.Empty
+                    : query.Trim().ToUpperInvariant();
+
+                return Task.FromResult<IReadOnlyList<User>>(
+                    Users
+                        .Where(user => user.IsActive
+                            && (normalizedQuery.Length == 0
+                                || user.NormalizedEmail.Contains(normalizedQuery)
+                                || user.DisplayName.ToUpperInvariant().Contains(normalizedQuery)))
+                        .OrderBy(user => user.DisplayName)
+                        .ThenBy(user => user.Email)
+                        .Take(limit)
+                        .ToArray());
             }
         }
 

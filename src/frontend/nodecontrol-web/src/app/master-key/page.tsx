@@ -4,7 +4,10 @@ import { PlaceholderProductPage } from "@/components/layout/PlaceholderProductPa
 export default function MasterKeyPage() {
   return (
     <AppPage>
-      <PlaceholderProductPage title="Master-Key" />
+      <PlaceholderProductPage
+        description="Master-Key-Verwaltung ist für spätere Betriebs- und Wiederherstellungsprozesse rund um geschützte Werte vorgesehen."
+        title="Master-Key"
+      />
     </AppPage>
   );
 }
