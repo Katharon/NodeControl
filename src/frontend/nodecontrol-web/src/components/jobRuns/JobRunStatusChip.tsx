@@ -10,6 +10,8 @@ type JobRunStatusChipProps = {
 export function JobRunStatusChip({ status }: JobRunStatusChipProps) {
   const color = status === "Running"
     ? "info"
+    : status === "Cancelling"
+      ? "warning"
     : status === "Succeeded"
       ? "success"
       : status === "Failed" || status === "TimedOut"

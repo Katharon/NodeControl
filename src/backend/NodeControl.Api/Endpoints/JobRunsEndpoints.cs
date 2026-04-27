@@ -56,6 +56,44 @@ public static class JobRunsEndpoints
                     cancellationToken));
         });
 
+        group.MapPost("/{jobRunId:guid}/cancel", async (
+            Guid customerId,
+            Guid jobRunId,
+            CancelJobRunRequest? request,
+            CurrentUserService currentUserService,
+            JobRunService jobRunService,
+            CancellationToken cancellationToken) =>
+        {
+            var currentUser = await currentUserService.GetCurrentUserAsync(cancellationToken);
+            return currentUser is null
+                ? Results.Unauthorized()
+                : CustomersEndpoints.ToResult(await jobRunService.CancelAsync(
+                    currentUser,
+                    customerId,
+                    jobRunId,
+                    request ?? new CancelJobRunRequest(null),
+                    cancellationToken));
+        });
+
+        group.MapPost("/{jobRunId:guid}/retry", async (
+            Guid customerId,
+            Guid jobRunId,
+            CurrentUserService currentUserService,
+            JobRunService jobRunService,
+            CancellationToken cancellationToken) =>
+        {
+            var currentUser = await currentUserService.GetCurrentUserAsync(cancellationToken);
+            if (currentUser is null)
+            {
+                return Results.Unauthorized();
+            }
+
+            var result = await jobRunService.RetryAsync(currentUser, customerId, jobRunId, cancellationToken);
+            return CustomersEndpoints.ToResult(
+                result,
+                jobRun => $"/api/v1/customers/{customerId}/job-runs/{jobRun.Id}");
+        });
+
         return endpoints;
     }
 }

@@ -97,7 +97,7 @@ Backend:
 - ASP.NET Core Minimal APIs
 - Entity Framework Core
 - PostgreSQL
-- Quartz.NET for scheduling
+- Database-backed Worker schedule polling
 - Background worker for execution
 - xUnit and integration tests
 

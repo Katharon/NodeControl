@@ -30,7 +30,8 @@ public sealed class JobRunExecutionService(
 
     public async Task ExecuteAsync(JobRun jobRun, CancellationToken cancellationToken = default)
     {
-        if (jobRun.Status != JobRunStatus.Queued)
+        var currentStatus = await dbContext.GetJobRunStatusAsync(jobRun.Id, cancellationToken);
+        if (jobRun.Status != JobRunStatus.Queued || currentStatus != JobRunStatus.Queued)
         {
             return;
         }
@@ -85,10 +86,19 @@ public sealed class JobRunExecutionService(
                     workspace.StderrLogPath,
                     TimeSpan.FromSeconds(executionContext.Job!.DefaultTimeoutSeconds),
                     (line, token) => AppendLogAsync(jobRun, JobRunLogStream.StdOut, JobRunLogLevel.Info, line, token),
-                    (line, token) => AppendLogAsync(jobRun, JobRunLogStream.StdErr, JobRunLogLevel.Error, line, token)),
+                    (line, token) => AppendLogAsync(jobRun, JobRunLogStream.StdErr, JobRunLogLevel.Error, line, token),
+                    token => dbContext.IsJobRunCancellationRequestedAsync(jobRun.Id, token)),
                 cancellationToken);
 
-            if (runResult.TimedOut)
+            if (runResult.Cancelled || await dbContext.IsJobRunCancellationRequestedAsync(jobRun.Id, cancellationToken))
+            {
+                var errorMessage = runResult.ErrorMessage ?? "JobRun was cancelled.";
+                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Warning, "Cancellation observed by worker.", cancellationToken);
+                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Warning, "ansible-playbook terminated because cancellation was requested.", cancellationToken);
+                jobRun.MarkCancelled(runResult.ExitCode, errorMessage, clock.UtcNow);
+                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Warning, "JobRun cancelled.", cancellationToken);
+            }
+            else if (runResult.TimedOut)
             {
                 var errorMessage = runResult.ErrorMessage ?? "ansible-playbook execution timed out.";
                 await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken);

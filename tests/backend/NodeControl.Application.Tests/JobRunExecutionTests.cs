@@ -149,7 +149,7 @@ public sealed class JobRunExecutionTests
     public async Task JobRunExecutionService_sets_running_then_succeeded_when_runner_returns_exit_code_zero()
     {
         using var fixture = ExecutionFixture.Create();
-        var service = fixture.CreateExecutionService(new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, null)));
+        var service = fixture.CreateExecutionService(new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null)));
 
         await service.ExecuteAsync(fixture.JobRun);
 
@@ -163,7 +163,7 @@ public sealed class JobRunExecutionTests
     public async Task JobRunExecutionService_sets_failed_when_runner_returns_non_zero_exit_code()
     {
         using var fixture = ExecutionFixture.Create();
-        var service = fixture.CreateExecutionService(new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(2, false, "playbook failed")));
+        var service = fixture.CreateExecutionService(new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(2, false, false, "playbook failed")));
 
         await service.ExecuteAsync(fixture.JobRun);
 
@@ -176,7 +176,7 @@ public sealed class JobRunExecutionTests
     public async Task JobRunExecutionService_sets_timed_out_when_runner_reports_timeout()
     {
         using var fixture = ExecutionFixture.Create();
-        var service = fixture.CreateExecutionService(new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(null, true, "timeout")));
+        var service = fixture.CreateExecutionService(new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(null, true, false, "timeout")));
 
         await service.ExecuteAsync(fixture.JobRun);
 
@@ -189,7 +189,7 @@ public sealed class JobRunExecutionTests
     {
         using var fixture = ExecutionFixture.Create();
         var service = fixture.CreateExecutionService(
-            new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, null)),
+            new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null)),
             new FailingWorkspaceBuilder("setup failed"));
 
         await service.ExecuteAsync(fixture.JobRun);
@@ -202,7 +202,7 @@ public sealed class JobRunExecutionTests
     public async Task JobRunExecutionService_stores_stdout_and_stderr_log_paths()
     {
         using var fixture = ExecutionFixture.Create();
-        var service = fixture.CreateExecutionService(new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, null)));
+        var service = fixture.CreateExecutionService(new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null)));
 
         await service.ExecuteAsync(fixture.JobRun);
 
@@ -212,11 +212,56 @@ public sealed class JobRunExecutionTests
     }
 
     [Fact]
+    public async Task JobRunExecutionService_skips_job_run_cancelled_while_queued()
+    {
+        using var fixture = ExecutionFixture.Create();
+        fixture.JobRun.RequestCancellation(fixture.User.Id, "no longer needed", TestTime);
+        var runner = new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null));
+        var service = fixture.CreateExecutionService(runner);
+
+        await service.ExecuteAsync(fixture.JobRun);
+
+        Assert.Empty(runner.Requests);
+        Assert.Equal(JobRunStatus.Cancelled, fixture.JobRun.Status);
+    }
+
+    [Fact]
+    public async Task JobRunExecutionService_detects_running_cancellation_and_marks_cancelled()
+    {
+        using var fixture = ExecutionFixture.Create();
+        var runner = new CancellingAnsibleRunner(fixture.JobRun, fixture.User.Id);
+        var service = fixture.CreateExecutionService(runner);
+
+        await service.ExecuteAsync(fixture.JobRun);
+
+        Assert.True(runner.ObservedCancellation);
+        Assert.Equal(JobRunStatus.Cancelled, fixture.JobRun.Status);
+        Assert.Contains(fixture.Db.JobRunLogEntries, entry =>
+            entry.Stream == JobRunLogStream.System
+            && entry.Message == "Cancellation observed by worker.");
+        Assert.Contains(fixture.Db.JobRunLogEntries, entry =>
+            entry.Stream == JobRunLogStream.System
+            && entry.Message == "JobRun cancelled.");
+    }
+
+    [Fact]
+    public async Task JobRunExecutionService_does_not_overwrite_cancelled_with_succeeded()
+    {
+        using var fixture = ExecutionFixture.Create();
+        var service = fixture.CreateExecutionService(new CancellingAnsibleRunner(fixture.JobRun, fixture.User.Id));
+
+        await service.ExecuteAsync(fixture.JobRun);
+
+        Assert.Equal(JobRunStatus.Cancelled, fixture.JobRun.Status);
+        Assert.NotEqual(JobRunStatus.Succeeded, fixture.JobRun.Status);
+    }
+
+    [Fact]
     public async Task JobRunExecutionService_persists_system_stdout_and_stderr_log_entries()
     {
         using var fixture = ExecutionFixture.Create();
         var service = fixture.CreateExecutionService(new FakeAnsibleRunner(
-            _ => new AnsiblePlaybookRunResult(1, false, "playbook failed"),
+            _ => new AnsiblePlaybookRunResult(1, false, false, "playbook failed"),
             StdoutLines: ["ok: [web-01]"],
             StderrLines: ["fatal: [web-01]"]));
 
@@ -243,7 +288,7 @@ public sealed class JobRunExecutionTests
     public async Task QueuedJobRunWorker_ignores_when_no_queued_job_runs_exist()
     {
         using var fixture = ExecutionFixture.Create(addJobRun: false);
-        var runner = new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, null));
+        var runner = new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null));
         using var provider = fixture.CreateWorkerServiceProvider(runner);
         var worker = new QueuedJobRunWorker(
             provider.GetRequiredService<IServiceScopeFactory>(),
@@ -261,7 +306,7 @@ public sealed class JobRunExecutionTests
         using var fixture = ExecutionFixture.Create(addJobRun: false);
         var newer = fixture.AddJobRun(TestTime.AddMinutes(2));
         var older = fixture.AddJobRun(TestTime.AddMinutes(1));
-        var runner = new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, null));
+        var runner = new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null));
         using var provider = fixture.CreateWorkerServiceProvider(runner);
         var worker = new QueuedJobRunWorker(
             provider.GetRequiredService<IServiceScopeFactory>(),
@@ -307,6 +352,26 @@ public sealed class JobRunExecutionTests
             }
 
             return handler(request);
+        }
+    }
+
+    private sealed class CancellingAnsibleRunner(JobRun jobRun, Guid userId) : IAnsiblePlaybookRunner
+    {
+        public bool ObservedCancellation { get; private set; }
+
+        public async Task<AnsiblePlaybookRunResult> RunAsync(
+            AnsiblePlaybookRunRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            jobRun.RequestCancellation(userId, "stop", TestTime);
+            ObservedCancellation = request.IsCancellationRequested is not null
+                && await request.IsCancellationRequested(cancellationToken);
+
+            return new AnsiblePlaybookRunResult(
+                130,
+                false,
+                ObservedCancellation,
+                ObservedCancellation ? "ansible-playbook was cancelled." : "cancellation was not observed.");
         }
     }
 

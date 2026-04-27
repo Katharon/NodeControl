@@ -211,6 +211,19 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
                 .HasColumnType("timestamp with time zone")
                 .HasColumnName("created_at");
 
+            b.Property<DateTimeOffset?>("CancellationRequestedAtUtc")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("cancellation_requested_at_utc");
+
+            b.Property<Guid?>("CancellationRequestedByUserId")
+                .HasColumnType("uuid")
+                .HasColumnName("cancellation_requested_by_user_id");
+
+            b.Property<string>("CancellationReason")
+                .HasMaxLength(1000)
+                .HasColumnType("character varying(1000)")
+                .HasColumnName("cancellation_reason");
+
             b.Property<Guid>("CustomerId")
                 .HasColumnType("uuid")
                 .HasColumnName("customer_id");
@@ -409,6 +422,14 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
                 .HasColumnType("timestamp with time zone")
                 .HasColumnName("queued_at");
 
+            b.Property<Guid?>("RetriedFromJobRunId")
+                .HasColumnType("uuid")
+                .HasColumnName("retried_from_job_run_id");
+
+            b.Property<int>("RetryAttempt")
+                .HasColumnType("integer")
+                .HasColumnName("retry_attempt");
+
             b.Property<Guid?>("ScheduleId")
                 .HasColumnType("uuid")
                 .HasColumnName("schedule_id");
@@ -451,8 +472,14 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
             b.HasKey("Id")
                 .HasName("pk_job_runs");
 
+            b.HasIndex("CancellationRequestedByUserId")
+                .HasDatabaseName("ix_job_runs_cancellation_requested_by_user_id");
+
             b.HasIndex("JobId")
                 .HasDatabaseName("ix_job_runs_job_id");
+
+            b.HasIndex("RetriedFromJobRunId")
+                .HasDatabaseName("ix_job_runs_retried_from_job_run_id");
 
             b.HasIndex("Status", "QueuedAt")
                 .HasDatabaseName("ix_job_runs_status_queued_at");
@@ -1009,6 +1036,18 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
                 .OnDelete(DeleteBehavior.Restrict)
                 .IsRequired()
                 .HasConstraintName("fk_job_runs_jobs_job_id");
+
+            b.HasOne("NodeControl.Domain.Jobs.JobRun", null)
+                .WithMany()
+                .HasForeignKey("RetriedFromJobRunId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_job_runs_job_runs_retried_from_job_run_id");
+
+            b.HasOne("NodeControl.Domain.Users.User", null)
+                .WithMany()
+                .HasForeignKey("CancellationRequestedByUserId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_job_runs_users_cancellation_requested_by_user_id");
 
             b.HasOne("NodeControl.Domain.Users.User", null)
                 .WithMany()

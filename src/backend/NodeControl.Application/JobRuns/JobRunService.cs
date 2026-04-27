@@ -96,6 +96,93 @@ public sealed class JobRunService(
         }
     }
 
+    public async Task<CustomerServiceResult<JobRunDto>> CancelAsync(
+        CurrentUserDto currentUser,
+        Guid customerId,
+        Guid jobRunId,
+        CancelJobRunRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var authorization = await AuthorizeAsync(currentUser, customerId, Permission.CancelJobRuns, cancellationToken);
+        if (authorization != CustomerAuthorizationResult.Allowed)
+        {
+            return CustomerServiceResult<JobRunDto>.FromAuthorization(authorization);
+        }
+
+        var jobRun = await dbContext.FindJobRunAsync(customerId, jobRunId, cancellationToken);
+        if (jobRun is null)
+        {
+            return CustomerServiceResult<JobRunDto>.NotFound();
+        }
+
+        try
+        {
+            var wasCancelling = jobRun.Status == JobRunStatus.Cancelling;
+            jobRun.RequestCancellation(currentUser.Id, request.Reason, clock.UtcNow);
+            if (!wasCancelling)
+            {
+                await AppendSystemLogAsync(jobRun, JobRunLogLevel.Warning, "Cancellation requested.", cancellationToken);
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return CustomerServiceResult<JobRunDto>.Ok(Map(jobRun));
+        }
+        catch (ArgumentException)
+        {
+            return CustomerServiceResult<JobRunDto>.BadRequest();
+        }
+        catch (InvalidOperationException)
+        {
+            return CustomerServiceResult<JobRunDto>.Conflict();
+        }
+    }
+
+    public async Task<CustomerServiceResult<JobRunDto>> RetryAsync(
+        CurrentUserDto currentUser,
+        Guid customerId,
+        Guid jobRunId,
+        CancellationToken cancellationToken = default)
+    {
+        var authorization = await AuthorizeAsync(currentUser, customerId, Permission.RetryJobRuns, cancellationToken);
+        if (authorization != CustomerAuthorizationResult.Allowed)
+        {
+            return CustomerServiceResult<JobRunDto>.FromAuthorization(authorization);
+        }
+
+        var original = await dbContext.FindJobRunAsync(customerId, jobRunId, cancellationToken);
+        if (original is null)
+        {
+            return CustomerServiceResult<JobRunDto>.NotFound();
+        }
+
+        var job = await dbContext.FindJobAsync(customerId, original.JobId, cancellationToken);
+        if (job is null)
+        {
+            return CustomerServiceResult<JobRunDto>.BadRequest();
+        }
+
+        if (job.Status != JobStatus.Active || !await ReferencesAreActiveAsync(job, cancellationToken))
+        {
+            return CustomerServiceResult<JobRunDto>.BadRequest();
+        }
+
+        try
+        {
+            var retry = JobRun.CreateRetry(original, job, currentUser.Id, clock.UtcNow);
+            dbContext.AddJobRun(retry);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return CustomerServiceResult<JobRunDto>.Ok(Map(retry));
+        }
+        catch (ArgumentException)
+        {
+            return CustomerServiceResult<JobRunDto>.BadRequest();
+        }
+        catch (InvalidOperationException)
+        {
+            return CustomerServiceResult<JobRunDto>.Conflict();
+        }
+    }
+
     private async Task<bool> ReferencesAreActiveAsync(Job job, CancellationToken cancellationToken)
     {
         var controlNode = await dbContext.FindControlNodeAsync(job.CustomerId, job.ControlNodeId, cancellationToken);
@@ -137,6 +224,22 @@ public sealed class JobRunService(
         return await authorizationService.AuthorizeAsync(currentUser, customerId, permission, cancellationToken);
     }
 
+    private async Task AppendSystemLogAsync(
+        JobRun jobRun,
+        JobRunLogLevel level,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        var sequence = await dbContext.GetNextJobRunLogSequenceAsync(jobRun.Id, cancellationToken);
+        dbContext.AddJobRunLogEntry(JobRunLogEntry.Create(
+            jobRun,
+            sequence,
+            clock.UtcNow,
+            JobRunLogStream.System,
+            level,
+            message));
+    }
+
     private static JobRunDto Map(JobRun jobRun)
     {
         return new JobRunDto(
@@ -146,6 +249,8 @@ public sealed class JobRunService(
             jobRun.TriggerType,
             jobRun.TriggeredByUserId,
             jobRun.ScheduleId,
+            jobRun.RetriedFromJobRunId,
+            jobRun.RetryAttempt,
             jobRun.Status,
             jobRun.QueuedAt,
             jobRun.StartedAt,
@@ -155,6 +260,9 @@ public sealed class JobRunService(
             jobRun.WorkspacePath,
             jobRun.StdoutLogPath,
             jobRun.StderrLogPath,
+            jobRun.CancellationRequestedAtUtc,
+            jobRun.CancellationRequestedByUserId,
+            jobRun.CancellationReason,
             jobRun.CreatedAt);
     }
 }

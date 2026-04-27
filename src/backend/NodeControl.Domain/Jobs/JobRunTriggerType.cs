@@ -4,5 +4,6 @@ public enum JobRunTriggerType
 {
     Manual = 1,
     Scheduled = 2,
-    System = 3
+    System = 3,
+    Retry = 4
 }

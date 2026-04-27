@@ -341,6 +341,23 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
             .FirstOrDefault());
     }
 
+    public Task<JobRunStatus?> GetJobRunStatusAsync(Guid jobRunId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(JobRuns
+            .Where(jobRun => jobRun.Id == jobRunId)
+            .Select(jobRun => (JobRunStatus?)jobRun.Status)
+            .FirstOrDefault());
+    }
+
+    public Task<bool> IsJobRunCancellationRequestedAsync(Guid jobRunId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(JobRuns.Any(jobRun =>
+            jobRun.Id == jobRunId
+            && (jobRun.Status == JobRunStatus.Cancelling
+                || (jobRun.CancellationRequestedAtUtc is not null
+                    && jobRun.Status is JobRunStatus.Running or JobRunStatus.Cancelling))));
+    }
+
     public Task<long> GetNextJobRunLogSequenceAsync(Guid jobRunId, CancellationToken cancellationToken)
     {
         var currentMax = JobRunLogEntries

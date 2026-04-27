@@ -9,6 +9,8 @@ public sealed record JobRunDto(
     JobRunTriggerType TriggerType,
     Guid? TriggeredByUserId,
     Guid? ScheduleId,
+    Guid? RetriedFromJobRunId,
+    int RetryAttempt,
     JobRunStatus Status,
     DateTimeOffset QueuedAt,
     DateTimeOffset? StartedAt,
@@ -18,4 +20,7 @@ public sealed record JobRunDto(
     string? WorkspacePath,
     string? StdoutLogPath,
     string? StderrLogPath,
+    DateTimeOffset? CancellationRequestedAtUtc,
+    Guid? CancellationRequestedByUserId,
+    string? CancellationReason,
     DateTimeOffset CreatedAt);

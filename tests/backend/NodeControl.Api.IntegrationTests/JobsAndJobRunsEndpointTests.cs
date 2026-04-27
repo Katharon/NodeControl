@@ -241,6 +241,98 @@ public sealed class JobsAndJobRunsEndpointTests
     }
 
     [Fact]
+    public async Task Post_cancel_job_run_requires_cancel_job_runs()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Operator);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        var jobRun = factory.Db.AddJobRunForCustomer(seeded.Customer.Id, seeded.User.Id);
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsJsonAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/job-runs/{jobRun.Id}/cancel",
+            new CancelJobRunRequest("stop"),
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_cancel_job_run_returns_updated_job_run()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Owner);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        var jobRun = factory.Db.AddJobRunForCustomer(seeded.Customer.Id, seeded.User.Id);
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsJsonAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/job-runs/{jobRun.Id}/cancel",
+            new CancelJobRunRequest("stop"),
+            JsonOptions);
+        var dto = await response.Content.ReadFromJsonAsync<JobRunDto>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(JobRunStatus.Cancelled, dto!.Status);
+        Assert.Equal("stop", dto.CancellationReason);
+    }
+
+    [Fact]
+    public async Task Post_retry_job_run_requires_retry_job_runs()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Viewer);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        var jobRun = factory.Db.AddTerminalJobRunForCustomer(seeded.Customer.Id, seeded.User.Id, JobRunStatus.Failed);
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/job-runs/{jobRun.Id}/retry",
+            JsonContent.Create(new { }));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_retry_job_run_returns_new_queued_retry_job_run()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Operator);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        var original = factory.Db.AddTerminalJobRunForCustomer(seeded.Customer.Id, seeded.User.Id, JobRunStatus.Failed);
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/job-runs/{original.Id}/retry",
+            JsonContent.Create(new { }));
+        var dto = await response.Content.ReadFromJsonAsync<JobRunDto>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(JobRunStatus.Queued, dto!.Status);
+        Assert.Equal(JobRunTriggerType.Retry, dto.TriggerType);
+        Assert.Equal(original.Id, dto.RetriedFromJobRunId);
+        Assert.Equal(1, dto.RetryAttempt);
+    }
+
+    [Fact]
+    public async Task Job_run_operational_endpoints_reject_cross_tenant_access()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Owner);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        var otherCustomer = Customer.Create("Other Customer", "other-customer", null, TestTime);
+        factory.Db.AddCustomer(otherCustomer);
+        var otherRun = factory.Db.AddTerminalJobRunForCustomer(otherCustomer.Id, seeded.User.Id, JobRunStatus.Failed, "other");
+        using var client = factory.CreateClient();
+
+        using var cancelResponse = await client.PostAsJsonAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/job-runs/{otherRun.Id}/cancel",
+            new CancelJobRunRequest(null),
+            JsonOptions);
+        using var retryResponse = await client.PostAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/job-runs/{otherRun.Id}/retry",
+            JsonContent.Create(new { }));
+
+        Assert.Equal(HttpStatusCode.NotFound, cancelResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, retryResponse.StatusCode);
+    }
+
+    [Fact]
     public async Task Get_job_runs_requires_customer_membership()
     {
         await using var factory = DefinitionApiFactory.CreateWithoutMembership();
@@ -900,6 +992,38 @@ public sealed class JobsAndJobRunsEndpointTests
                     TestTime));
                 var jobRun = JobRun.CreateManual(job, userId, TestTime);
                 JobRuns.Add(jobRun);
+                return jobRun;
+            }
+        }
+
+        public JobRun AddTerminalJobRunForCustomer(
+            Guid customerId,
+            Guid userId,
+            JobRunStatus status,
+            string suffix = "a")
+        {
+            lock (syncRoot)
+            {
+                var jobRun = AddJobRunForCustomer(customerId, userId, suffix);
+                jobRun.MarkRunning(TestTime);
+                switch (status)
+                {
+                    case JobRunStatus.Succeeded:
+                        jobRun.MarkSucceeded(0, TestTime);
+                        break;
+                    case JobRunStatus.Failed:
+                        jobRun.MarkFailed(1, "failed", TestTime);
+                        break;
+                    case JobRunStatus.Cancelled:
+                        jobRun.MarkCancelled(130, "cancelled", TestTime);
+                        break;
+                    case JobRunStatus.TimedOut:
+                        jobRun.MarkTimedOut(null, "timeout", TestTime);
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(status), status, "Status must be terminal.");
+                }
+
                 return jobRun;
             }
         }

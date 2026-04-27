@@ -131,6 +131,7 @@ Initial statuses:
 
 - Queued
 - Running
+- Cancelling
 - Succeeded
 - Failed
 - Cancelled
@@ -231,14 +232,16 @@ Post-MVP may add:
 
 ## Cancellation
 
-MVP should model cancellation, but actual process cancellation can be implemented after basic execution works.
+The API can cancel queued JobRuns or request cancellation for running JobRuns.
 
-Desired later behavior:
+- Queued cancellation immediately sets the JobRun to Cancelled.
+- Running cancellation sets the JobRun to Cancelling.
+- The API never kills operating system processes.
+- The Worker observes cancellation state in the database while `ansible-playbook` is running.
+- The Worker terminates the process tree, writes cancellation logs, and marks the JobRun Cancelled.
 
-- User cancels JobRun.
-- Worker terminates process.
-- Status becomes Cancelled.
-- AuditLog records cancellation.
+Cancelled, failed, and timed-out JobRuns can be retried by creating a new queued JobRun with
+`TriggerType = Retry`. The retry keeps a link to the original JobRun through `RetriedFromJobRunId`.
 
 ## Timeouts
 

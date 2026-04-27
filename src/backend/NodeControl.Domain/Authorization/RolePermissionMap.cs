@@ -18,6 +18,7 @@ public static class RolePermissionMap
         Permission.ViewNodes,
         Permission.ViewPlaybooks,
         Permission.RunJobs,
+        Permission.RetryJobRuns,
         Permission.ViewJobRuns,
         Permission.ViewSchedules
     };

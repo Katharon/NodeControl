@@ -4,8 +4,9 @@ public enum JobRunStatus
 {
     Queued = 1,
     Running = 2,
-    Succeeded = 3,
-    Failed = 4,
-    Cancelled = 5,
-    TimedOut = 6
+    Cancelling = 3,
+    Succeeded = 4,
+    Failed = 5,
+    Cancelled = 6,
+    TimedOut = 7
 }

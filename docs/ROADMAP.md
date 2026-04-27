@@ -115,8 +115,8 @@ Deliverables:
 
 Current implementation note: manual runs can be queued through the API and processed by `NodeControl.Worker`
 with local `ansible-playbook` execution for inline YAML playbooks. JobRun logs are persisted and exposed
-read-only through the API. Cancellation, retries, remote control-node dispatch, Quartz, and audit log
-persistence remain later slices.
+read-only through the API. Remote control-node dispatch, Quartz, and audit log persistence remain later
+slices.
 
 This is the most important MVP milestone.
 
@@ -152,6 +152,11 @@ Deliverables:
 - ControlNode health
 - ManagedNode status
 - Basic system health endpoint
+
+Current implementation note: JobRun operational controls allow queued cancellation, running cancellation
+requests, Worker process termination for cancelled runs, and retries for failed, timed-out, or cancelled
+JobRuns. The API only updates JobRun state or creates queued retry JobRuns; Ansible execution and process
+termination remain Worker responsibilities.
 
 ## Phase 8: Security and Hardening
 

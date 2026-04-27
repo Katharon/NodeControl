@@ -14,7 +14,7 @@ public sealed class AnsiblePlaybookRunner(IOptions<ExecutionOptions> options) : 
         CancellationToken cancellationToken = default)
     {
         var result = await RunProcessAsync(request, cancellationToken);
-        return new AnsiblePlaybookRunResult(result.ExitCode, result.TimedOut, result.ErrorMessage);
+        return new AnsiblePlaybookRunResult(result.ExitCode, result.TimedOut, result.Cancelled, result.ErrorMessage);
     }
 
     private async Task<AnsibleExecutionResult> RunProcessAsync(
@@ -44,12 +44,12 @@ public sealed class AnsiblePlaybookRunner(IOptions<ExecutionOptions> options) : 
         {
             if (!process.Start())
             {
-                return new AnsibleExecutionResult(null, false, "ansible-playbook could not be started.");
+                return new AnsibleExecutionResult(null, false, false, "ansible-playbook could not be started.");
             }
         }
         catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
         {
-            return new AnsibleExecutionResult(null, false, $"ansible-playbook could not be started: {exception.Message}");
+            return new AnsibleExecutionResult(null, false, false, $"ansible-playbook could not be started: {exception.Message}");
         }
 
         var stdoutCopy = CaptureLinesAsync(
@@ -63,22 +63,39 @@ public sealed class AnsiblePlaybookRunner(IOptions<ExecutionOptions> options) : 
             request.OnStderrLine,
             cancellationToken);
 
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(request.Timeout);
+        var deadlineUtc = DateTimeOffset.UtcNow.Add(request.Timeout);
+        while (!process.HasExited)
+        {
+            if (request.IsCancellationRequested is not null
+                && await request.IsCancellationRequested(cancellationToken))
+            {
+                TryKillProcessTree(process);
+                await process.WaitForExitAsync(CancellationToken.None);
+                await Task.WhenAll(IgnoreCancellation(stdoutCopy), IgnoreCancellation(stderrCopy));
+                return new AnsibleExecutionResult(
+                    TryGetExitCode(process),
+                    false,
+                    true,
+                    "ansible-playbook was cancelled.");
+            }
 
-        try
-        {
-            await process.WaitForExitAsync(timeoutCts.Token);
-            await Task.WhenAll(stdoutCopy, stderrCopy);
-            return new AnsibleExecutionResult(process.ExitCode, false, null);
+            if (DateTimeOffset.UtcNow >= deadlineUtc)
+            {
+                TryKillProcessTree(process);
+                await process.WaitForExitAsync(CancellationToken.None);
+                await Task.WhenAll(IgnoreCancellation(stdoutCopy), IgnoreCancellation(stderrCopy));
+                return new AnsibleExecutionResult(
+                    TryGetExitCode(process),
+                    true,
+                    false,
+                    $"ansible-playbook exceeded the timeout of {request.Timeout.TotalSeconds:N0} seconds.");
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            TryKillProcessTree(process);
-            await process.WaitForExitAsync(CancellationToken.None);
-            await Task.WhenAll(IgnoreCancellation(stdoutCopy), IgnoreCancellation(stderrCopy));
-            return new AnsibleExecutionResult(null, true, $"ansible-playbook exceeded the timeout of {request.Timeout.TotalSeconds:N0} seconds.");
-        }
+
+        await Task.WhenAll(stdoutCopy, stderrCopy);
+        return new AnsibleExecutionResult(process.ExitCode, false, false, null);
     }
 
     private static void TryKillProcessTree(Process process)
@@ -103,6 +120,18 @@ public sealed class AnsiblePlaybookRunner(IOptions<ExecutionOptions> options) : 
         }
         catch (OperationCanceledException)
         {
+        }
+    }
+
+    private static int? TryGetExitCode(Process process)
+    {
+        try
+        {
+            return process.HasExited ? process.ExitCode : null;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
         }
     }
 

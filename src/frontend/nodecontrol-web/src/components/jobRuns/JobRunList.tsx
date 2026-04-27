@@ -4,7 +4,9 @@ import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import { Alert, Button, CircularProgress, Divider, Paper, Stack, Typography } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
+import { CancelJobRunButton } from "@/components/jobRuns/CancelJobRunButton";
 import { JobRunStatusChip } from "@/components/jobRuns/JobRunStatusChip";
+import { RetryJobRunButton } from "@/components/jobRuns/RetryJobRunButton";
 import { getCustomer } from "@/lib/api/customers";
 import { getJobRuns } from "@/lib/api/jobRuns";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -38,6 +40,9 @@ export function JobRunList({ customerId }: JobRunListProps) {
     return <Alert severity="error">Job runs could not be loaded.</Alert>;
   }
 
+  const canCancelJobRuns = hasPermission(customerQuery.data.permissions, "CancelJobRuns");
+  const canRetryJobRuns = hasPermission(customerQuery.data.permissions, "RetryJobRuns");
+
   return (
     <Stack sx={{ gap: 2 }}>
       <Typography component="h1" variant="h4">Job Runs</Typography>
@@ -57,6 +62,12 @@ export function JobRunList({ customerId }: JobRunListProps) {
                 </Stack>
                 <Stack direction="row" sx={{ alignItems: "center", gap: 1 }}>
                   <JobRunStatusChip status={jobRun.status} />
+                  {canCancelJobRuns && (jobRun.status === "Queued" || jobRun.status === "Running" || jobRun.status === "Cancelling") ? (
+                    <CancelJobRunButton customerId={customerId} jobRunId={jobRun.id} status={jobRun.status} />
+                  ) : null}
+                  {canRetryJobRuns && (jobRun.status === "Failed" || jobRun.status === "TimedOut" || jobRun.status === "Cancelled") ? (
+                    <RetryJobRunButton customerId={customerId} jobRunId={jobRun.id} />
+                  ) : null}
                   <Button endIcon={<OpenInNewIcon />} href={`/customers/${customerId}/job-runs/${jobRun.id}`} variant="outlined">Open</Button>
                 </Stack>
               </Stack>

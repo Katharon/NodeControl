@@ -11,7 +11,7 @@ type JobRunLogsPanelProps = {
   status: JobRunStatus;
 };
 
-const activeStatuses: JobRunStatus[] = ["Queued", "Running"];
+const activeStatuses: JobRunStatus[] = ["Queued", "Running", "Cancelling"];
 
 export function JobRunLogsPanel({ customerId, jobRunId, status }: JobRunLogsPanelProps) {
   const isActive = activeStatuses.includes(status);

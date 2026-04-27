@@ -1,7 +1,7 @@
-import { apiGet } from "@/lib/api/apiClient";
+import { apiGet, apiPost } from "@/lib/api/apiClient";
 
-export type JobRunStatus = "Queued" | "Running" | "Succeeded" | "Failed" | "Cancelled" | "TimedOut";
-export type JobRunTriggerType = "Manual" | "Scheduled" | "System";
+export type JobRunStatus = "Queued" | "Running" | "Cancelling" | "Succeeded" | "Failed" | "Cancelled" | "TimedOut";
+export type JobRunTriggerType = "Manual" | "Scheduled" | "System" | "Retry";
 export type JobRunLogStream = "System" | "StdOut" | "StdErr";
 export type JobRunLogLevel = "Info" | "Warning" | "Error";
 
@@ -12,6 +12,8 @@ export type JobRun = {
   triggerType: JobRunTriggerType;
   triggeredByUserId: string | null;
   scheduleId: string | null;
+  retriedFromJobRunId: string | null;
+  retryAttempt: number;
   status: JobRunStatus;
   queuedAt: string;
   startedAt: string | null;
@@ -21,6 +23,9 @@ export type JobRun = {
   workspacePath: string | null;
   stdoutLogPath: string | null;
   stderrLogPath: string | null;
+  cancellationRequestedAtUtc: string | null;
+  cancellationRequestedByUserId: string | null;
+  cancellationReason: string | null;
   createdAt: string;
 };
 
@@ -62,4 +67,18 @@ export function getJobRunLogs(
 
   const query = params.size > 0 ? `?${params.toString()}` : "";
   return apiGet<JobRunLogsResponse>(`/api/v1/customers/${customerId}/job-runs/${jobRunId}/logs${query}`);
+}
+
+export function cancelJobRun(customerId: string, jobRunId: string, reason?: string | null) {
+  return apiPost<{ reason?: string | null }, JobRun>(
+    `/api/v1/customers/${customerId}/job-runs/${jobRunId}/cancel`,
+    { reason: reason || null },
+  );
+}
+
+export function retryJobRun(customerId: string, jobRunId: string) {
+  return apiPost<Record<string, never>, JobRun>(
+    `/api/v1/customers/${customerId}/job-runs/${jobRunId}/retry`,
+    {},
+  );
 }

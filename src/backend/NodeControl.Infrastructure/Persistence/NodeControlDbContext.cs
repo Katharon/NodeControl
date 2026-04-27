@@ -404,6 +404,27 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<JobRunStatus?> GetJobRunStatusAsync(Guid jobRunId, CancellationToken cancellationToken)
+    {
+        return await JobRuns
+            .AsNoTracking()
+            .Where(jobRun => jobRun.Id == jobRunId)
+            .Select(jobRun => (JobRunStatus?)jobRun.Status)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<bool> IsJobRunCancellationRequestedAsync(Guid jobRunId, CancellationToken cancellationToken)
+    {
+        return await JobRuns
+            .AsNoTracking()
+            .AnyAsync(
+                jobRun => jobRun.Id == jobRunId
+                    && (jobRun.Status == JobRunStatus.Cancelling
+                        || (jobRun.CancellationRequestedAtUtc != null
+                            && (jobRun.Status == JobRunStatus.Running || jobRun.Status == JobRunStatus.Cancelling))),
+                cancellationToken);
+    }
+
     public async Task<long> GetNextJobRunLogSequenceAsync(Guid jobRunId, CancellationToken cancellationToken)
     {
         var currentMax = await JobRunLogEntries

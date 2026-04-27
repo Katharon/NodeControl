@@ -238,6 +238,10 @@ remains local to the Worker process until remote control-node dispatch is introd
 JobRun logs are persisted by the Worker as ordered entries. The API provides read-only access to those logs
 through customer-scoped authorization and never starts Ansible execution.
 
+JobRun cancellation and retry are operational controls around the same execution pipeline. The API can mark
+queued runs Cancelled, mark running runs Cancelling, and create queued retry runs. The Worker observes
+cancellation requests from the database and is the only process that stops `ansible-playbook`.
+
 ## Data Flow: Scheduled Job
 
 ```text

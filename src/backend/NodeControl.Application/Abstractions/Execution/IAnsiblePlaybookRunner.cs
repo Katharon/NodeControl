@@ -14,9 +14,11 @@ public sealed record AnsiblePlaybookRunRequest(
     string StderrLogPath,
     TimeSpan Timeout,
     Func<string, CancellationToken, Task>? OnStdoutLine = null,
-    Func<string, CancellationToken, Task>? OnStderrLine = null);
+    Func<string, CancellationToken, Task>? OnStderrLine = null,
+    Func<CancellationToken, Task<bool>>? IsCancellationRequested = null);
 
 public sealed record AnsiblePlaybookRunResult(
     int? ExitCode,
     bool TimedOut,
+    bool Cancelled,
     string? ErrorMessage);

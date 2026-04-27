@@ -177,6 +177,16 @@ public interface INodeControlDbContext
         throw new NotSupportedException();
     }
 
+    Task<JobRunStatus?> GetJobRunStatusAsync(Guid jobRunId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<bool> IsJobRunCancellationRequestedAsync(Guid jobRunId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
     Task<long> GetNextJobRunLogSequenceAsync(Guid jobRunId, CancellationToken cancellationToken)
     {
         throw new NotSupportedException();
