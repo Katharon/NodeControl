@@ -158,6 +158,10 @@ requests, Worker process termination for cancelled runs, and retries for failed,
 JobRuns. The API only updates JobRun state or creates queued retry JobRuns; Ansible execution and process
 termination remain Worker responsibilities.
 
+Current implementation note: customer-scoped audit logging is available for core operational activity around
+Jobs, manual/scheduled JobRuns, cancellation/retry, and Schedules. Audit logs are read through a dedicated
+customer-scoped Activity Trail and remain separate from technical JobRun logs.
+
 ## Phase 8: Security and Hardening
 
 Goal:

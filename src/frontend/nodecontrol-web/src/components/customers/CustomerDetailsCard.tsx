@@ -1,6 +1,7 @@
 "use client";
 
 import GroupsIcon from "@mui/icons-material/Groups";
+import HistoryIcon from "@mui/icons-material/History";
 import HubIcon from "@mui/icons-material/Hub";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import ScheduleIcon from "@mui/icons-material/Schedule";
@@ -60,6 +61,7 @@ export function CustomerDetailsCard({ customerId }: CustomerDetailsCardProps) {
   const canViewJobs = hasPermission(customer.permissions, "ViewPlaybooks");
   const canViewJobRuns = hasPermission(customer.permissions, "ViewJobRuns");
   const canViewSchedules = hasPermission(customer.permissions, "ViewSchedules");
+  const canViewAudit = hasPermission(customer.permissions, "ViewAuditLogs");
 
   return (
     <Paper sx={{ p: 3 }}>
@@ -94,6 +96,11 @@ export function CustomerDetailsCard({ customerId }: CustomerDetailsCardProps) {
             {canViewSchedules ? (
               <Button startIcon={<ScheduleIcon />} href={`/customers/${customer.id}/schedules`} variant="outlined">
                 Schedules
+              </Button>
+            ) : null}
+            {canViewAudit ? (
+              <Button startIcon={<HistoryIcon />} href={`/customers/${customer.id}/audit`} variant="outlined">
+                Audit
               </Button>
             ) : null}
             {canManageMemberships ? (

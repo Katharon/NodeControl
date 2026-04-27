@@ -243,6 +243,10 @@ The API can cancel queued JobRuns or request cancellation for running JobRuns.
 Cancelled, failed, and timed-out JobRuns can be retried by creating a new queued JobRun with
 `TriggerType = Retry`. The retry keeps a link to the original JobRun through `RetriedFromJobRunId`.
 
+Manual run creation, cancellation requests, retries, and scheduled run creation write audit entries. These
+entries record the business operation and affected customer/entity only. Worker stdout/stderr and detailed
+execution progress continue to belong to JobRun log entries, not audit entries.
+
 ## Timeouts
 
 Jobs should have a default timeout.

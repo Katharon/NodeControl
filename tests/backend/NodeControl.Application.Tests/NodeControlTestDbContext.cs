@@ -1,4 +1,6 @@
+using NodeControl.Application.Audit;
 using NodeControl.Application.Abstractions.Persistence;
+using NodeControl.Domain.Audit;
 using NodeControl.Domain.Customers;
 using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
@@ -38,6 +40,8 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     public List<JobRun> JobRuns { get; } = [];
 
     public List<JobRunLogEntry> JobRunLogEntries { get; } = [];
+
+    public List<AuditLogEntry> AuditLogEntries { get; } = [];
 
     public List<JobRunStatus[]> SavedJobRunStatuses { get; } = [];
 
@@ -382,6 +386,66 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
                 .ToArray());
     }
 
+    public Task<IReadOnlyList<AuditLogEntry>> ListAuditLogEntriesAsync(
+        Guid customerId,
+        AuditLogQuery query,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var entries = AuditLogEntries.Where(entry => entry.CustomerId == customerId);
+
+        if (!string.IsNullOrWhiteSpace(query.Action))
+        {
+            entries = entries.Where(entry => entry.Action == query.Action);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.EntityType))
+        {
+            entries = entries.Where(entry => entry.EntityType == query.EntityType);
+        }
+
+        if (query.EntityId is not null)
+        {
+            entries = entries.Where(entry => entry.EntityId == query.EntityId);
+        }
+
+        if (query.ActorUserId is not null)
+        {
+            entries = entries.Where(entry => entry.ActorUserId == query.ActorUserId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Outcome)
+            && Enum.TryParse<AuditOutcome>(query.Outcome, ignoreCase: true, out var outcome))
+        {
+            entries = entries.Where(entry => entry.Outcome == outcome);
+        }
+
+        if (query.FromUtc is not null)
+        {
+            entries = entries.Where(entry => entry.CreatedAtUtc >= query.FromUtc);
+        }
+
+        if (query.ToUtc is not null)
+        {
+            entries = entries.Where(entry => entry.CreatedAtUtc <= query.ToUtc);
+        }
+
+        return Task.FromResult<IReadOnlyList<AuditLogEntry>>(
+            entries
+                .OrderByDescending(entry => entry.CreatedAtUtc)
+                .Take(limit)
+                .ToArray());
+    }
+
+    public Task<AuditLogEntry?> FindAuditLogEntryAsync(
+        Guid customerId,
+        Guid auditLogEntryId,
+        CancellationToken cancellationToken)
+    {
+        return Task.FromResult(AuditLogEntries.FirstOrDefault(entry =>
+            entry.CustomerId == customerId && entry.Id == auditLogEntryId));
+    }
+
     public void AddUser(User user)
     {
         Users.Add(user);
@@ -455,6 +519,11 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     public void AddJobRunLogEntry(JobRunLogEntry jobRunLogEntry)
     {
         JobRunLogEntries.Add(jobRunLogEntry);
+    }
+
+    public void AddAuditLogEntry(AuditLogEntry auditLogEntry)
+    {
+        AuditLogEntries.Add(auditLogEntry);
     }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken)

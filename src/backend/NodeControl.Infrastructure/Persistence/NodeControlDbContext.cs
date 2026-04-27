@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using NodeControl.Application.Audit;
 using NodeControl.Application.Abstractions.Persistence;
+using NodeControl.Domain.Audit;
 using NodeControl.Domain.Customers;
 using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
@@ -40,6 +42,8 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
     public DbSet<JobRun> JobRuns => Set<JobRun>();
 
     public DbSet<JobRunLogEntry> JobRunLogEntries => Set<JobRunLogEntry>();
+
+    public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
 
     public async Task<ExternalIdentity?> FindExternalIdentityAsync(
         string provider,
@@ -448,6 +452,68 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<AuditLogEntry>> ListAuditLogEntriesAsync(
+        Guid customerId,
+        AuditLogQuery query,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var entries = AuditLogEntries
+            .Where(entry => entry.CustomerId == customerId);
+
+        if (!string.IsNullOrWhiteSpace(query.Action))
+        {
+            entries = entries.Where(entry => entry.Action == query.Action);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.EntityType))
+        {
+            entries = entries.Where(entry => entry.EntityType == query.EntityType);
+        }
+
+        if (query.EntityId is not null)
+        {
+            entries = entries.Where(entry => entry.EntityId == query.EntityId);
+        }
+
+        if (query.ActorUserId is not null)
+        {
+            entries = entries.Where(entry => entry.ActorUserId == query.ActorUserId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Outcome)
+            && Enum.TryParse<AuditOutcome>(query.Outcome, ignoreCase: true, out var outcome))
+        {
+            entries = entries.Where(entry => entry.Outcome == outcome);
+        }
+
+        if (query.FromUtc is not null)
+        {
+            entries = entries.Where(entry => entry.CreatedAtUtc >= query.FromUtc);
+        }
+
+        if (query.ToUtc is not null)
+        {
+            entries = entries.Where(entry => entry.CreatedAtUtc <= query.ToUtc);
+        }
+
+        return await entries
+            .OrderByDescending(entry => entry.CreatedAtUtc)
+            .ThenByDescending(entry => entry.Id)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<AuditLogEntry?> FindAuditLogEntryAsync(
+        Guid customerId,
+        Guid auditLogEntryId,
+        CancellationToken cancellationToken)
+    {
+        return await AuditLogEntries.FirstOrDefaultAsync(
+            entry => entry.CustomerId == customerId && entry.Id == auditLogEntryId,
+            cancellationToken);
+    }
+
     public void AddUser(User user)
     {
         Users.Add(user);
@@ -521,6 +587,11 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
     public void AddJobRunLogEntry(JobRunLogEntry jobRunLogEntry)
     {
         JobRunLogEntries.Add(jobRunLogEntry);
+    }
+
+    public void AddAuditLogEntry(AuditLogEntry auditLogEntry)
+    {
+        AuditLogEntries.Add(auditLogEntry);
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -1,3 +1,5 @@
+using NodeControl.Application.Audit;
+using NodeControl.Domain.Audit;
 using NodeControl.Domain.Users;
 using NodeControl.Domain.Customers;
 using NodeControl.Domain.Inventories;
@@ -201,6 +203,23 @@ public interface INodeControlDbContext
         throw new NotSupportedException();
     }
 
+    Task<IReadOnlyList<AuditLogEntry>> ListAuditLogEntriesAsync(
+        Guid customerId,
+        AuditLogQuery query,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<AuditLogEntry?> FindAuditLogEntryAsync(
+        Guid customerId,
+        Guid auditLogEntryId,
+        CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
     void AddUser(User user);
 
     void AddExternalIdentity(ExternalIdentity externalIdentity);
@@ -260,6 +279,11 @@ public interface INodeControlDbContext
     }
 
     void AddJobRunLogEntry(JobRunLogEntry jobRunLogEntry)
+    {
+        throw new NotSupportedException();
+    }
+
+    void AddAuditLogEntry(AuditLogEntry auditLogEntry)
     {
         throw new NotSupportedException();
     }

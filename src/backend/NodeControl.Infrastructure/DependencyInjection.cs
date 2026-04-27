@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using NodeControl.Application.Audit;
 using NodeControl.Application.Abstractions.Persistence;
 using NodeControl.Application.Abstractions.Time;
 using NodeControl.Infrastructure.Execution;
@@ -40,6 +42,8 @@ public static class DependencyInjection
         services.AddSingleton(Options.Create(executionOptions));
 
         services.AddSingleton<IClock, SystemClock>();
+        services.TryAddScoped<IRequestAuditContext, EmptyRequestAuditContext>();
+        services.TryAddScoped<IAuditLogWriter, AuditLogWriter>();
 
         return services;
     }

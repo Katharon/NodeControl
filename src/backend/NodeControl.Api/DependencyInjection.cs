@@ -2,7 +2,9 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Options;
+using NodeControl.Api.Audit;
 using NodeControl.Api.Auth;
+using NodeControl.Application.Audit;
 using NodeControl.Application.Abstractions.Authorization;
 using NodeControl.Application.Abstractions.Auth;
 using NodeControl.Application.Authorization;
@@ -38,9 +40,11 @@ public static class DependencyInjection
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUserAccessor>();
+        services.AddScoped<IRequestAuditContext, HttpRequestAuditContext>();
         services.AddScoped<UserProvisioningService>();
         services.AddScoped<CurrentUserService>();
         services.AddScoped<ICustomerAuthorizationService, CustomerAuthorizationService>();
+        services.AddScoped<AuditLogService>();
         services.AddScoped<CustomerService>();
         services.AddScoped<CustomerMembershipService>();
         services.AddScoped<ControlNodeService>();

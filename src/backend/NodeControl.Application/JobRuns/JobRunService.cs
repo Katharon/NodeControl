@@ -1,9 +1,12 @@
+using System.Text.Json;
+using NodeControl.Application.Audit;
 using NodeControl.Application.Abstractions.Authorization;
 using NodeControl.Application.Abstractions.Persistence;
 using NodeControl.Application.Abstractions.Time;
 using NodeControl.Application.Auth;
 using NodeControl.Application.Customers;
 using NodeControl.Domain.Authorization;
+using NodeControl.Domain.Audit;
 using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
@@ -15,7 +18,8 @@ namespace NodeControl.Application.JobRuns;
 public sealed class JobRunService(
     INodeControlDbContext dbContext,
     ICustomerAuthorizationService authorizationService,
-    IClock clock)
+    IClock clock,
+    IAuditLogWriter auditLogWriter)
 {
     public async Task<CustomerServiceResult<IReadOnlyList<JobRunDto>>> ListAsync(
         CurrentUserDto currentUser,
@@ -83,6 +87,13 @@ public sealed class JobRunService(
             var jobRun = JobRun.CreateManual(job, currentUser.Id, clock.UtcNow);
             dbContext.AddJobRun(jobRun);
             await dbContext.SaveChangesAsync(cancellationToken);
+            await WriteJobRunAuditAsync(
+                currentUser,
+                jobRun,
+                "job_run.created_manual",
+                $"Manual run queued for job '{job.Name}'.",
+                job.Name,
+                cancellationToken);
 
             return CustomerServiceResult<JobRunDto>.Ok(Map(jobRun));
         }
@@ -117,6 +128,7 @@ public sealed class JobRunService(
 
         try
         {
+            var previousStatus = jobRun.Status;
             var wasCancelling = jobRun.Status == JobRunStatus.Cancelling;
             jobRun.RequestCancellation(currentUser.Id, request.Reason, clock.UtcNow);
             if (!wasCancelling)
@@ -125,6 +137,17 @@ public sealed class JobRunService(
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);
+            if (!wasCancelling)
+            {
+                var action = previousStatus == JobRunStatus.Queued
+                    ? "job_run.cancelled_queued"
+                    : "job_run.cancel_requested";
+                var message = previousStatus == JobRunStatus.Queued
+                    ? "Queued JobRun was cancelled before execution."
+                    : "Cancellation was requested for a running JobRun.";
+                await WriteJobRunAuditAsync(currentUser, jobRun, action, message, null, cancellationToken);
+            }
+
             return CustomerServiceResult<JobRunDto>.Ok(Map(jobRun));
         }
         catch (ArgumentException)
@@ -171,6 +194,14 @@ public sealed class JobRunService(
             var retry = JobRun.CreateRetry(original, job, currentUser.Id, clock.UtcNow);
             dbContext.AddJobRun(retry);
             await dbContext.SaveChangesAsync(cancellationToken);
+            await WriteJobRunAuditAsync(
+                currentUser,
+                retry,
+                "job_run.retried",
+                $"Retry run queued for job '{job.Name}'.",
+                job.Name,
+                cancellationToken,
+                original.Id);
             return CustomerServiceResult<JobRunDto>.Ok(Map(retry));
         }
         catch (ArgumentException)
@@ -238,6 +269,38 @@ public sealed class JobRunService(
             JobRunLogStream.System,
             level,
             message));
+    }
+
+    private async Task WriteJobRunAuditAsync(
+        CurrentUserDto currentUser,
+        JobRun jobRun,
+        string action,
+        string message,
+        string? jobName,
+        CancellationToken cancellationToken,
+        Guid? originalJobRunId = null)
+    {
+        await auditLogWriter.WriteAsync(new AuditLogWriteRequest(
+            jobRun.CustomerId,
+            currentUser.Id,
+            currentUser.DisplayName,
+            AuditActorType.User,
+            action,
+            "JobRun",
+            jobRun.Id,
+            $"Run {jobRun.Id}",
+            AuditOutcome.Succeeded,
+            message,
+            JsonSerializer.Serialize(new
+            {
+                jobRunId = jobRun.Id,
+                jobId = jobRun.JobId,
+                jobName,
+                status = jobRun.Status.ToString(),
+                triggerType = jobRun.TriggerType.ToString(),
+                originalJobRunId
+            })),
+            cancellationToken);
     }
 
     private static JobRunDto Map(JobRun jobRun)

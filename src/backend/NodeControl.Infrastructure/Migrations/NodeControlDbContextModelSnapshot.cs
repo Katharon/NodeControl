@@ -20,6 +20,102 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
 
         NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+        modelBuilder.Entity("NodeControl.Domain.Audit.AuditLogEntry", b =>
+        {
+            b.Property<Guid>("Id")
+                .ValueGeneratedNever()
+                .HasColumnType("uuid")
+                .HasColumnName("id");
+
+            b.Property<string>("Action")
+                .IsRequired()
+                .HasMaxLength(200)
+                .HasColumnType("character varying(200)")
+                .HasColumnName("action");
+
+            b.Property<string>("ActorDisplayName")
+                .HasMaxLength(300)
+                .HasColumnType("character varying(300)")
+                .HasColumnName("actor_display_name");
+
+            b.Property<string>("ActorType")
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasColumnType("character varying(40)")
+                .HasColumnName("actor_type");
+
+            b.Property<Guid?>("ActorUserId")
+                .HasColumnType("uuid")
+                .HasColumnName("actor_user_id");
+
+            b.Property<DateTimeOffset>("CreatedAtUtc")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("created_at_utc");
+
+            b.Property<Guid?>("CustomerId")
+                .HasColumnType("uuid")
+                .HasColumnName("customer_id");
+
+            b.Property<string>("EntityDisplayName")
+                .HasMaxLength(300)
+                .HasColumnType("character varying(300)")
+                .HasColumnName("entity_display_name");
+
+            b.Property<Guid?>("EntityId")
+                .HasColumnType("uuid")
+                .HasColumnName("entity_id");
+
+            b.Property<string>("EntityType")
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasColumnType("character varying(100)")
+                .HasColumnName("entity_type");
+
+            b.Property<string>("IpAddress")
+                .HasMaxLength(100)
+                .HasColumnType("character varying(100)")
+                .HasColumnName("ip_address");
+
+            b.Property<string>("Message")
+                .IsRequired()
+                .HasMaxLength(1000)
+                .HasColumnType("character varying(1000)")
+                .HasColumnName("message");
+
+            b.Property<string>("MetadataJson")
+                .HasMaxLength(8000)
+                .HasColumnType("character varying(8000)")
+                .HasColumnName("metadata_json");
+
+            b.Property<string>("Outcome")
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasColumnType("character varying(40)")
+                .HasColumnName("outcome");
+
+            b.Property<string>("UserAgent")
+                .HasMaxLength(500)
+                .HasColumnType("character varying(500)")
+                .HasColumnName("user_agent");
+
+            b.HasKey("Id")
+                .HasName("pk_audit_log_entries");
+
+            b.HasIndex("ActorUserId", "CreatedAtUtc")
+                .HasDatabaseName("ix_audit_log_entries_actor_user_id_created_at_utc");
+
+            b.HasIndex("CustomerId", "Action")
+                .HasDatabaseName("ix_audit_log_entries_customer_id_action");
+
+            b.HasIndex("CustomerId", "CreatedAtUtc")
+                .HasDatabaseName("ix_audit_log_entries_customer_id_created_at_utc");
+
+            b.HasIndex("CustomerId", "EntityType", "EntityId")
+                .HasDatabaseName("ix_audit_log_entries_customer_id_entity");
+
+            b.ToTable("audit_log_entries", (string)null);
+        });
+
         modelBuilder.Entity("NodeControl.Domain.Customers.Customer", b =>
         {
             b.Property<Guid>("Id")

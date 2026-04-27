@@ -1,9 +1,12 @@
+using System.Text.Json;
+using NodeControl.Application.Audit;
 using NodeControl.Application.Abstractions.Authorization;
 using NodeControl.Application.Abstractions.Persistence;
 using NodeControl.Application.Abstractions.Time;
 using NodeControl.Application.Auth;
 using NodeControl.Application.Customers;
 using NodeControl.Domain.Authorization;
+using NodeControl.Domain.Audit;
 using NodeControl.Domain.Jobs;
 
 namespace NodeControl.Application.Schedules;
@@ -12,7 +15,8 @@ public sealed class JobScheduleService(
     INodeControlDbContext dbContext,
     ICustomerAuthorizationService authorizationService,
     ICronScheduleCalculator cronScheduleCalculator,
-    IClock clock)
+    IClock clock,
+    IAuditLogWriter auditLogWriter)
 {
     private const string DefaultTimeZoneId = "UTC";
 
@@ -93,6 +97,12 @@ public sealed class JobScheduleService(
 
             dbContext.AddJobSchedule(schedule);
             await dbContext.SaveChangesAsync(cancellationToken);
+            await WriteScheduleAuditAsync(
+                currentUser,
+                schedule,
+                "schedule.created",
+                $"Schedule '{schedule.Name}' was created.",
+                cancellationToken);
 
             return CustomerServiceResult<JobScheduleDto>.Ok(Map(schedule));
         }
@@ -165,6 +175,12 @@ public sealed class JobScheduleService(
                 clock.UtcNow);
 
             await dbContext.SaveChangesAsync(cancellationToken);
+            await WriteScheduleAuditAsync(
+                currentUser,
+                schedule,
+                "schedule.updated",
+                $"Schedule '{schedule.Name}' was updated.",
+                cancellationToken);
             return CustomerServiceResult<JobScheduleDto>.Ok(Map(schedule));
         }
         catch (ArgumentException)
@@ -188,6 +204,8 @@ public sealed class JobScheduleService(
             customerId,
             scheduleId,
             (schedule, _) => schedule.Pause(clock.UtcNow),
+            "schedule.paused",
+            schedule => $"Schedule '{schedule.Name}' was paused.",
             cancellationToken);
     }
 
@@ -211,6 +229,8 @@ public sealed class JobScheduleService(
 
                 schedule.Resume(job, nextRunAtUtc, clock.UtcNow);
             },
+            "schedule.resumed",
+            schedule => $"Schedule '{schedule.Name}' was resumed.",
             cancellationToken);
     }
 
@@ -225,6 +245,8 @@ public sealed class JobScheduleService(
             customerId,
             scheduleId,
             (schedule, _) => schedule.Archive(clock.UtcNow),
+            "schedule.archived",
+            schedule => $"Schedule '{schedule.Name}' was archived.",
             cancellationToken);
     }
 
@@ -233,6 +255,8 @@ public sealed class JobScheduleService(
         Guid customerId,
         Guid scheduleId,
         Action<JobSchedule, Job> change,
+        string auditAction,
+        Func<JobSchedule, string> auditMessage,
         CancellationToken cancellationToken)
     {
         var authorization = await AuthorizeAsync(currentUser, customerId, Permission.ManageSchedules, cancellationToken);
@@ -257,6 +281,12 @@ public sealed class JobScheduleService(
         {
             change(schedule, job);
             await dbContext.SaveChangesAsync(cancellationToken);
+            await WriteScheduleAuditAsync(
+                currentUser,
+                schedule,
+                auditAction,
+                auditMessage(schedule),
+                cancellationToken);
             return CustomerServiceResult<JobScheduleDto>.Ok(Map(schedule));
         }
         catch (InvalidOperationException)
@@ -293,6 +323,34 @@ public sealed class JobScheduleService(
         CancellationToken cancellationToken)
     {
         return await authorizationService.AuthorizeAsync(currentUser, customerId, permission, cancellationToken);
+    }
+
+    private async Task WriteScheduleAuditAsync(
+        CurrentUserDto currentUser,
+        JobSchedule schedule,
+        string action,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        await auditLogWriter.WriteAsync(new AuditLogWriteRequest(
+            schedule.CustomerId,
+            currentUser.Id,
+            currentUser.DisplayName,
+            AuditActorType.User,
+            action,
+            "Schedule",
+            schedule.Id,
+            schedule.Name,
+            AuditOutcome.Succeeded,
+            message,
+            JsonSerializer.Serialize(new
+            {
+                scheduleId = schedule.Id,
+                scheduleSlug = schedule.Slug,
+                jobId = schedule.JobId,
+                status = schedule.Status.ToString()
+            })),
+            cancellationToken);
     }
 
     private static JobScheduleDto Map(JobSchedule schedule)

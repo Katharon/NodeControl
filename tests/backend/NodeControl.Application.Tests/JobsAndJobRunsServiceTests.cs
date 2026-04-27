@@ -1,3 +1,4 @@
+using NodeControl.Application.Audit;
 using NodeControl.Application.Abstractions.Time;
 using NodeControl.Application.Auth;
 using NodeControl.Application.Authorization;
@@ -30,6 +31,7 @@ public sealed class JobsAndJobRunsServiceTests
         Assert.Single(fixture.Db.Jobs);
         Assert.Equal(JobStatus.Active, result.Value!.Status);
         Assert.Equal(1800, result.Value.DefaultTimeoutSeconds);
+        Assert.Equal("job.created", Assert.Single(fixture.Db.AuditLogEntries).Action);
     }
 
     [Fact]
@@ -146,6 +148,26 @@ public sealed class JobsAndJobRunsServiceTests
         Assert.Null(result.Error);
         Assert.Single(fixture.Db.Jobs);
         Assert.Equal(JobStatus.Archived, fixture.Db.Jobs[0].Status);
+        Assert.Equal("job.archived", fixture.Db.AuditLogEntries.Last().Action);
+    }
+
+    [Fact]
+    public async Task JobService_update_writes_audit_entry()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+        var create = await fixture.CreateJobService().CreateAsync(
+            fixture.CurrentUser,
+            fixture.Customer.Id,
+            fixture.ValidJobRequest("deploy-app"));
+
+        var result = await fixture.CreateJobService().UpdateAsync(
+            fixture.CurrentUser,
+            fixture.Customer.Id,
+            create.Value!.Id,
+            fixture.ValidUpdateJobRequest("deploy-app-updated"));
+
+        Assert.Null(result.Error);
+        Assert.Equal("job.updated", fixture.Db.AuditLogEntries.Last().Action);
     }
 
     [Fact]
@@ -164,6 +186,7 @@ public sealed class JobsAndJobRunsServiceTests
         Assert.Equal(JobRunStatus.Queued, result.Value!.Status);
         Assert.Equal(JobRunTriggerType.Manual, result.Value.TriggerType);
         Assert.Equal(fixture.CurrentUser.Id, result.Value.TriggeredByUserId);
+        Assert.Equal("job_run.created_manual", Assert.Single(fixture.Db.AuditLogEntries).Action);
     }
 
     [Fact]
@@ -259,6 +282,7 @@ public sealed class JobsAndJobRunsServiceTests
         Assert.Equal(TestTime, jobRun.CancellationRequestedAtUtc);
         Assert.Equal(fixture.CurrentUser.Id, jobRun.CancellationRequestedByUserId);
         Assert.Equal("maintenance window closed", jobRun.CancellationReason);
+        Assert.Equal("job_run.cancelled_queued", fixture.Db.AuditLogEntries.Last().Action);
     }
 
     [Fact]
@@ -373,6 +397,7 @@ public sealed class JobsAndJobRunsServiceTests
         Assert.Equal(original.Id, retry.RetriedFromJobRunId);
         Assert.Equal(original.RetryAttempt + 1, retry.RetryAttempt);
         Assert.Equal(terminalStatus, original.Status);
+        Assert.Equal("job_run.retried", fixture.Db.AuditLogEntries.Last().Action);
     }
 
     [Theory]
@@ -558,6 +583,19 @@ public sealed class JobsAndJobRunsServiceTests
                 selected.VariableSet.Id);
         }
 
+        public UpdateJobRequest ValidUpdateJobRequest(string slug, DefinitionResources? resources = null)
+        {
+            var selected = resources ?? Resources;
+            return new UpdateJobRequest(
+                "Deploy App",
+                slug,
+                null,
+                selected.ControlNode.Id,
+                selected.InventoryGroup.Id,
+                selected.Playbook.Id,
+                selected.VariableSet.Id);
+        }
+
         public Job AddValidJob()
         {
             return AddValidJob(Customer.Id, Resources);
@@ -632,12 +670,17 @@ public sealed class JobsAndJobRunsServiceTests
 
         public JobService CreateJobService()
         {
-            return new JobService(Db, new CustomerAuthorizationService(Db), clock);
+            return new JobService(Db, new CustomerAuthorizationService(Db), clock, CreateAuditWriter());
         }
 
         public JobRunService CreateJobRunService()
         {
-            return new JobRunService(Db, new CustomerAuthorizationService(Db), clock);
+            return new JobRunService(Db, new CustomerAuthorizationService(Db), clock, CreateAuditWriter());
+        }
+
+        private AuditLogWriter CreateAuditWriter()
+        {
+            return new AuditLogWriter(Db, clock, new EmptyRequestAuditContext());
         }
 
         private static DefinitionResources AddResources(NodeControlTestDbContext db, Guid customerId, string suffix)

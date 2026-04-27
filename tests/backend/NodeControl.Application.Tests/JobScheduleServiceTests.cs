@@ -1,3 +1,4 @@
+using NodeControl.Application.Audit;
 using NodeControl.Application.Abstractions.Time;
 using NodeControl.Application.Auth;
 using NodeControl.Application.Authorization;
@@ -25,6 +26,7 @@ public sealed class JobScheduleServiceTests
         Assert.Single(fixture.Db.JobSchedules);
         Assert.Equal("Active", result.Value!.Status);
         Assert.NotNull(result.Value.NextRunAtUtc);
+        Assert.Equal("schedule.created", Assert.Single(fixture.Db.AuditLogEntries).Action);
     }
 
     [Fact]
@@ -131,6 +133,7 @@ public sealed class JobScheduleServiceTests
         Assert.Null(result.Error);
         Assert.Equal("hourly", result.Value!.Slug);
         Assert.True(result.Value.NextRunAtUtc > fixture.Clock.UtcNow);
+        Assert.Equal("schedule.updated", fixture.Db.AuditLogEntries.Last().Action);
     }
 
     [Fact]
@@ -152,6 +155,9 @@ public sealed class JobScheduleServiceTests
         Assert.NotNull(resumed.Value.NextRunAtUtc);
         Assert.Equal("Archived", archived.Value!.Status);
         Assert.NotNull(fixture.Db.JobSchedules.Single().ArchivedAt);
+        Assert.Contains(fixture.Db.AuditLogEntries, entry => entry.Action == "schedule.paused");
+        Assert.Contains(fixture.Db.AuditLogEntries, entry => entry.Action == "schedule.resumed");
+        Assert.Contains(fixture.Db.AuditLogEntries, entry => entry.Action == "schedule.archived");
     }
 
     [Fact]
@@ -200,6 +206,7 @@ public sealed class JobScheduleServiceTests
         Assert.Equal(TestTime, schedule.LastRunAtUtc);
         Assert.Equal(jobRun.Id, schedule.LastJobRunId);
         Assert.True(schedule.NextRunAtUtc > TestTime);
+        Assert.Equal("job_run.created_scheduled", Assert.Single(fixture.Db.AuditLogEntries).Action);
     }
 
     [Theory]
@@ -319,12 +326,17 @@ public sealed class JobScheduleServiceTests
 
         public JobScheduleService CreateScheduleService()
         {
-            return new JobScheduleService(Db, new CustomerAuthorizationService(Db), new CronScheduleCalculator(), Clock);
+            return new JobScheduleService(Db, new CustomerAuthorizationService(Db), new CronScheduleCalculator(), Clock, CreateAuditWriter());
         }
 
         public ScheduledJobRunService CreateScheduledJobRunService()
         {
-            return new ScheduledJobRunService(Db, new CronScheduleCalculator(), Clock);
+            return new ScheduledJobRunService(Db, new CronScheduleCalculator(), Clock, CreateAuditWriter());
+        }
+
+        private AuditLogWriter CreateAuditWriter()
+        {
+            return new AuditLogWriter(Db, Clock, new EmptyRequestAuditContext());
         }
 
         private static Job AddJob(NodeControlTestDbContext db, Guid customerId, string suffix)

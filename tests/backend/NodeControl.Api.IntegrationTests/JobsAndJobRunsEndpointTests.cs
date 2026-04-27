@@ -7,7 +7,9 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using NodeControl.Application.Audit;
 using NodeControl.Application.Abstractions.Persistence;
+using NodeControl.Domain.Audit;
 using NodeControl.Application.JobRuns;
 using NodeControl.Application.Jobs;
 using NodeControl.Application.Schedules;
@@ -466,6 +468,58 @@ public sealed class JobsAndJobRunsEndpointTests
         Assert.Null(jobRun.StartedAt);
     }
 
+    [Fact]
+    public async Task Get_audit_logs_requires_view_audit_logs()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Viewer);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync($"/api/v1/customers/{seeded.Customer.Id}/audit-logs");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_audit_logs_allows_auditor_and_filters_by_action()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Auditor);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        var matching = factory.Db.AddAuditLogEntryForCustomer(seeded.Customer.Id, "job.created", "Job", TestTime);
+        factory.Db.AddAuditLogEntryForCustomer(seeded.Customer.Id, "schedule.created", "Schedule", TestTime.AddMinutes(-1));
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/audit-logs?action=job.created");
+        var payload = await response.Content.ReadFromJsonAsync<AuditLogListResponse>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var item = Assert.Single(payload!.Items);
+        Assert.Equal(matching.Id, item.Id);
+    }
+
+    [Fact]
+    public async Task Audit_log_endpoints_reject_cross_tenant_access()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Auditor);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        var otherCustomer = Customer.Create("Other Customer", "other-customer", null, TestTime);
+        factory.Db.AddCustomer(otherCustomer);
+        var own = factory.Db.AddAuditLogEntryForCustomer(seeded.Customer.Id, "job.created", "Job", TestTime);
+        var other = factory.Db.AddAuditLogEntryForCustomer(otherCustomer.Id, "job.created", "Job", TestTime);
+        using var client = factory.CreateClient();
+
+        using var listResponse = await client.GetAsync($"/api/v1/customers/{seeded.Customer.Id}/audit-logs");
+        var payload = await listResponse.Content.ReadFromJsonAsync<AuditLogListResponse>(JsonOptions);
+        using var detailResponse = await client.GetAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/audit-logs/{other.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
+        var item = Assert.Single(payload!.Items);
+        Assert.Equal(own.Id, item.Id);
+        Assert.Equal(HttpStatusCode.NotFound, detailResponse.StatusCode);
+    }
+
     private static CreateJobRequest ValidJobRequest(string slug, DefinitionResources resources)
     {
         return new CreateJobRequest(
@@ -583,6 +637,8 @@ public sealed class JobsAndJobRunsEndpointTests
         public List<JobRun> JobRuns { get; } = [];
 
         public List<JobRunLogEntry> JobRunLogEntries { get; } = [];
+
+        public List<AuditLogEntry> AuditLogEntries { get; } = [];
 
         public DefinitionResources AddDefinitionResources(Guid customerId, string suffix)
         {
@@ -850,6 +906,72 @@ public sealed class JobsAndJobRunsEndpointTests
             }
         }
 
+        public Task<IReadOnlyList<AuditLogEntry>> ListAuditLogEntriesAsync(
+            Guid customerId,
+            AuditLogQuery query,
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                var entries = AuditLogEntries.Where(entry => entry.CustomerId == customerId);
+
+                if (!string.IsNullOrWhiteSpace(query.Action))
+                {
+                    entries = entries.Where(entry => entry.Action == query.Action);
+                }
+
+                if (!string.IsNullOrWhiteSpace(query.EntityType))
+                {
+                    entries = entries.Where(entry => entry.EntityType == query.EntityType);
+                }
+
+                if (query.EntityId is not null)
+                {
+                    entries = entries.Where(entry => entry.EntityId == query.EntityId);
+                }
+
+                if (query.ActorUserId is not null)
+                {
+                    entries = entries.Where(entry => entry.ActorUserId == query.ActorUserId);
+                }
+
+                if (!string.IsNullOrWhiteSpace(query.Outcome)
+                    && Enum.TryParse<AuditOutcome>(query.Outcome, ignoreCase: true, out var outcome))
+                {
+                    entries = entries.Where(entry => entry.Outcome == outcome);
+                }
+
+                if (query.FromUtc is not null)
+                {
+                    entries = entries.Where(entry => entry.CreatedAtUtc >= query.FromUtc);
+                }
+
+                if (query.ToUtc is not null)
+                {
+                    entries = entries.Where(entry => entry.CreatedAtUtc <= query.ToUtc);
+                }
+
+                return Task.FromResult<IReadOnlyList<AuditLogEntry>>(
+                    entries
+                        .OrderByDescending(entry => entry.CreatedAtUtc)
+                        .Take(limit)
+                        .ToArray());
+            }
+        }
+
+        public Task<AuditLogEntry?> FindAuditLogEntryAsync(
+            Guid customerId,
+            Guid auditLogEntryId,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult(AuditLogEntries.FirstOrDefault(entry =>
+                    entry.CustomerId == customerId && entry.Id == auditLogEntryId));
+            }
+        }
+
         public void AddUser(User user)
         {
             lock (syncRoot)
@@ -1033,6 +1155,39 @@ public sealed class JobsAndJobRunsEndpointTests
             lock (syncRoot)
             {
                 JobRunLogEntries.Add(jobRunLogEntry);
+            }
+        }
+
+        public AuditLogEntry AddAuditLogEntryForCustomer(
+            Guid customerId,
+            string action,
+            string entityType,
+            DateTimeOffset createdAtUtc)
+        {
+            var entry = AuditLogEntry.Create(
+                customerId,
+                null,
+                null,
+                AuditActorType.System,
+                action,
+                entityType,
+                Guid.NewGuid(),
+                entityType,
+                AuditOutcome.Succeeded,
+                $"{action} message",
+                null,
+                null,
+                null,
+                createdAtUtc);
+            AddAuditLogEntry(entry);
+            return entry;
+        }
+
+        public void AddAuditLogEntry(AuditLogEntry auditLogEntry)
+        {
+            lock (syncRoot)
+            {
+                AuditLogEntries.Add(auditLogEntry);
             }
         }
 

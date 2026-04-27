@@ -1,9 +1,12 @@
+using System.Text.Json;
+using NodeControl.Application.Audit;
 using NodeControl.Application.Abstractions.Authorization;
 using NodeControl.Application.Abstractions.Persistence;
 using NodeControl.Application.Abstractions.Time;
 using NodeControl.Application.Auth;
 using NodeControl.Application.Customers;
 using NodeControl.Domain.Authorization;
+using NodeControl.Domain.Audit;
 using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
@@ -15,7 +18,8 @@ namespace NodeControl.Application.Jobs;
 public sealed class JobService(
     INodeControlDbContext dbContext,
     ICustomerAuthorizationService authorizationService,
-    IClock clock)
+    IClock clock,
+    IAuditLogWriter auditLogWriter)
 {
     public async Task<CustomerServiceResult<IReadOnlyList<JobDto>>> ListAsync(
         CurrentUserDto currentUser,
@@ -88,6 +92,7 @@ public sealed class JobService(
 
             dbContext.AddJob(job);
             await dbContext.SaveChangesAsync(cancellationToken);
+            await WriteJobAuditAsync(currentUser, job, "job.created", $"Job '{job.Name}' was created.", cancellationToken);
 
             return CustomerServiceResult<JobDto>.Ok(Map(job));
         }
@@ -140,6 +145,7 @@ public sealed class JobService(
                 request.DefaultTimeoutSeconds,
                 clock.UtcNow);
             await dbContext.SaveChangesAsync(cancellationToken);
+            await WriteJobAuditAsync(currentUser, job, "job.updated", $"Job '{job.Name}' was updated.", cancellationToken);
 
             return CustomerServiceResult<JobDto>.Ok(Map(job));
         }
@@ -169,8 +175,36 @@ public sealed class JobService(
 
         job.Archive(clock.UtcNow);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteJobAuditAsync(currentUser, job, "job.archived", $"Job '{job.Name}' was archived.", cancellationToken);
 
         return CustomerServiceResult<JobDto>.Ok(Map(job));
+    }
+
+    private async Task WriteJobAuditAsync(
+        CurrentUserDto currentUser,
+        Job job,
+        string action,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        await auditLogWriter.WriteAsync(new AuditLogWriteRequest(
+            job.CustomerId,
+            currentUser.Id,
+            currentUser.DisplayName,
+            AuditActorType.User,
+            action,
+            "Job",
+            job.Id,
+            job.Name,
+            AuditOutcome.Succeeded,
+            message,
+            JsonSerializer.Serialize(new
+            {
+                jobId = job.Id,
+                jobSlug = job.Slug,
+                jobStatus = job.Status.ToString()
+            })),
+            cancellationToken);
     }
 
     private async Task<bool> ReferencesAreActiveAsync(

@@ -28,6 +28,7 @@ app.MapVariableSetsEndpoints();
 app.MapJobsEndpoints();
 app.MapJobRunsEndpoints();
 app.MapSchedulesEndpoints();
+app.MapAuditEndpoints();
 
 app.Run();
 

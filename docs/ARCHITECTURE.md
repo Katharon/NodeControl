@@ -242,6 +242,16 @@ JobRun cancellation and retry are operational controls around the same execution
 queued runs Cancelled, mark running runs Cancelling, and create queued retry runs. The Worker observes
 cancellation requests from the database and is the only process that stops `ansible-playbook`.
 
+Audit logs are persisted separately from JobRun logs. Audit entries are append-only business activity records
+with actor, customer, entity, action, outcome, timestamp, and a short message. JobRun logs remain technical
+execution output for a single run and may contain stdout/stderr lines; audit entries must not store Ansible
+stdout/stderr or secret variable values.
+
+Slice 10 records the focused operational audit actions `job.created`, `job.updated`, `job.archived`,
+`job_run.created_manual`, `job_run.cancel_requested`, `job_run.cancelled_queued`, `job_run.retried`,
+`job_run.created_scheduled`, `schedule.created`, `schedule.updated`, `schedule.paused`,
+`schedule.resumed`, and `schedule.archived`. Customer-scoped audit API reads require `ViewAuditLogs`.
+
 ## Data Flow: Scheduled Job
 
 ```text
