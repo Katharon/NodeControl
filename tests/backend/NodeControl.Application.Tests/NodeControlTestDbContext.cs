@@ -1,6 +1,7 @@
 using NodeControl.Application.Abstractions.Persistence;
 using NodeControl.Domain.Customers;
 using NodeControl.Domain.Inventories;
+using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Playbooks;
 using NodeControl.Domain.Users;
@@ -29,6 +30,10 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     public List<Playbook> Playbooks { get; } = [];
 
     public List<VariableSet> VariableSets { get; } = [];
+
+    public List<Job> Jobs { get; } = [];
+
+    public List<JobRun> JobRuns { get; } = [];
 
     public Task<ExternalIdentity?> FindExternalIdentityAsync(
         string provider,
@@ -241,6 +246,41 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
             variableSet.CustomerId == customerId && variableSet.Slug == slug));
     }
 
+    public Task<IReadOnlyList<Job>> ListActiveJobsAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult<IReadOnlyList<Job>>(
+            Jobs
+                .Where(job => job.CustomerId == customerId && job.Status == JobStatus.Active)
+                .ToArray());
+    }
+
+    public Task<Job?> FindJobAsync(Guid customerId, Guid jobId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(Jobs.FirstOrDefault(job =>
+            job.CustomerId == customerId && job.Id == jobId));
+    }
+
+    public Task<Job?> FindJobBySlugAsync(Guid customerId, string slug, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(Jobs.FirstOrDefault(job =>
+            job.CustomerId == customerId && job.Slug == slug));
+    }
+
+    public Task<IReadOnlyList<JobRun>> ListJobRunsAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult<IReadOnlyList<JobRun>>(
+            JobRuns
+                .Where(jobRun => jobRun.CustomerId == customerId)
+                .OrderByDescending(jobRun => jobRun.CreatedAt)
+                .ToArray());
+    }
+
+    public Task<JobRun?> FindJobRunAsync(Guid customerId, Guid jobRunId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(JobRuns.FirstOrDefault(jobRun =>
+            jobRun.CustomerId == customerId && jobRun.Id == jobRunId));
+    }
+
     public void AddUser(User user)
     {
         Users.Add(user);
@@ -294,6 +334,16 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     public void AddVariableSet(VariableSet variableSet)
     {
         VariableSets.Add(variableSet);
+    }
+
+    public void AddJob(Job job)
+    {
+        Jobs.Add(job);
+    }
+
+    public void AddJobRun(JobRun jobRun)
+    {
+        JobRuns.Add(jobRun);
     }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken)

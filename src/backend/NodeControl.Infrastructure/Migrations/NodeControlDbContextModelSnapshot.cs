@@ -192,6 +192,169 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
             b.ToTable("inventory_group_nodes", (string)null);
         });
 
+        modelBuilder.Entity("NodeControl.Domain.Jobs.Job", b =>
+        {
+            b.Property<Guid>("Id")
+                .ValueGeneratedNever()
+                .HasColumnType("uuid")
+                .HasColumnName("id");
+
+            b.Property<DateTimeOffset?>("ArchivedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("archived_at");
+
+            b.Property<Guid>("ControlNodeId")
+                .HasColumnType("uuid")
+                .HasColumnName("control_node_id");
+
+            b.Property<DateTimeOffset>("CreatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("created_at");
+
+            b.Property<Guid>("CustomerId")
+                .HasColumnType("uuid")
+                .HasColumnName("customer_id");
+
+            b.Property<int>("DefaultTimeoutSeconds")
+                .HasColumnType("integer")
+                .HasColumnName("default_timeout_seconds");
+
+            b.Property<string>("Description")
+                .HasMaxLength(1000)
+                .HasColumnType("character varying(1000)")
+                .HasColumnName("description");
+
+            b.Property<Guid>("InventoryGroupId")
+                .HasColumnType("uuid")
+                .HasColumnName("inventory_group_id");
+
+            b.Property<string>("Name")
+                .IsRequired()
+                .HasMaxLength(200)
+                .HasColumnType("character varying(200)")
+                .HasColumnName("name");
+
+            b.Property<Guid>("PlaybookId")
+                .HasColumnType("uuid")
+                .HasColumnName("playbook_id");
+
+            b.Property<string>("Slug")
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasColumnType("character varying(100)")
+                .HasColumnName("slug");
+
+            b.Property<string>("Status")
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasColumnType("character varying(40)")
+                .HasColumnName("status");
+
+            b.Property<DateTimeOffset?>("UpdatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("updated_at");
+
+            b.Property<Guid?>("VariableSetId")
+                .HasColumnType("uuid")
+                .HasColumnName("variable_set_id");
+
+            b.HasKey("Id")
+                .HasName("pk_jobs");
+
+            b.HasIndex("ControlNodeId")
+                .HasDatabaseName("ix_jobs_control_node_id");
+
+            b.HasIndex("InventoryGroupId")
+                .HasDatabaseName("ix_jobs_inventory_group_id");
+
+            b.HasIndex("PlaybookId")
+                .HasDatabaseName("ix_jobs_playbook_id");
+
+            b.HasIndex("VariableSetId")
+                .HasDatabaseName("ix_jobs_variable_set_id");
+
+            b.HasIndex("CustomerId", "Slug")
+                .IsUnique()
+                .HasDatabaseName("ux_jobs_customer_id_slug");
+
+            b.ToTable("jobs", (string)null);
+        });
+
+        modelBuilder.Entity("NodeControl.Domain.Jobs.JobRun", b =>
+        {
+            b.Property<Guid>("Id")
+                .ValueGeneratedNever()
+                .HasColumnType("uuid")
+                .HasColumnName("id");
+
+            b.Property<DateTimeOffset>("CreatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("created_at");
+
+            b.Property<Guid>("CustomerId")
+                .HasColumnType("uuid")
+                .HasColumnName("customer_id");
+
+            b.Property<string>("ErrorMessage")
+                .HasMaxLength(4000)
+                .HasColumnType("character varying(4000)")
+                .HasColumnName("error_message");
+
+            b.Property<int?>("ExitCode")
+                .HasColumnType("integer")
+                .HasColumnName("exit_code");
+
+            b.Property<DateTimeOffset?>("FinishedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("finished_at");
+
+            b.Property<Guid>("JobId")
+                .HasColumnType("uuid")
+                .HasColumnName("job_id");
+
+            b.Property<DateTimeOffset>("QueuedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("queued_at");
+
+            b.Property<Guid?>("ScheduleId")
+                .HasColumnType("uuid")
+                .HasColumnName("schedule_id");
+
+            b.Property<DateTimeOffset?>("StartedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("started_at");
+
+            b.Property<string>("Status")
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasColumnType("character varying(40)")
+                .HasColumnName("status");
+
+            b.Property<Guid?>("TriggeredByUserId")
+                .HasColumnType("uuid")
+                .HasColumnName("triggered_by_user_id");
+
+            b.Property<string>("TriggerType")
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasColumnType("character varying(40)")
+                .HasColumnName("trigger_type");
+
+            b.HasKey("Id")
+                .HasName("pk_job_runs");
+
+            b.HasIndex("JobId")
+                .HasDatabaseName("ix_job_runs_job_id");
+
+            b.HasIndex("TriggeredByUserId")
+                .HasDatabaseName("ix_job_runs_triggered_by_user_id");
+
+            b.HasIndex("CustomerId", "CreatedAt")
+                .HasDatabaseName("ix_job_runs_customer_id_created_at");
+
+            b.ToTable("job_runs", (string)null);
+        });
+
         modelBuilder.Entity("NodeControl.Domain.Nodes.ControlNode", b =>
         {
             b.Property<Guid>("Id")
@@ -634,6 +797,66 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
                 .OnDelete(DeleteBehavior.Restrict)
                 .IsRequired()
                 .HasConstraintName("fk_inventory_group_nodes_managed_nodes_managed_node_id");
+        });
+
+        modelBuilder.Entity("NodeControl.Domain.Jobs.Job", b =>
+        {
+            b.HasOne("NodeControl.Domain.Nodes.ControlNode", null)
+                .WithMany()
+                .HasForeignKey("ControlNodeId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("fk_jobs_control_nodes_control_node_id");
+
+            b.HasOne("NodeControl.Domain.Customers.Customer", null)
+                .WithMany()
+                .HasForeignKey("CustomerId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("fk_jobs_customers_customer_id");
+
+            b.HasOne("NodeControl.Domain.Inventories.InventoryGroup", null)
+                .WithMany()
+                .HasForeignKey("InventoryGroupId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("fk_jobs_inventory_groups_inventory_group_id");
+
+            b.HasOne("NodeControl.Domain.Playbooks.Playbook", null)
+                .WithMany()
+                .HasForeignKey("PlaybookId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("fk_jobs_playbooks_playbook_id");
+
+            b.HasOne("NodeControl.Domain.VariableSets.VariableSet", null)
+                .WithMany()
+                .HasForeignKey("VariableSetId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_jobs_variable_sets_variable_set_id");
+        });
+
+        modelBuilder.Entity("NodeControl.Domain.Jobs.JobRun", b =>
+        {
+            b.HasOne("NodeControl.Domain.Customers.Customer", null)
+                .WithMany()
+                .HasForeignKey("CustomerId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("fk_job_runs_customers_customer_id");
+
+            b.HasOne("NodeControl.Domain.Jobs.Job", null)
+                .WithMany()
+                .HasForeignKey("JobId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("fk_job_runs_jobs_job_id");
+
+            b.HasOne("NodeControl.Domain.Users.User", null)
+                .WithMany()
+                .HasForeignKey("TriggeredByUserId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_job_runs_users_triggered_by_user_id");
         });
 
         modelBuilder.Entity("NodeControl.Domain.Nodes.ControlNode", b =>

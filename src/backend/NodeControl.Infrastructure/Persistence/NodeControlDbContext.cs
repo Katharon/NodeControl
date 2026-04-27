@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NodeControl.Application.Abstractions.Persistence;
 using NodeControl.Domain.Customers;
 using NodeControl.Domain.Inventories;
+using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Playbooks;
 using NodeControl.Domain.Users;
@@ -31,6 +32,10 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
     public DbSet<Playbook> Playbooks => Set<Playbook>();
 
     public DbSet<VariableSet> VariableSets => Set<VariableSet>();
+
+    public DbSet<Job> Jobs => Set<Job>();
+
+    public DbSet<JobRun> JobRuns => Set<JobRun>();
 
     public async Task<ExternalIdentity?> FindExternalIdentityAsync(
         string provider,
@@ -288,6 +293,56 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Job>> ListActiveJobsAsync(
+        Guid customerId,
+        CancellationToken cancellationToken)
+    {
+        return await Jobs
+            .Where(job => job.CustomerId == customerId && job.Status == JobStatus.Active)
+            .OrderBy(job => job.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<Job?> FindJobAsync(
+        Guid customerId,
+        Guid jobId,
+        CancellationToken cancellationToken)
+    {
+        return await Jobs.FirstOrDefaultAsync(
+            job => job.CustomerId == customerId && job.Id == jobId,
+            cancellationToken);
+    }
+
+    public async Task<Job?> FindJobBySlugAsync(
+        Guid customerId,
+        string slug,
+        CancellationToken cancellationToken)
+    {
+        return await Jobs.FirstOrDefaultAsync(
+            job => job.CustomerId == customerId && job.Slug == slug,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<JobRun>> ListJobRunsAsync(
+        Guid customerId,
+        CancellationToken cancellationToken)
+    {
+        return await JobRuns
+            .Where(jobRun => jobRun.CustomerId == customerId)
+            .OrderByDescending(jobRun => jobRun.CreatedAt)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<JobRun?> FindJobRunAsync(
+        Guid customerId,
+        Guid jobRunId,
+        CancellationToken cancellationToken)
+    {
+        return await JobRuns.FirstOrDefaultAsync(
+            jobRun => jobRun.CustomerId == customerId && jobRun.Id == jobRunId,
+            cancellationToken);
+    }
+
     public void AddUser(User user)
     {
         Users.Add(user);
@@ -341,6 +396,16 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
     public void AddVariableSet(VariableSet variableSet)
     {
         VariableSets.Add(variableSet);
+    }
+
+    public void AddJob(Job job)
+    {
+        Jobs.Add(job);
+    }
+
+    public void AddJobRun(JobRun jobRun)
+    {
+        JobRuns.Add(jobRun);
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

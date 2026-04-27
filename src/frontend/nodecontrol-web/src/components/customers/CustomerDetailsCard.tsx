@@ -2,6 +2,8 @@
 
 import GroupsIcon from "@mui/icons-material/Groups";
 import HubIcon from "@mui/icons-material/Hub";
+import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import WorkIcon from "@mui/icons-material/Work";
 import {
   Alert,
   Button,
@@ -54,6 +56,8 @@ export function CustomerDetailsCard({ customerId }: CustomerDetailsCardProps) {
   const canManageCustomer = hasPermission(customer.permissions, "ManageCustomer");
   const canManageMemberships = hasPermission(customer.permissions, "ManageMemberships");
   const canViewNodes = hasPermission(customer.permissions, "ViewNodes");
+  const canViewJobs = hasPermission(customer.permissions, "ViewPlaybooks");
+  const canViewJobRuns = hasPermission(customer.permissions, "ViewJobRuns");
 
   return (
     <Paper sx={{ p: 3 }}>
@@ -73,6 +77,16 @@ export function CustomerDetailsCard({ customerId }: CustomerDetailsCardProps) {
             {canViewNodes ? (
               <Button startIcon={<HubIcon />} href={`/customers/${customer.id}/nodes`} variant="outlined">
                 Nodes
+              </Button>
+            ) : null}
+            {canViewJobs ? (
+              <Button startIcon={<WorkIcon />} href={`/customers/${customer.id}/jobs`} variant="outlined">
+                Jobs
+              </Button>
+            ) : null}
+            {canViewJobRuns ? (
+              <Button startIcon={<ReceiptLongIcon />} href={`/customers/${customer.id}/job-runs`} variant="outlined">
+                Job Runs
               </Button>
             ) : null}
             {canManageMemberships ? (

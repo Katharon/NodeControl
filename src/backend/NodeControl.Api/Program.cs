@@ -25,6 +25,8 @@ app.MapManagedNodesEndpoints();
 app.MapInventoryGroupsEndpoints();
 app.MapPlaybooksEndpoints();
 app.MapVariableSetsEndpoints();
+app.MapJobsEndpoints();
+app.MapJobRunsEndpoints();
 
 app.Run();
 

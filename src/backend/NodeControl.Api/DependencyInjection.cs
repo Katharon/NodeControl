@@ -10,6 +10,8 @@ using NodeControl.Application.Auth;
 using NodeControl.Application.ControlNodes;
 using NodeControl.Application.Customers;
 using NodeControl.Application.InventoryGroups;
+using NodeControl.Application.JobRuns;
+using NodeControl.Application.Jobs;
 using NodeControl.Application.ManagedNodes;
 using NodeControl.Application.Memberships;
 using NodeControl.Application.Playbooks;
@@ -47,6 +49,8 @@ public static class DependencyInjection
         services.AddScoped<YamlJsonValidationService>();
         services.AddScoped<PlaybookService>();
         services.AddScoped<VariableSetService>();
+        services.AddScoped<JobService>();
+        services.AddScoped<JobRunService>();
 
         services.AddNodeControlInfrastructure(configuration);
 

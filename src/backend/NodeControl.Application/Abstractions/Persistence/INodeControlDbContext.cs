@@ -1,6 +1,7 @@
 using NodeControl.Domain.Users;
 using NodeControl.Domain.Customers;
 using NodeControl.Domain.Inventories;
+using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Playbooks;
 using NodeControl.Domain.VariableSets;
@@ -123,6 +124,31 @@ public interface INodeControlDbContext
         throw new NotSupportedException();
     }
 
+    Task<IReadOnlyList<Job>> ListActiveJobsAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<Job?> FindJobAsync(Guid customerId, Guid jobId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<Job?> FindJobBySlugAsync(Guid customerId, string slug, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<IReadOnlyList<JobRun>> ListJobRunsAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<JobRun?> FindJobRunAsync(Guid customerId, Guid jobRunId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
     void AddUser(User user);
 
     void AddExternalIdentity(ExternalIdentity externalIdentity);
@@ -162,6 +188,16 @@ public interface INodeControlDbContext
     }
 
     void AddVariableSet(VariableSet variableSet)
+    {
+        throw new NotSupportedException();
+    }
+
+    void AddJob(Job job)
+    {
+        throw new NotSupportedException();
+    }
+
+    void AddJobRun(JobRun jobRun)
     {
         throw new NotSupportedException();
     }
