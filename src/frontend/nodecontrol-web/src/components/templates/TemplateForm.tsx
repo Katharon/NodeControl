@@ -89,7 +89,7 @@ export function TemplateForm({ template, submitLabel, onSubmit, onValidate, onVa
       <TextField error={Boolean(errors.language)} helperText={errors.language?.message} label="Language" {...register("language")} />
       <TextField
         error={Boolean(errors.content)}
-        helperText={errors.content?.message}
+        helperText={errors.content?.message ?? "Use secret://my-secret to reference a stored secret."}
         label="Content"
         minRows={18}
         multiline

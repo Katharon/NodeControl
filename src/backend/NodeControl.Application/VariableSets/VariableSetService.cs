@@ -3,6 +3,7 @@ using NodeControl.Application.Abstractions.Persistence;
 using NodeControl.Application.Abstractions.Time;
 using NodeControl.Application.Auth;
 using NodeControl.Application.Customers;
+using NodeControl.Application.Secrets;
 using NodeControl.Application.Validation;
 using NodeControl.Domain.Authorization;
 using NodeControl.Domain.VariableSets;
@@ -13,6 +14,7 @@ public sealed class VariableSetService(
     INodeControlDbContext dbContext,
     ICustomerAuthorizationService authorizationService,
     YamlJsonValidationService validationService,
+    SecretReferenceValidationService secretReferenceValidationService,
     IClock clock)
 {
     public async Task<CustomerServiceResult<IReadOnlyList<VariableSetDto>>> ListAsync(
@@ -60,7 +62,7 @@ public sealed class VariableSetService(
             return CustomerServiceResult<VariableSetDto>.FromAuthorization(authorization);
         }
 
-        if (!ValidateContent(request.Format, request.Content).IsValid)
+        if (!await IsContentValidAsync(customerId, request.Format, request.Content, cancellationToken))
         {
             return CustomerServiceResult<VariableSetDto>.BadRequest();
         }
@@ -106,7 +108,7 @@ public sealed class VariableSetService(
             return CustomerServiceResult<VariableSetDto>.FromAuthorization(authorization);
         }
 
-        if (!ValidateContent(request.Format, request.Content).IsValid)
+        if (!await IsContentValidAsync(customerId, request.Format, request.Content, cancellationToken))
         {
             return CustomerServiceResult<VariableSetDto>.BadRequest();
         }
@@ -198,6 +200,22 @@ public sealed class VariableSetService(
             VariableSetFormat.Json => validationService.ValidateJson(content),
             _ => ValidationResult.Invalid("Unsupported variable set format.", ["Unsupported variable set format."])
         };
+    }
+
+    private async Task<bool> IsContentValidAsync(
+        Guid customerId,
+        VariableSetFormat format,
+        string content,
+        CancellationToken cancellationToken)
+    {
+        var contentValidation = ValidateContent(format, content);
+        if (!contentValidation.IsValid)
+        {
+            return false;
+        }
+
+        var referenceValidation = await secretReferenceValidationService.ValidateAsync(customerId, content, cancellationToken);
+        return referenceValidation.IsValid;
     }
 
     private async Task<CustomerAuthorizationResult> AuthorizeAsync(

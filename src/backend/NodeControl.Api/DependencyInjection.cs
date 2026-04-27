@@ -57,6 +57,8 @@ public static class DependencyInjection
         services.AddScoped<PlaybookService>();
         services.AddScoped<VariableSetService>();
         services.AddScoped<TemplateValidationService>();
+        services.AddSingleton<SecretReferenceParser>();
+        services.AddScoped<SecretReferenceValidationService>();
         services.AddScoped<TemplateService>();
         services.AddScoped<SecretService>();
         services.AddScoped<JobService>();

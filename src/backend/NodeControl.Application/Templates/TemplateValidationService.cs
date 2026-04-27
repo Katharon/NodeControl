@@ -43,7 +43,7 @@ public sealed class TemplateValidationService
             warnings.Add("Content contains secret-like words. Avoid storing secrets in templates.");
         }
 
-        return new TemplateValidationResultDto(errors.Count == 0, errors, warnings);
+        return new TemplateValidationResultDto(errors.Count == 0, errors, warnings, []);
     }
 
     private static void AddDelimiterErrors(

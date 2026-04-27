@@ -14,7 +14,9 @@ export type Permission =
   | "ManageSchedules"
   | "ViewAuditLogs"
   | "ViewTemplates"
-  | "ManageTemplates";
+  | "ManageTemplates"
+  | "ViewSecrets"
+  | "ManageSecrets";
 
 export function hasPermission(
   permissions: readonly Permission[] | undefined,

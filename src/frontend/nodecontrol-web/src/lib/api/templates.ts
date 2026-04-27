@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api/apiClient";
+import type { SecretReference } from "@/lib/api/secrets";
 
 export type TemplateType = "GenericText" | "Jinja2" | "AnsibleVars" | "ShellScript" | "ConfigFile";
 export type TemplateStatus = "Active" | "Archived";
@@ -31,6 +32,7 @@ export type TemplateValidationResult = {
   isValid: boolean;
   errors: string[];
   warnings: string[];
+  secretReferences: SecretReference[];
 };
 
 export function getTemplates(customerId: string) {

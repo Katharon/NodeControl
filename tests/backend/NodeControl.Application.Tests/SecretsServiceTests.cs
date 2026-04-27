@@ -14,6 +14,89 @@ namespace NodeControl.Application.Tests;
 public sealed class SecretsServiceTests
 {
     [Fact]
+    public void SecretReferenceParser_detects_one_reference()
+    {
+        var slugs = new SecretReferenceParser().ParseDistinctSlugs("password: secret://db-password");
+
+        Assert.Equal(["db-password"], slugs);
+    }
+
+    [Fact]
+    public void SecretReferenceParser_detects_multiple_distinct_references()
+    {
+        var slugs = new SecretReferenceParser().ParseDistinctSlugs("secret://api-token secret://db-password secret://api-token");
+
+        Assert.Equal(["api-token", "db-password"], slugs);
+    }
+
+    [Fact]
+    public void SecretReferenceParser_ignores_malformed_references()
+    {
+        var slugs = new SecretReferenceParser().ParseDistinctSlugs("secret://Bad secret://a secret://bad_slug");
+
+        Assert.Empty(slugs);
+    }
+
+    [Fact]
+    public async Task SecretReferenceValidation_accepts_active_same_customer_secret()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+        fixture.Db.AddSecret(Secret.Create(fixture.Customer.Id, "DB Password", "db-password", null, SecretKind.Password, "protected", TestTime));
+
+        var result = await fixture.CreateSecretReferenceValidationService().ValidateAsync(
+            fixture.Customer.Id,
+            "db_password: secret://db-password");
+
+        Assert.True(result.IsValid);
+        Assert.Single(result.References);
+        Assert.True(result.References[0].Found);
+    }
+
+    [Fact]
+    public async Task SecretReferenceValidation_rejects_missing_secret()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+
+        var result = await fixture.CreateSecretReferenceValidationService().ValidateAsync(
+            fixture.Customer.Id,
+            "db_password: secret://db-password");
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.Contains("does not exist", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task SecretReferenceValidation_rejects_archived_secret()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+        var secret = Secret.Create(fixture.Customer.Id, "DB Password", "db-password", null, SecretKind.Password, "protected", TestTime);
+        secret.Archive(TestTime);
+        fixture.Db.AddSecret(secret);
+
+        var result = await fixture.CreateSecretReferenceValidationService().ValidateAsync(
+            fixture.Customer.Id,
+            "db_password: secret://db-password");
+
+        Assert.False(result.IsValid);
+        Assert.Equal("Archived", result.References[0].Status);
+    }
+
+    [Fact]
+    public async Task SecretReferenceValidation_does_not_allow_cross_tenant_reference()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+        var other = fixture.AddOtherCustomer();
+        fixture.Db.AddSecret(Secret.Create(other.Customer.Id, "DB Password", "db-password", null, SecretKind.Password, "protected", TestTime));
+
+        var result = await fixture.CreateSecretReferenceValidationService().ValidateAsync(
+            fixture.Customer.Id,
+            "db_password: secret://db-password");
+
+        Assert.False(result.IsValid);
+        Assert.False(result.References[0].Found);
+    }
+
+    [Fact]
     public async Task SecretService_creates_secret_when_user_has_manage_secrets()
     {
         var fixture = TestFixture.Create(CustomerRole.Owner);
@@ -269,6 +352,11 @@ public sealed class SecretsServiceTests
                 secretProtector,
                 Clock,
                 new AuditLogWriter(Db, Clock, new EmptyRequestAuditContext()));
+        }
+
+        public SecretReferenceValidationService CreateSecretReferenceValidationService()
+        {
+            return new SecretReferenceValidationService(Db, new SecretReferenceParser());
         }
     }
 

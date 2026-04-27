@@ -170,6 +170,10 @@ Current implementation note: Secrets backend/API support is available as a metad
 resource. Secret values are protected before persistence, can be rotated, and are never returned by API
 responses. Secrets are not connected to execution or template rendering yet.
 
+Current implementation note: Secrets now have a customer-scoped frontend and safe reference validation through
+`secret://secret-slug`. Template validation reports reference status, and VariableSet create/update rejects
+missing or archived references. References are metadata-only and are not resolved during execution.
+
 ## Phase 8: Security and Hardening
 
 Goal:

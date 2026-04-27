@@ -5,6 +5,7 @@ using NodeControl.Application.Abstractions.Persistence;
 using NodeControl.Application.Abstractions.Time;
 using NodeControl.Application.Auth;
 using NodeControl.Application.Customers;
+using NodeControl.Application.Secrets;
 using NodeControl.Domain.Audit;
 using NodeControl.Domain.Authorization;
 using NodeControl.Domain.Templates;
@@ -15,6 +16,7 @@ public sealed class TemplateService(
     INodeControlDbContext dbContext,
     ICustomerAuthorizationService authorizationService,
     TemplateValidationService validationService,
+    SecretReferenceValidationService secretReferenceValidationService,
     IClock clock,
     IAuditLogWriter auditLogWriter)
 {
@@ -68,7 +70,7 @@ public sealed class TemplateService(
             return CustomerServiceResult<TemplateDto>.BadRequest();
         }
 
-        if (!validationService.Validate(templateType, request.Content, request.Language).IsValid)
+        if (!(await ValidateTemplateAsync(customerId, templateType, request.Content, request.Language, cancellationToken)).IsValid)
         {
             return CustomerServiceResult<TemplateDto>.BadRequest();
         }
@@ -120,7 +122,7 @@ public sealed class TemplateService(
             return CustomerServiceResult<TemplateDto>.BadRequest();
         }
 
-        if (!validationService.Validate(templateType, request.Content, request.Language).IsValid)
+        if (!(await ValidateTemplateAsync(customerId, templateType, request.Content, request.Language, cancellationToken)).IsValid)
         {
             return CustomerServiceResult<TemplateDto>.BadRequest();
         }
@@ -206,7 +208,7 @@ public sealed class TemplateService(
         }
 
         return CustomerServiceResult<TemplateValidationResultDto>.Ok(
-            validationService.Validate(templateType, request.Content, request.Language));
+            await ValidateTemplateAsync(customerId, templateType, request.Content, request.Language, cancellationToken));
     }
 
     public async Task<CustomerServiceResult<TemplateValidationResultDto>> ValidateExistingAsync(
@@ -228,7 +230,26 @@ public sealed class TemplateService(
         }
 
         return CustomerServiceResult<TemplateValidationResultDto>.Ok(
-            validationService.Validate(template.TemplateType, template.Content, template.Language));
+            await ValidateTemplateAsync(customerId, template.TemplateType, template.Content, template.Language, cancellationToken));
+    }
+
+    private async Task<TemplateValidationResultDto> ValidateTemplateAsync(
+        Guid customerId,
+        TemplateType templateType,
+        string content,
+        string? language,
+        CancellationToken cancellationToken)
+    {
+        var templateValidation = validationService.Validate(templateType, content, language);
+        var referenceValidation = await secretReferenceValidationService.ValidateAsync(customerId, content, cancellationToken);
+        var errors = templateValidation.Errors.Concat(referenceValidation.Errors).ToArray();
+        var warnings = templateValidation.Warnings.Concat(referenceValidation.Warnings).ToArray();
+
+        return new TemplateValidationResultDto(
+            templateValidation.IsValid && referenceValidation.IsValid,
+            errors,
+            warnings,
+            referenceValidation.References);
     }
 
     private async Task WriteTemplateAuditAsync(

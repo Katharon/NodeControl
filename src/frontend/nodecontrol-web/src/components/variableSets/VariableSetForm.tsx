@@ -74,7 +74,7 @@ export function VariableSetForm({ variableSet, submitLabel, onSubmit }: Variable
       />
       <TextField
         error={Boolean(errors.content)}
-        helperText={errors.content?.message}
+        helperText={errors.content?.message ?? "Use secret://my-secret to reference a stored secret."}
         label="Inhalt"
         minRows={14}
         multiline

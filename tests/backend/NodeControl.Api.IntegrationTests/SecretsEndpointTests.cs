@@ -209,6 +209,34 @@ public sealed class SecretsEndpointTests
         Assert.DoesNotContain(factory.Db.Secrets.Single().ProtectedValue, metadata);
     }
 
+    [Fact]
+    public async Task Secret_reference_validation_endpoint_returns_metadata_only()
+    {
+        await using var factory = SecretApiFactory.Create(CustomerRole.Viewer);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        var secret = Secret.Create(
+            seeded.Customer.Id,
+            "API Token",
+            "api-token",
+            null,
+            SecretKind.ApiToken,
+            "protected-secret-value",
+            TestTime);
+        factory.Db.AddSecret(secret);
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsJsonAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/secret-references/validate",
+            new ValidateSecretReferencesRequest("token: secret://api-token"),
+            JsonOptions);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("api-token", body);
+        Assert.DoesNotContain("protected-secret-value", body);
+        Assert.DoesNotContain("protectedValue", body, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static CreateSecretRequest ValidCreateRequest(string slug, string value)
     {
         return new CreateSecretRequest("API Token", slug, null, "ApiToken", value);

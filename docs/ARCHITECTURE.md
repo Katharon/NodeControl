@@ -206,7 +206,8 @@ operations. Templates are not executed, rendered, uploaded to hosts, or wired in
 A customer-scoped protected value such as a password, API token, SSH private key, certificate, or connection
 string. Slice 13a exposes secret metadata only through the API. Plaintext values are accepted on create/rotate,
 protected before persistence, never returned in API responses, and not connected to Templates, Variables, Actions,
-or Worker execution yet.
+or Worker execution yet. Slice 13bc adds the canonical safe reference syntax `secret://secret-slug`; references
+are validated by customer and active status only, without decrypting or returning secret values.
 
 ### Job
 

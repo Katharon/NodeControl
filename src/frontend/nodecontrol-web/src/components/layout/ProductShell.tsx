@@ -94,7 +94,7 @@ const navigationGroups: NavigationGroup[] = [
   {
     label: "Geheimnisse & Benachrichtigungen",
     items: [
-      { label: "Secrets", href: "/secrets", icon: VpnKeyIcon },
+      { label: "Secrets", href: "/secrets", icon: VpnKeyIcon, scopedSegment: "secrets" },
       { label: "Benachrichtigungen", href: "/notifications", icon: NotificationsIcon },
     ],
   },
@@ -118,6 +118,7 @@ const scopedPathBySegment: Record<string, string> = {
   playbooks: "playbooks",
   runs: "runs",
   schedules: "schedules",
+  secrets: "secrets",
   templates: "templates",
   variables: "variables",
 };

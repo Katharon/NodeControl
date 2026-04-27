@@ -196,7 +196,9 @@ templates to playbook artifacts or deployment flows, but Worker execution remain
 Secrets are customer-scoped protected values managed through metadata-only API responses. Slice 13a accepts
 plaintext values only on create and rotate, protects them before persistence, and never returns plaintext or
 protected payloads from API responses. Secrets are not resolved during JobRun execution and are not integrated
-with Templates, VariableSets, Jobs, or Worker workspaces yet.
+with Jobs or Worker workspaces yet. Slice 13bc introduces safe `secret://secret-slug` references for Templates
+and VariableSets. Reference validation checks only same-customer active metadata and never decrypts, renders,
+exports, or passes secret values to Ansible.
 
 ## Dangerous Execution Concerns
 

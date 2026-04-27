@@ -3,6 +3,7 @@ using NodeControl.Application.Auth;
 using NodeControl.Application.Authorization;
 using NodeControl.Application.Customers;
 using NodeControl.Application.Playbooks;
+using NodeControl.Application.Secrets;
 using NodeControl.Application.Validation;
 using NodeControl.Application.VariableSets;
 using NodeControl.Domain.Customers;
@@ -274,7 +275,12 @@ public sealed class PlaybooksAndVariableSetsServiceTests
 
         public VariableSetService CreateVariableSetService()
         {
-            return new VariableSetService(Db, new CustomerAuthorizationService(Db), validationService, clock);
+            return new VariableSetService(
+                Db,
+                new CustomerAuthorizationService(Db),
+                validationService,
+                new SecretReferenceValidationService(Db, new SecretReferenceParser()),
+                clock);
         }
     }
 

@@ -3,9 +3,11 @@ using NodeControl.Application.Abstractions.Time;
 using NodeControl.Application.Auth;
 using NodeControl.Application.Authorization;
 using NodeControl.Application.Customers;
+using NodeControl.Application.Secrets;
 using NodeControl.Application.Templates;
 using NodeControl.Domain.Audit;
 using NodeControl.Domain.Customers;
+using NodeControl.Domain.Secrets;
 using NodeControl.Domain.Templates;
 using NodeControl.Domain.Users;
 
@@ -271,6 +273,38 @@ public sealed class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task TemplateValidation_reports_missing_secret_reference_as_invalid()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+
+        var result = await fixture.CreateTemplateService().ValidateRequestAsync(
+            fixture.CurrentUser,
+            fixture.Customer.Id,
+            new ValidateTemplateRequest("Jinja2", "password: secret://missing-secret", "jinja2"));
+
+        Assert.Null(result.Error);
+        Assert.False(result.Value!.IsValid);
+        Assert.Single(result.Value.SecretReferences);
+        Assert.False(result.Value.SecretReferences[0].Found);
+    }
+
+    [Fact]
+    public async Task TemplateValidation_accepts_active_secret_reference()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+        fixture.Db.AddSecret(Secret.Create(fixture.Customer.Id, "DB Password", "db-password", null, SecretKind.Password, "protected", TestTime));
+
+        var result = await fixture.CreateTemplateService().ValidateRequestAsync(
+            fixture.CurrentUser,
+            fixture.Customer.Id,
+            new ValidateTemplateRequest("Jinja2", "password: secret://db-password", "jinja2"));
+
+        Assert.Null(result.Error);
+        Assert.True(result.Value!.IsValid);
+        Assert.True(result.Value.SecretReferences[0].Found);
+    }
+
+    [Fact]
     public async Task Template_audit_metadata_does_not_contain_full_content()
     {
         var fixture = TestFixture.Create(CustomerRole.Owner);
@@ -343,6 +377,7 @@ public sealed class TemplatesServiceTests
                 Db,
                 new CustomerAuthorizationService(Db),
                 new TemplateValidationService(),
+                new SecretReferenceValidationService(Db, new SecretReferenceParser()),
                 clock,
                 new AuditLogWriter(Db, clock, new EmptyRequestAuditContext()));
         }
