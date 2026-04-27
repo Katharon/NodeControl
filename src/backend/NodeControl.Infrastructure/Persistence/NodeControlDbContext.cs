@@ -343,6 +343,15 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
             cancellationToken);
     }
 
+    public async Task<JobRun?> FindOldestQueuedJobRunAsync(CancellationToken cancellationToken)
+    {
+        return await JobRuns
+            .Where(jobRun => jobRun.Status == JobRunStatus.Queued)
+            .OrderBy(jobRun => jobRun.QueuedAt)
+            .ThenBy(jobRun => jobRun.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public void AddUser(User user)
     {
         Users.Add(user);

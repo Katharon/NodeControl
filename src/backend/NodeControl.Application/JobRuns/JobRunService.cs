@@ -152,6 +152,9 @@ public sealed class JobRunService(
             jobRun.FinishedAt,
             jobRun.ExitCode,
             jobRun.ErrorMessage,
+            jobRun.WorkspacePath,
+            jobRun.StdoutLogPath,
+            jobRun.StderrLogPath,
             jobRun.CreatedAt);
     }
 }

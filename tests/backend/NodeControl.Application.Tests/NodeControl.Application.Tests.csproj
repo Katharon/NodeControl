@@ -21,6 +21,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\backend\NodeControl.Domain\NodeControl.Domain.csproj" />
     <ProjectReference Include="..\..\..\src\backend\NodeControl.Application\NodeControl.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\backend\NodeControl.Infrastructure\NodeControl.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\backend\NodeControl.Worker\NodeControl.Worker.csproj" />
   </ItemGroup>
 
 </Project>

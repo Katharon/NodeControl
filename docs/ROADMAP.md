@@ -113,6 +113,10 @@ Deliverables:
 - AuditLog entry
 - Frontend run button and JobRun detail page
 
+Current implementation note: manual runs can be queued through the API and processed by `NodeControl.Worker`
+with local `ansible-playbook` execution for inline YAML playbooks. Scheduling, Quartz, live logs,
+cancellation, retries, remote control-node dispatch, and audit log persistence remain later slices.
+
 This is the most important MVP milestone.
 
 ## Phase 6: Scheduled Jobs / Cronjobs

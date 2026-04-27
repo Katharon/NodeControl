@@ -15,4 +15,7 @@ public sealed record JobRunDto(
     DateTimeOffset? FinishedAt,
     int? ExitCode,
     string? ErrorMessage,
+    string? WorkspacePath,
+    string? StdoutLogPath,
+    string? StderrLogPath,
     DateTimeOffset CreatedAt);

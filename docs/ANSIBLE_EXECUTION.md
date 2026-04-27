@@ -87,6 +87,10 @@ Suggested path:
 └── stderr.log
 ```
 
+Slice 6 implements local Worker execution for queued manual JobRuns. The workspace root is configured with
+`NodeControl:Execution:RunWorkspaceRoot`; development uses `.nodecontrol/runs`, while production-style
+configuration uses `/var/lib/nodecontrol/runs`.
+
 ## Execution Command
 
 Conceptually:
@@ -96,6 +100,10 @@ ansible-playbook -i inventory.yml playbook/site.yml -e @vars.yml
 ```
 
 The exact implementation belongs to Infrastructure/Worker.
+
+Slice 6 runs `ansible-playbook` from `NodeControl.Worker` only, using `ProcessStartInfo.ArgumentList`
+with `UseShellExecute = false`. The executable path is configured with
+`NodeControl:Execution:AnsiblePlaybookPath` and defaults to `ansible-playbook`.
 
 ## MVP Captured Data
 
@@ -153,11 +161,15 @@ Slice 3 implements target structure and a read-only inventory preview only.
 - Archived Managed Nodes are excluded from preview output.
 - The API still must not execute Ansible; execution remains a later Worker concern.
 
+For Worker execution, the selected Job inventory group is rendered to `inventory.yml`. Active managed nodes
+linked to that group become hosts, and archived nodes are excluded. If the group has no active managed nodes,
+the JobRun fails before Ansible starts.
+
 ## Variable Sets
 
 VariableSets may be stored as YAML or JSON content.
 
-They are written into the JobRun workspace as `vars.yml`.
+They are written into the JobRun workspace as `vars.yml` or `vars.json` depending on the VariableSet format.
 
 Sensitive values need special care.
 

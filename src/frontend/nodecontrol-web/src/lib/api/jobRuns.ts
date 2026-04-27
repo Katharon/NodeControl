@@ -16,6 +16,9 @@ export type JobRun = {
   finishedAt: string | null;
   exitCode: number | null;
   errorMessage: string | null;
+  workspacePath: string | null;
+  stdoutLogPath: string | null;
+  stderrLogPath: string | null;
   createdAt: string;
 };
 

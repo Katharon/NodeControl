@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using NodeControl.Application.Abstractions.Persistence;
 using NodeControl.Application.Abstractions.Time;
+using NodeControl.Infrastructure.Execution;
 using NodeControl.Infrastructure.Persistence;
 using NodeControl.Infrastructure.Time;
 
@@ -22,6 +24,20 @@ public static class DependencyInjection
 
         services.AddScoped<INodeControlDbContext>(serviceProvider =>
             serviceProvider.GetRequiredService<NodeControlDbContext>());
+
+        var executionOptions = new ExecutionOptions();
+        var executionSection = configuration.GetSection(ExecutionOptions.SectionName);
+        if (!string.IsNullOrWhiteSpace(executionSection[nameof(ExecutionOptions.RunWorkspaceRoot)]))
+        {
+            executionOptions.RunWorkspaceRoot = executionSection[nameof(ExecutionOptions.RunWorkspaceRoot)]!;
+        }
+
+        if (!string.IsNullOrWhiteSpace(executionSection[nameof(ExecutionOptions.AnsiblePlaybookPath)]))
+        {
+            executionOptions.AnsiblePlaybookPath = executionSection[nameof(ExecutionOptions.AnsiblePlaybookPath)]!;
+        }
+
+        services.AddSingleton(Options.Create(executionOptions));
 
         services.AddSingleton<IClock, SystemClock>();
 

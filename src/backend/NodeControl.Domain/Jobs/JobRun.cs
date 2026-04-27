@@ -52,6 +52,12 @@ public sealed class JobRun
 
     public string? ErrorMessage { get; private set; }
 
+    public string? WorkspacePath { get; private set; }
+
+    public string? StdoutLogPath { get; private set; }
+
+    public string? StderrLogPath { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public static JobRun CreateManual(Job job, Guid triggeredByUserId, DateTimeOffset queuedAt)
@@ -76,5 +82,78 @@ public sealed class JobRun
             JobRunStatus.Queued,
             queuedAt,
             queuedAt);
+    }
+
+    public void MarkRunning(DateTimeOffset startedAt)
+    {
+        EnsureStatus(JobRunStatus.Queued);
+
+        Status = JobRunStatus.Running;
+        StartedAt = startedAt;
+        ErrorMessage = null;
+    }
+
+    public void SetExecutionPaths(string workspacePath, string stdoutLogPath, string stderrLogPath)
+    {
+        WorkspacePath = NormalizePath(workspacePath, nameof(workspacePath));
+        StdoutLogPath = NormalizePath(stdoutLogPath, nameof(stdoutLogPath));
+        StderrLogPath = NormalizePath(stderrLogPath, nameof(stderrLogPath));
+    }
+
+    public void MarkSucceeded(int exitCode, DateTimeOffset finishedAt)
+    {
+        EnsureStatus(JobRunStatus.Running);
+
+        Status = JobRunStatus.Succeeded;
+        ExitCode = exitCode;
+        ErrorMessage = null;
+        FinishedAt = finishedAt;
+    }
+
+    public void MarkFailed(int? exitCode, string errorMessage, DateTimeOffset finishedAt)
+    {
+        EnsureStatus(JobRunStatus.Running);
+
+        Status = JobRunStatus.Failed;
+        ExitCode = exitCode;
+        ErrorMessage = NormalizeErrorMessage(errorMessage);
+        FinishedAt = finishedAt;
+    }
+
+    public void MarkTimedOut(int? exitCode, string errorMessage, DateTimeOffset finishedAt)
+    {
+        EnsureStatus(JobRunStatus.Running);
+
+        Status = JobRunStatus.TimedOut;
+        ExitCode = exitCode;
+        ErrorMessage = NormalizeErrorMessage(errorMessage);
+        FinishedAt = finishedAt;
+    }
+
+    private void EnsureStatus(JobRunStatus expectedStatus)
+    {
+        if (Status != expectedStatus)
+        {
+            throw new InvalidOperationException($"JobRun must be {expectedStatus}.");
+        }
+    }
+
+    private static string NormalizeErrorMessage(string errorMessage)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(errorMessage);
+        var trimmed = errorMessage.Trim();
+        return trimmed.Length <= 4000 ? trimmed : trimmed[..4000];
+    }
+
+    private static string NormalizePath(string path, string parameterName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path, parameterName);
+        var trimmed = path.Trim();
+        if (trimmed.Length > 1000)
+        {
+            throw new ArgumentException("Path must be at most 1000 characters.", parameterName);
+        }
+
+        return trimmed;
     }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, CircularProgress, Paper, Stack, Typography } from "@mui/material";
+import { Alert, CircularProgress, Divider, Paper, Stack, Typography } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { JobRunStatusChip } from "@/components/jobRuns/JobRunStatusChip";
 import { getCustomer } from "@/lib/api/customers";
@@ -38,6 +38,11 @@ export function JobRunDetailsCard({ customerId, jobRunId }: JobRunDetailsCardPro
   }
 
   const jobRun = jobRunQuery.data;
+  const pathRows = [
+    ["Workspace", jobRun.workspacePath],
+    ["Stdout log", jobRun.stdoutLogPath],
+    ["Stderr log", jobRun.stderrLogPath],
+  ] as const;
 
   return (
     <Paper sx={{ p: 3 }}>
@@ -51,9 +56,25 @@ export function JobRunDetailsCard({ customerId, jobRunId }: JobRunDetailsCardPro
         </Stack>
         <Typography>Trigger: {jobRun.triggerType}</Typography>
         <Typography>Queued: {new Date(jobRun.queuedAt).toLocaleString()}</Typography>
+        <Typography>Started: {jobRun.startedAt ? new Date(jobRun.startedAt).toLocaleString() : "Not started"}</Typography>
+        <Typography>Finished: {jobRun.finishedAt ? new Date(jobRun.finishedAt).toLocaleString() : "Not finished"}</Typography>
+        <Typography>Exit code: {jobRun.exitCode ?? "Not available"}</Typography>
         <Typography>Job: {jobRun.jobId}</Typography>
         {jobRun.triggeredByUserId ? <Typography>Triggered by: {jobRun.triggeredByUserId}</Typography> : null}
         {jobRun.errorMessage ? <Alert severity="error">{jobRun.errorMessage}</Alert> : null}
+        {pathRows.some(([, value]) => value) ? (
+          <>
+            <Divider />
+            <Stack sx={{ gap: 1 }}>
+              {pathRows.map(([label, value]) => value ? (
+                <Stack key={label}>
+                  <Typography color="text.secondary" variant="body2">{label}</Typography>
+                  <Typography sx={{ overflowWrap: "anywhere" }}>{value}</Typography>
+                </Stack>
+              ) : null)}
+            </Stack>
+          </>
+        ) : null}
       </Stack>
     </Paper>
   );

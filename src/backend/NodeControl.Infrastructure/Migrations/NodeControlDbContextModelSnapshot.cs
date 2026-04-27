@@ -324,6 +324,16 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
                 .HasColumnType("timestamp with time zone")
                 .HasColumnName("started_at");
 
+            b.Property<string>("StderrLogPath")
+                .HasMaxLength(1000)
+                .HasColumnType("character varying(1000)")
+                .HasColumnName("stderr_log_path");
+
+            b.Property<string>("StdoutLogPath")
+                .HasMaxLength(1000)
+                .HasColumnType("character varying(1000)")
+                .HasColumnName("stdout_log_path");
+
             b.Property<string>("Status")
                 .IsRequired()
                 .HasMaxLength(40)
@@ -340,11 +350,19 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
                 .HasColumnType("character varying(40)")
                 .HasColumnName("trigger_type");
 
+            b.Property<string>("WorkspacePath")
+                .HasMaxLength(1000)
+                .HasColumnType("character varying(1000)")
+                .HasColumnName("workspace_path");
+
             b.HasKey("Id")
                 .HasName("pk_job_runs");
 
             b.HasIndex("JobId")
                 .HasDatabaseName("ix_job_runs_job_id");
+
+            b.HasIndex("Status", "QueuedAt")
+                .HasDatabaseName("ix_job_runs_status_queued_at");
 
             b.HasIndex("TriggeredByUserId")
                 .HasDatabaseName("ix_job_runs_triggered_by_user_id");

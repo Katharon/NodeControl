@@ -231,6 +231,10 @@ Worker updates JobRun
 AuditLog records execution
 ```
 
+The MVP Worker polls queued JobRuns from the database and processes the oldest queued run first. Actual
+Ansible execution remains local to the Worker process until remote control-node dispatch is introduced in a
+later slice.
+
 ## Data Flow: Scheduled Job
 
 ```text

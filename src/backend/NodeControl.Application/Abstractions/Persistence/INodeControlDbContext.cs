@@ -149,6 +149,11 @@ public interface INodeControlDbContext
         throw new NotSupportedException();
     }
 
+    Task<JobRun?> FindOldestQueuedJobRunAsync(CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
     void AddUser(User user);
 
     void AddExternalIdentity(ExternalIdentity externalIdentity);

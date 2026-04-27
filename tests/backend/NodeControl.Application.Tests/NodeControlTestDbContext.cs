@@ -35,6 +35,8 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
 
     public List<JobRun> JobRuns { get; } = [];
 
+    public List<JobRunStatus[]> SavedJobRunStatuses { get; } = [];
+
     public Task<ExternalIdentity?> FindExternalIdentityAsync(
         string provider,
         string subject,
@@ -281,6 +283,15 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
             jobRun.CustomerId == customerId && jobRun.Id == jobRunId));
     }
 
+    public Task<JobRun?> FindOldestQueuedJobRunAsync(CancellationToken cancellationToken)
+    {
+        return Task.FromResult(JobRuns
+            .Where(jobRun => jobRun.Status == JobRunStatus.Queued)
+            .OrderBy(jobRun => jobRun.QueuedAt)
+            .ThenBy(jobRun => jobRun.CreatedAt)
+            .FirstOrDefault());
+    }
+
     public void AddUser(User user)
     {
         Users.Add(user);
@@ -348,6 +359,7 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken)
     {
+        SavedJobRunStatuses.Add(JobRuns.Select(jobRun => jobRun.Status).ToArray());
         return Task.FromResult(1);
     }
 }

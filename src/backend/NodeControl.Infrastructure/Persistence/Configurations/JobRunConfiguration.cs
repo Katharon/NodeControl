@@ -61,6 +61,18 @@ public sealed class JobRunConfiguration : IEntityTypeConfiguration<JobRun>
             .HasColumnName("error_message")
             .HasMaxLength(4000);
 
+        builder.Property(jobRun => jobRun.WorkspacePath)
+            .HasColumnName("workspace_path")
+            .HasMaxLength(1000);
+
+        builder.Property(jobRun => jobRun.StdoutLogPath)
+            .HasColumnName("stdout_log_path")
+            .HasMaxLength(1000);
+
+        builder.Property(jobRun => jobRun.StderrLogPath)
+            .HasColumnName("stderr_log_path")
+            .HasMaxLength(1000);
+
         builder.Property(jobRun => jobRun.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
@@ -84,5 +96,8 @@ public sealed class JobRunConfiguration : IEntityTypeConfiguration<JobRun>
 
         builder.HasIndex(jobRun => new { jobRun.CustomerId, jobRun.CreatedAt })
             .HasDatabaseName("ix_job_runs_customer_id_created_at");
+
+        builder.HasIndex(jobRun => new { jobRun.Status, jobRun.QueuedAt })
+            .HasDatabaseName("ix_job_runs_status_queued_at");
     }
 }
