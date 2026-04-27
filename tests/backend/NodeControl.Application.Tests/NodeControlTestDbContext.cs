@@ -2,7 +2,9 @@ using NodeControl.Application.Abstractions.Persistence;
 using NodeControl.Domain.Customers;
 using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Nodes;
+using NodeControl.Domain.Playbooks;
 using NodeControl.Domain.Users;
+using NodeControl.Domain.VariableSets;
 
 namespace NodeControl.Application.Tests;
 
@@ -23,6 +25,10 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     public List<InventoryGroup> InventoryGroups { get; } = [];
 
     public List<InventoryGroupNode> InventoryGroupNodes { get; } = [];
+
+    public List<Playbook> Playbooks { get; } = [];
+
+    public List<VariableSet> VariableSets { get; } = [];
 
     public Task<ExternalIdentity?> FindExternalIdentityAsync(
         string provider,
@@ -195,6 +201,46 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
                 .ToArray());
     }
 
+    public Task<IReadOnlyList<Playbook>> ListActivePlaybooksAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult<IReadOnlyList<Playbook>>(
+            Playbooks
+                .Where(playbook => playbook.CustomerId == customerId && playbook.Status == PlaybookStatus.Active)
+                .ToArray());
+    }
+
+    public Task<Playbook?> FindPlaybookAsync(Guid customerId, Guid playbookId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(Playbooks.FirstOrDefault(playbook =>
+            playbook.CustomerId == customerId && playbook.Id == playbookId));
+    }
+
+    public Task<Playbook?> FindPlaybookBySlugAsync(Guid customerId, string slug, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(Playbooks.FirstOrDefault(playbook =>
+            playbook.CustomerId == customerId && playbook.Slug == slug));
+    }
+
+    public Task<IReadOnlyList<VariableSet>> ListActiveVariableSetsAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult<IReadOnlyList<VariableSet>>(
+            VariableSets
+                .Where(variableSet => variableSet.CustomerId == customerId && variableSet.Status == VariableSetStatus.Active)
+                .ToArray());
+    }
+
+    public Task<VariableSet?> FindVariableSetAsync(Guid customerId, Guid variableSetId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(VariableSets.FirstOrDefault(variableSet =>
+            variableSet.CustomerId == customerId && variableSet.Id == variableSetId));
+    }
+
+    public Task<VariableSet?> FindVariableSetBySlugAsync(Guid customerId, string slug, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(VariableSets.FirstOrDefault(variableSet =>
+            variableSet.CustomerId == customerId && variableSet.Slug == slug));
+    }
+
     public void AddUser(User user)
     {
         Users.Add(user);
@@ -238,6 +284,16 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     public void RemoveInventoryGroupNode(InventoryGroupNode inventoryGroupNode)
     {
         InventoryGroupNodes.Remove(inventoryGroupNode);
+    }
+
+    public void AddPlaybook(Playbook playbook)
+    {
+        Playbooks.Add(playbook);
+    }
+
+    public void AddVariableSet(VariableSet variableSet)
+    {
+        VariableSets.Add(variableSet);
     }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken)

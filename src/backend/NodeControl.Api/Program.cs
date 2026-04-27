@@ -23,6 +23,8 @@ app.MapCustomerMembershipsEndpoints();
 app.MapControlNodesEndpoints();
 app.MapManagedNodesEndpoints();
 app.MapInventoryGroupsEndpoints();
+app.MapPlaybooksEndpoints();
+app.MapVariableSetsEndpoints();
 
 app.Run();
 

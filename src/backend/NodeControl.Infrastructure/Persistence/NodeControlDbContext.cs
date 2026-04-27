@@ -3,7 +3,9 @@ using NodeControl.Application.Abstractions.Persistence;
 using NodeControl.Domain.Customers;
 using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Nodes;
+using NodeControl.Domain.Playbooks;
 using NodeControl.Domain.Users;
+using NodeControl.Domain.VariableSets;
 
 namespace NodeControl.Infrastructure.Persistence;
 
@@ -25,6 +27,10 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
     public DbSet<InventoryGroup> InventoryGroups => Set<InventoryGroup>();
 
     public DbSet<InventoryGroupNode> InventoryGroupNodes => Set<InventoryGroupNode>();
+
+    public DbSet<Playbook> Playbooks => Set<Playbook>();
+
+    public DbSet<VariableSet> VariableSets => Set<VariableSet>();
 
     public async Task<ExternalIdentity?> FindExternalIdentityAsync(
         string provider,
@@ -222,6 +228,66 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Playbook>> ListActivePlaybooksAsync(
+        Guid customerId,
+        CancellationToken cancellationToken)
+    {
+        return await Playbooks
+            .Where(playbook => playbook.CustomerId == customerId && playbook.Status == PlaybookStatus.Active)
+            .OrderBy(playbook => playbook.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<Playbook?> FindPlaybookAsync(
+        Guid customerId,
+        Guid playbookId,
+        CancellationToken cancellationToken)
+    {
+        return await Playbooks.FirstOrDefaultAsync(
+            playbook => playbook.CustomerId == customerId && playbook.Id == playbookId,
+            cancellationToken);
+    }
+
+    public async Task<Playbook?> FindPlaybookBySlugAsync(
+        Guid customerId,
+        string slug,
+        CancellationToken cancellationToken)
+    {
+        return await Playbooks.FirstOrDefaultAsync(
+            playbook => playbook.CustomerId == customerId && playbook.Slug == slug,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<VariableSet>> ListActiveVariableSetsAsync(
+        Guid customerId,
+        CancellationToken cancellationToken)
+    {
+        return await VariableSets
+            .Where(variableSet => variableSet.CustomerId == customerId && variableSet.Status == VariableSetStatus.Active)
+            .OrderBy(variableSet => variableSet.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<VariableSet?> FindVariableSetAsync(
+        Guid customerId,
+        Guid variableSetId,
+        CancellationToken cancellationToken)
+    {
+        return await VariableSets.FirstOrDefaultAsync(
+            variableSet => variableSet.CustomerId == customerId && variableSet.Id == variableSetId,
+            cancellationToken);
+    }
+
+    public async Task<VariableSet?> FindVariableSetBySlugAsync(
+        Guid customerId,
+        string slug,
+        CancellationToken cancellationToken)
+    {
+        return await VariableSets.FirstOrDefaultAsync(
+            variableSet => variableSet.CustomerId == customerId && variableSet.Slug == slug,
+            cancellationToken);
+    }
+
     public void AddUser(User user)
     {
         Users.Add(user);
@@ -265,6 +331,16 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
     public void RemoveInventoryGroupNode(InventoryGroupNode inventoryGroupNode)
     {
         InventoryGroupNodes.Remove(inventoryGroupNode);
+    }
+
+    public void AddPlaybook(Playbook playbook)
+    {
+        Playbooks.Add(playbook);
+    }
+
+    public void AddVariableSet(VariableSet variableSet)
+    {
+        VariableSets.Add(variableSet);
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

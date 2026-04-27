@@ -12,6 +12,9 @@ using NodeControl.Application.Customers;
 using NodeControl.Application.InventoryGroups;
 using NodeControl.Application.ManagedNodes;
 using NodeControl.Application.Memberships;
+using NodeControl.Application.Playbooks;
+using NodeControl.Application.Validation;
+using NodeControl.Application.VariableSets;
 using NodeControl.Infrastructure;
 
 namespace NodeControl.Api;
@@ -41,6 +44,9 @@ public static class DependencyInjection
         services.AddScoped<ManagedNodeService>();
         services.AddScoped<InventoryGroupService>();
         services.AddScoped<InventoryPreviewService>();
+        services.AddScoped<YamlJsonValidationService>();
+        services.AddScoped<PlaybookService>();
+        services.AddScoped<VariableSetService>();
 
         services.AddNodeControlInfrastructure(configuration);
 
@@ -95,7 +101,7 @@ public static class DependencyInjection
         services.AddAuthorization();
         services.ConfigureHttpJsonOptions(options =>
         {
-            options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+            options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false));
         });
         services.AddOpenApi();
 

@@ -2,6 +2,8 @@ using NodeControl.Domain.Users;
 using NodeControl.Domain.Customers;
 using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Nodes;
+using NodeControl.Domain.Playbooks;
+using NodeControl.Domain.VariableSets;
 
 namespace NodeControl.Application.Abstractions.Persistence;
 
@@ -91,6 +93,36 @@ public interface INodeControlDbContext
         throw new NotSupportedException();
     }
 
+    Task<IReadOnlyList<Playbook>> ListActivePlaybooksAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<Playbook?> FindPlaybookAsync(Guid customerId, Guid playbookId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<Playbook?> FindPlaybookBySlugAsync(Guid customerId, string slug, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<IReadOnlyList<VariableSet>> ListActiveVariableSetsAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<VariableSet?> FindVariableSetAsync(Guid customerId, Guid variableSetId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<VariableSet?> FindVariableSetBySlugAsync(Guid customerId, string slug, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
     void AddUser(User user);
 
     void AddExternalIdentity(ExternalIdentity externalIdentity);
@@ -120,6 +152,16 @@ public interface INodeControlDbContext
     }
 
     void RemoveInventoryGroupNode(InventoryGroupNode inventoryGroupNode)
+    {
+        throw new NotSupportedException();
+    }
+
+    void AddPlaybook(Playbook playbook)
+    {
+        throw new NotSupportedException();
+    }
+
+    void AddVariableSet(VariableSet variableSet)
     {
         throw new NotSupportedException();
     }
