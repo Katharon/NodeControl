@@ -8,6 +8,7 @@ export type Permission =
   | "ManagePlaybooks"
   | "RunJobs"
   | "ViewJobRuns"
+  | "ViewSchedules"
   | "ManageSchedules"
   | "ViewAuditLogs";
 

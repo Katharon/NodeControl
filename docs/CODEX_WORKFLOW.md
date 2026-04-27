@@ -58,7 +58,7 @@ Good:
 - Implement CustomerMembership authorization.
 - Add inventory preview.
 - Add manual JobRun creation.
-- Add Quartz schedule registration.
+- Add database-polled schedule creation.
 - Add frontend customer list page.
 
 Bad:

@@ -139,6 +139,29 @@ public interface INodeControlDbContext
         throw new NotSupportedException();
     }
 
+    Task<IReadOnlyList<JobSchedule>> ListJobSchedulesAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<JobSchedule?> FindJobScheduleAsync(Guid customerId, Guid jobScheduleId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<JobSchedule?> FindJobScheduleBySlugAsync(Guid customerId, string slug, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<IReadOnlyList<JobSchedule>> ListDueActiveJobSchedulesAsync(
+        DateTimeOffset nowUtc,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
     Task<IReadOnlyList<JobRun>> ListJobRunsAsync(Guid customerId, CancellationToken cancellationToken)
     {
         throw new NotSupportedException();
@@ -212,6 +235,11 @@ public interface INodeControlDbContext
     }
 
     void AddJob(Job job)
+    {
+        throw new NotSupportedException();
+    }
+
+    void AddJobSchedule(JobSchedule jobSchedule)
     {
         throw new NotSupportedException();
     }

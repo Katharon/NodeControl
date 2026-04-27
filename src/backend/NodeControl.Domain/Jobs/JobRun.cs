@@ -84,6 +84,32 @@ public sealed class JobRun
             queuedAt);
     }
 
+    public static JobRun CreateScheduled(Job job, JobSchedule schedule, DateTimeOffset queuedAt)
+    {
+        ArgumentNullException.ThrowIfNull(job);
+        ArgumentNullException.ThrowIfNull(schedule);
+        if (job.Status != JobStatus.Active)
+        {
+            throw new InvalidOperationException("Archived jobs cannot be queued.");
+        }
+
+        if (schedule.CustomerId != job.CustomerId || schedule.JobId != job.Id)
+        {
+            throw new InvalidOperationException("Schedule and job must belong to the same customer.");
+        }
+
+        return new JobRun(
+            Guid.NewGuid(),
+            job.CustomerId,
+            job.Id,
+            JobRunTriggerType.Scheduled,
+            null,
+            schedule.Id,
+            JobRunStatus.Queued,
+            queuedAt,
+            queuedAt);
+    }
+
     public void MarkRunning(DateTimeOffset startedAt)
     {
         EnsureStatus(JobRunStatus.Queued);

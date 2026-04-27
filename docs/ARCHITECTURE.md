@@ -99,7 +99,7 @@ Examples:
 
 - EF Core DbContext
 - PostgreSQL mappings
-- Quartz scheduler integration
+- Database-backed schedule persistence
 - File storage
 - Ansible process runner
 - Audit writer implementation
@@ -128,7 +128,7 @@ Examples:
 
 - Poll queued JobRuns
 - Execute JobRuns
-- Host Quartz scheduler
+- Poll due schedules and enqueue scheduled JobRuns
 - Create execution workspaces
 - Run `ansible-playbook`
 - Capture logs
@@ -231,9 +231,9 @@ Worker updates JobRun
 AuditLog records execution
 ```
 
-The MVP Worker polls queued JobRuns from the database and processes the oldest queued run first. Actual
-Ansible execution remains local to the Worker process until remote control-node dispatch is introduced in a
-later slice.
+The MVP Worker polls queued JobRuns from the database and processes the oldest queued run first. It also
+polls active schedules and creates queued scheduled JobRuns when they are due. Actual Ansible execution
+remains local to the Worker process until remote control-node dispatch is introduced in a later slice.
 
 JobRun logs are persisted by the Worker as ordered entries. The API provides read-only access to those logs
 through customer-scoped authorization and never starts Ansible execution.
@@ -241,7 +241,7 @@ through customer-scoped authorization and never starts Ansible execution.
 ## Data Flow: Scheduled Job
 
 ```text
-Quartz trigger fires
+Worker schedule poller finds due active schedule
   |
 Worker creates JobRun with TriggerType = Scheduled
   |

@@ -280,6 +280,99 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
             b.ToTable("jobs", (string)null);
         });
 
+        modelBuilder.Entity("NodeControl.Domain.Jobs.JobSchedule", b =>
+        {
+            b.Property<Guid>("Id")
+                .ValueGeneratedNever()
+                .HasColumnType("uuid")
+                .HasColumnName("id");
+
+            b.Property<DateTimeOffset?>("ArchivedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("archived_at");
+
+            b.Property<string>("CronExpression")
+                .IsRequired()
+                .HasMaxLength(120)
+                .HasColumnType("character varying(120)")
+                .HasColumnName("cron_expression");
+
+            b.Property<DateTimeOffset>("CreatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("created_at");
+
+            b.Property<Guid>("CustomerId")
+                .HasColumnType("uuid")
+                .HasColumnName("customer_id");
+
+            b.Property<string>("Description")
+                .HasMaxLength(1000)
+                .HasColumnType("character varying(1000)")
+                .HasColumnName("description");
+
+            b.Property<Guid>("JobId")
+                .HasColumnType("uuid")
+                .HasColumnName("job_id");
+
+            b.Property<Guid?>("LastJobRunId")
+                .HasColumnType("uuid")
+                .HasColumnName("last_job_run_id");
+
+            b.Property<DateTimeOffset?>("LastRunAtUtc")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("last_run_at_utc");
+
+            b.Property<string>("Name")
+                .IsRequired()
+                .HasMaxLength(200)
+                .HasColumnType("character varying(200)")
+                .HasColumnName("name");
+
+            b.Property<DateTimeOffset?>("NextRunAtUtc")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("next_run_at_utc");
+
+            b.Property<string>("Slug")
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasColumnType("character varying(100)")
+                .HasColumnName("slug");
+
+            b.Property<string>("Status")
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasColumnType("character varying(40)")
+                .HasColumnName("status");
+
+            b.Property<string>("TimeZoneId")
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasColumnType("character varying(100)")
+                .HasColumnName("time_zone_id");
+
+            b.Property<DateTimeOffset?>("UpdatedAt")
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("updated_at");
+
+            b.HasKey("Id")
+                .HasName("pk_job_schedules");
+
+            b.HasIndex("JobId")
+                .HasDatabaseName("ix_job_schedules_job_id");
+
+            b.HasIndex("LastJobRunId")
+                .HasDatabaseName("ix_job_schedules_last_job_run_id");
+
+            b.HasIndex("Status", "NextRunAtUtc")
+                .HasDatabaseName("ix_job_schedules_status_next_run_at_utc");
+
+            b.HasIndex("CustomerId", "Slug")
+                .IsUnique()
+                .HasDatabaseName("ux_job_schedules_customer_id_slug");
+
+            b.ToTable("job_schedules", (string)null);
+        });
+
         modelBuilder.Entity("NodeControl.Domain.Jobs.JobRun", b =>
         {
             b.Property<Guid>("Id")
@@ -922,6 +1015,31 @@ partial class NodeControlDbContextModelSnapshot : ModelSnapshot
                 .HasForeignKey("TriggeredByUserId")
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_job_runs_users_triggered_by_user_id");
+        });
+
+        modelBuilder.Entity("NodeControl.Domain.Jobs.JobSchedule", b =>
+        {
+            b.HasOne("NodeControl.Domain.Customers.Customer", null)
+                .WithMany()
+                .HasForeignKey("CustomerId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("fk_job_schedules_customers_customer_id");
+
+            b.HasOne("NodeControl.Domain.Jobs.JobRun", null)
+                .WithMany()
+                .HasForeignKey("LastJobRunId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_job_schedules_job_runs_last_job_run_id");
+
+            b.HasOne("NodeControl.Domain.Jobs.Job", "Job")
+                .WithMany()
+                .HasForeignKey("JobId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("fk_job_schedules_jobs_job_id");
+
+            b.Navigation("Job");
         });
 
         modelBuilder.Entity("NodeControl.Domain.Jobs.JobRunLogEntry", b =>

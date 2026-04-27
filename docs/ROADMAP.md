@@ -114,8 +114,9 @@ Deliverables:
 - Frontend run button and JobRun detail page
 
 Current implementation note: manual runs can be queued through the API and processed by `NodeControl.Worker`
-with local `ansible-playbook` execution for inline YAML playbooks. Scheduling, Quartz, live logs,
-cancellation, retries, remote control-node dispatch, and audit log persistence remain later slices.
+with local `ansible-playbook` execution for inline YAML playbooks. JobRun logs are persisted and exposed
+read-only through the API. Cancellation, retries, remote control-node dispatch, Quartz, and audit log
+persistence remain later slices.
 
 This is the most important MVP milestone.
 
@@ -130,9 +131,9 @@ Deliverables:
 - Schedule entity
 - Cron expression validation
 - Time zone support
-- Quartz integration
+- Worker database poller for due schedules
 - Next run preview
-- Enable/disable schedule
+- Pause/resume/archive schedule
 - Scheduled JobRun creation
 - Frontend schedule management
 

@@ -119,7 +119,7 @@ Reason:
 - Dynamic RBAC is a separate product feature.
 - Static roles are easier to secure and test.
 
-## DEC-010: Use Quartz.NET for scheduling
+## DEC-010: Start with database-polled schedules
 
 Status: Accepted
 
@@ -127,7 +127,8 @@ Reason:
 
 - Scheduling is a product feature.
 - Cron support is needed.
-- Misfire handling and trigger management should not be hand-written in the MVP.
+- Slice 8 keeps the MVP simple by polling due active schedules from `NodeControl.Worker`.
+- Quartz.NET remains a possible later implementation if richer misfire handling or clustering becomes necessary.
 
 ## DEC-011: Keep scheduling domain independent from Quartz
 
@@ -135,7 +136,7 @@ Status: Accepted
 
 NodeControl owns the Schedule domain model.
 
-Quartz is an implementation detail.
+Any scheduler implementation is an infrastructure detail.
 
 ## DEC-012: API must not execute Ansible
 

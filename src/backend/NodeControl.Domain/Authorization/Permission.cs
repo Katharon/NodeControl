@@ -11,6 +11,7 @@ public enum Permission
     ManagePlaybooks = 7,
     RunJobs = 8,
     ViewJobRuns = 9,
-    ManageSchedules = 10,
-    ViewAuditLogs = 11
+    ViewSchedules = 10,
+    ManageSchedules = 11,
+    ViewAuditLogs = 12
 }

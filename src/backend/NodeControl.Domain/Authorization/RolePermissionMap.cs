@@ -18,7 +18,8 @@ public static class RolePermissionMap
         Permission.ViewNodes,
         Permission.ViewPlaybooks,
         Permission.RunJobs,
-        Permission.ViewJobRuns
+        Permission.ViewJobRuns,
+        Permission.ViewSchedules
     };
 
     private static readonly IReadOnlySet<Permission> ViewerPermissions = new HashSet<Permission>
@@ -26,7 +27,8 @@ public static class RolePermissionMap
         Permission.ViewCustomer,
         Permission.ViewNodes,
         Permission.ViewPlaybooks,
-        Permission.ViewJobRuns
+        Permission.ViewJobRuns,
+        Permission.ViewSchedules
     };
 
     private static readonly IReadOnlySet<Permission> AuditorPermissions = new HashSet<Permission>

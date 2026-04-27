@@ -2,7 +2,7 @@
 
 ## Scheduling Goal
 
-NodeControl must support cyclic execution of Ansible jobs.
+NodeControl supports cyclic execution of existing Jobs by creating queued JobRuns when a Schedule is due.
 
 Examples:
 
@@ -12,25 +12,18 @@ Examples:
 - Check certificate expiration daily.
 - Apply a baseline configuration every week.
 
-## Main Decision
+## Slice 8 Decision
 
-Use Quartz.NET for scheduling.
+Slice 8 uses a simple database-backed poller in `NodeControl.Worker`.
 
 Reason:
 
-- Cron expressions are a core requirement.
-- Scheduling is a product feature.
-- Building reliable cron/misfire behavior manually is unnecessary complexity.
+- It keeps the MVP small.
+- Manual and scheduled runs use the same JobRun execution path.
+- The API manages schedule definitions only.
+- Quartz or another scheduler can still be introduced later if the product needs richer misfire and clustering behavior.
 
-## Important Domain Separation
-
-Quartz is an implementation detail.
-
-NodeControl owns the domain model:
-
-- Job
-- JobRun
-- Schedule
+Quartz.NET is not part of Slice 8.
 
 ## Concepts
 
@@ -38,156 +31,98 @@ NodeControl owns the domain model:
 
 A reusable execution template.
 
-Example:
-
-```text
-Run "Update packages" playbook on "Production Linux Servers" with "Default Maintenance Vars".
-```
-
 ### JobRun
 
 One concrete execution of a Job.
 
-Example:
+### JobSchedule
 
-```text
-JobRun #123 started at 2026-04-26 02:00 and failed with exit code 2.
-```
+A customer-scoped recurring trigger rule for an existing Job.
 
-### Schedule
+Important fields:
 
-A recurring trigger rule that creates JobRuns.
-
-Example:
-
-```text
-Run Job #5 every Monday at 02:00 Europe/Vienna.
-```
-
-## Schedule Fields
-
-Initial fields:
-
-- Id
 - CustomerId
 - JobId
 - Name
+- Slug
 - CronExpression
-- TimeZone
-- IsEnabled
-- MisfirePolicy
-- LastTriggeredAt
-- NextRunAt
-- CreatedAt
-- UpdatedAt
-
-## Trigger Types
-
-JobRun should distinguish:
-
-- Manual
-- Scheduled
-- System
+- TimeZoneId
+- Status: Active, Paused, Archived
+- NextRunAtUtc
+- LastRunAtUtc
+- LastJobRunId
 
 ## Execution Model
 
-Scheduled and manual jobs must use the same execution path.
+Scheduled and manual jobs use the same execution path.
 
 ```text
 Manual Run:
 User -> API -> JobRun Queued -> Worker -> Execute
 
 Scheduled Run:
-Quartz -> Worker -> JobRun Queued -> Worker -> Execute
+Worker schedule poller -> JobRun Queued -> Worker queued-run processor -> Execute
 ```
 
-The actual Ansible execution logic must not be duplicated.
+The schedule poller never runs Ansible. It only creates queued JobRuns.
 
 ## Cron Validation
 
+Schedules use standard 5-field cron expressions:
+
+```text
+*/5 * * * *
+0 * * * *
+30 2 * * *
+```
+
 When a Schedule is created or updated:
 
-1. Validate cron expression.
-2. Validate time zone.
-3. Calculate next run preview.
-4. Store normalized configuration.
-5. Register/update Quartz trigger.
-
-## Misfire Policy
-
-MVP can start simple.
-
-Possible values:
-
-- IgnoreMisfire
-- FireOnceNow
-- SkipMissedRuns
-
-Recommended MVP default:
-
-```text
-SkipMissedRuns
-```
-
-Reason:
-
-If NodeControl was offline, it should not unexpectedly run a large backlog of maintenance jobs.
-
-## Concurrency Rules
-
-MVP should prevent the same Job from running concurrently unless explicitly allowed later.
-
-Initial rule:
-
-```text
-A Job cannot have two active JobRuns at the same time.
-```
-
-Potential future field:
-
-```text
-Job.AllowConcurrentRuns
-```
+1. Validate the cron expression.
+2. Validate the time zone id.
+3. Calculate and store `NextRunAtUtc` for active schedules.
 
 ## Worker Responsibility
 
 The Worker:
 
-- Hosts Quartz scheduler
-- Reacts to scheduled triggers
-- Creates scheduled JobRuns
-- Executes queued JobRuns
-- Updates statuses
-- Writes logs
-- Writes audit entries
+- Polls active schedules with `NextRunAtUtc <= now`.
+- Creates queued JobRuns with `TriggerType = Scheduled`.
+- Sets `ScheduleId`.
+- Leaves `TriggeredByUserId` null.
+- Updates `LastRunAtUtc`, `LastJobRunId`, and `NextRunAtUtc`.
+- Processes queued JobRuns through the existing execution worker.
 
 ## API Responsibility
 
 The API:
 
-- Creates schedules
-- Updates schedules
-- Enables/disables schedules
-- Shows schedule previews
-- Does not execute jobs directly
+- Creates schedules.
+- Updates schedules.
+- Pauses, resumes, and archives schedules.
+- Enforces customer-scoped authorization.
+- Does not create due scheduled JobRuns.
+- Does not execute jobs directly.
 
 ## Frontend Requirements
 
-The schedule UI should show:
+The schedule UI shows:
 
 - Name
 - Job
 - Cron expression
 - Time zone
-- Enabled/disabled state
+- Status
 - Next run time
-- Last triggered time
-- Preview of upcoming runs
+- Last run time
+- Last JobRun link where available
 
 ## Post-MVP Scheduling Features
 
 Potential later features:
 
+- Quartz.NET integration
+- Misfire policies
 - Calendar exclusions
 - Maintenance windows
 - Approval before scheduled run

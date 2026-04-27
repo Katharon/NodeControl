@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using NodeControl.Application.Abstractions.Persistence;
 using NodeControl.Application.JobRuns;
 using NodeControl.Application.Jobs;
+using NodeControl.Application.Schedules;
 using NodeControl.Domain.Customers;
 using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
@@ -74,6 +75,108 @@ public sealed class JobsAndJobRunsEndpointTests
             JsonContent.Create(new { }));
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_schedules_requires_view_schedules()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Auditor);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync($"/api/v1/customers/{seeded.Customer.Id}/schedules");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_schedules_requires_manage_schedules()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Viewer);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        var resources = factory.Db.AddDefinitionResources(seeded.Customer.Id, "a");
+        var job = factory.Db.AddJob(Job.Create(
+            seeded.Customer.Id,
+            "Deploy App",
+            "deploy-app",
+            null,
+            resources.ControlNode.Id,
+            resources.InventoryGroup.Id,
+            resources.Playbook.Id,
+            resources.VariableSet.Id,
+            1800,
+            TestTime));
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsJsonAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/schedules",
+            new CreateJobScheduleRequest("Nightly", "nightly", null, job.Id, "0 * * * *", "UTC"),
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_schedules_creates_schedule_for_authorized_member()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Owner);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        var resources = factory.Db.AddDefinitionResources(seeded.Customer.Id, "a");
+        var job = factory.Db.AddJob(Job.Create(
+            seeded.Customer.Id,
+            "Deploy App",
+            "deploy-app",
+            null,
+            resources.ControlNode.Id,
+            resources.InventoryGroup.Id,
+            resources.Playbook.Id,
+            resources.VariableSet.Id,
+            1800,
+            TestTime));
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsJsonAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/schedules",
+            new CreateJobScheduleRequest("Nightly", "nightly", null, job.Id, "0 * * * *", "UTC"),
+            JsonOptions);
+        var schedule = await response.Content.ReadFromJsonAsync<JobScheduleDto>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal("Active", schedule!.Status);
+        Assert.Single(factory.Db.JobSchedules);
+    }
+
+    [Fact]
+    public async Task Schedule_mutations_require_manage_schedules()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Viewer);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        var schedule = factory.Db.AddScheduleForCustomer(seeded.Customer.Id);
+        using var client = factory.CreateClient();
+
+        var updateRequest = new UpdateJobScheduleRequest("Nightly", "nightly-new", null, schedule.JobId, "0 * * * *", "UTC");
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync($"/api/v1/customers/{seeded.Customer.Id}/schedules/{schedule.Id}", updateRequest, JsonOptions)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsync($"/api/v1/customers/{seeded.Customer.Id}/schedules/{schedule.Id}/pause", JsonContent.Create(new { }))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsync($"/api/v1/customers/{seeded.Customer.Id}/schedules/{schedule.Id}/resume", JsonContent.Create(new { }))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.DeleteAsync($"/api/v1/customers/{seeded.Customer.Id}/schedules/{schedule.Id}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Schedule_endpoints_reject_cross_tenant_access()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Owner);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        var otherCustomer = Customer.Create("Other Customer", "other-customer", null, TestTime);
+        factory.Db.AddCustomer(otherCustomer);
+        var otherSchedule = factory.Db.AddScheduleForCustomer(otherCustomer.Id, "other");
+        using var client = factory.CreateClient();
+
+        using var getResponse = await client.GetAsync($"/api/v1/customers/{seeded.Customer.Id}/schedules/{otherSchedule.Id}");
+        using var pauseResponse = await client.PostAsync($"/api/v1/customers/{seeded.Customer.Id}/schedules/{otherSchedule.Id}/pause", JsonContent.Create(new { }));
+
+        Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, pauseResponse.StatusCode);
     }
 
     [Fact]
@@ -383,6 +486,8 @@ public sealed class JobsAndJobRunsEndpointTests
 
         public List<Job> Jobs { get; } = [];
 
+        public List<JobSchedule> JobSchedules { get; } = [];
+
         public List<JobRun> JobRuns { get; } = [];
 
         public List<JobRunLogEntry> JobRunLogEntries { get; } = [];
@@ -555,6 +660,56 @@ public sealed class JobsAndJobRunsEndpointTests
             }
         }
 
+        public Task<IReadOnlyList<JobSchedule>> ListJobSchedulesAsync(Guid customerId, CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult<IReadOnlyList<JobSchedule>>(
+                    JobSchedules
+                        .Where(schedule => schedule.CustomerId == customerId
+                            && schedule.Status != JobScheduleStatus.Archived)
+                        .OrderBy(schedule => schedule.Name)
+                        .ToArray());
+            }
+        }
+
+        public Task<JobSchedule?> FindJobScheduleAsync(Guid customerId, Guid jobScheduleId, CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult(JobSchedules.FirstOrDefault(schedule =>
+                    schedule.CustomerId == customerId && schedule.Id == jobScheduleId));
+            }
+        }
+
+        public Task<JobSchedule?> FindJobScheduleBySlugAsync(Guid customerId, string slug, CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult(JobSchedules.FirstOrDefault(schedule =>
+                    schedule.CustomerId == customerId
+                    && schedule.Slug == slug));
+            }
+        }
+
+        public Task<IReadOnlyList<JobSchedule>> ListDueActiveJobSchedulesAsync(
+            DateTimeOffset nowUtc,
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult<IReadOnlyList<JobSchedule>>(
+                    JobSchedules
+                        .Where(schedule => schedule.Status == JobScheduleStatus.Active
+                            && schedule.NextRunAtUtc is not null
+                            && schedule.NextRunAtUtc <= nowUtc)
+                        .OrderBy(schedule => schedule.NextRunAtUtc)
+                        .Take(limit)
+                        .ToArray());
+            }
+        }
+
         public Task<IReadOnlyList<JobRun>> ListJobRunsAsync(Guid customerId, CancellationToken cancellationToken)
         {
             lock (syncRoot)
@@ -679,6 +834,44 @@ public sealed class JobsAndJobRunsEndpointTests
         void INodeControlDbContext.AddJob(Job job)
         {
             AddJob(job);
+        }
+
+        public JobSchedule AddScheduleForCustomer(Guid customerId, string suffix = "a")
+        {
+            lock (syncRoot)
+            {
+                var resources = AddDefinitionResources(customerId, suffix);
+                var job = AddJob(Job.Create(
+                    customerId,
+                    $"Deploy {suffix}",
+                    $"deploy-schedule-{suffix}",
+                    null,
+                    resources.ControlNode.Id,
+                    resources.InventoryGroup.Id,
+                    resources.Playbook.Id,
+                    resources.VariableSet.Id,
+                    1800,
+                    TestTime));
+                var schedule = JobSchedule.Create(
+                    job,
+                    $"Nightly {suffix}",
+                    $"nightly-{suffix}",
+                    null,
+                    "0 * * * *",
+                    "UTC",
+                    TestTime.AddHours(1),
+                    TestTime);
+                JobSchedules.Add(schedule);
+                return schedule;
+            }
+        }
+
+        public void AddJobSchedule(JobSchedule jobSchedule)
+        {
+            lock (syncRoot)
+            {
+                JobSchedules.Add(jobSchedule);
+            }
         }
 
         public void AddJobRun(JobRun jobRun)

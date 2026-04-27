@@ -33,6 +33,8 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
 
     public List<Job> Jobs { get; } = [];
 
+    public List<JobSchedule> JobSchedules { get; } = [];
+
     public List<JobRun> JobRuns { get; } = [];
 
     public List<JobRunLogEntry> JobRunLogEntries { get; } = [];
@@ -270,6 +272,51 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
             job.CustomerId == customerId && job.Slug == slug));
     }
 
+    public Task<IReadOnlyList<JobSchedule>> ListJobSchedulesAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult<IReadOnlyList<JobSchedule>>(
+            JobSchedules
+                .Where(schedule => schedule.CustomerId == customerId
+                    && schedule.Status != JobScheduleStatus.Archived)
+                .OrderBy(schedule => schedule.Name)
+                .ToArray());
+    }
+
+    public Task<JobSchedule?> FindJobScheduleAsync(
+        Guid customerId,
+        Guid jobScheduleId,
+        CancellationToken cancellationToken)
+    {
+        return Task.FromResult(JobSchedules.FirstOrDefault(schedule =>
+            schedule.CustomerId == customerId && schedule.Id == jobScheduleId));
+    }
+
+    public Task<JobSchedule?> FindJobScheduleBySlugAsync(
+        Guid customerId,
+        string slug,
+        CancellationToken cancellationToken)
+    {
+        return Task.FromResult(JobSchedules.FirstOrDefault(schedule =>
+            schedule.CustomerId == customerId
+            && schedule.Slug == slug));
+    }
+
+    public Task<IReadOnlyList<JobSchedule>> ListDueActiveJobSchedulesAsync(
+        DateTimeOffset nowUtc,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        return Task.FromResult<IReadOnlyList<JobSchedule>>(
+            JobSchedules
+                .Where(schedule => schedule.Status == JobScheduleStatus.Active
+                    && schedule.NextRunAtUtc is not null
+                    && schedule.NextRunAtUtc <= nowUtc)
+                .OrderBy(schedule => schedule.NextRunAtUtc)
+                .ThenBy(schedule => schedule.CreatedAt)
+                .Take(limit)
+                .ToArray());
+    }
+
     public Task<IReadOnlyList<JobRun>> ListJobRunsAsync(Guid customerId, CancellationToken cancellationToken)
     {
         return Task.FromResult<IReadOnlyList<JobRun>>(
@@ -376,6 +423,11 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     public void AddJob(Job job)
     {
         Jobs.Add(job);
+    }
+
+    public void AddJobSchedule(JobSchedule jobSchedule)
+    {
+        JobSchedules.Add(jobSchedule);
     }
 
     public void AddJobRun(JobRun jobRun)

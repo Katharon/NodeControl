@@ -15,6 +15,7 @@ using NodeControl.Application.Jobs;
 using NodeControl.Application.ManagedNodes;
 using NodeControl.Application.Memberships;
 using NodeControl.Application.Playbooks;
+using NodeControl.Application.Schedules;
 using NodeControl.Application.Validation;
 using NodeControl.Application.VariableSets;
 using NodeControl.Infrastructure;
@@ -52,6 +53,8 @@ public static class DependencyInjection
         services.AddScoped<JobService>();
         services.AddScoped<JobRunService>();
         services.AddScoped<JobRunLogService>();
+        services.AddSingleton<ICronScheduleCalculator, CronScheduleCalculator>();
+        services.AddScoped<JobScheduleService>();
 
         services.AddNodeControlInfrastructure(configuration);
 
