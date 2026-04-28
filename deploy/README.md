@@ -1,6 +1,7 @@
 # NodeControl Deploy Notes
 
-`deploy/` is intentionally minimal right now. Slice 19 only adds dev/demo bootstrap support; it does not add a production deployment platform.
+`deploy/` is intentionally minimal right now. It documents dev/demo bootstrap support; it does not add a
+production deployment platform.
 
 For a local demo, use the root development compose file through the scripts:
 
@@ -18,3 +19,5 @@ Then run the API, Worker, and frontend in separate terminals:
 ```
 
 Open `http://localhost:3000` and sign in through Fake Auth. Production deployment hardening, packaging, TLS, and identity-provider configuration are intentionally outside this slice.
+
+For fuller setup notes, see `docs/DEPLOYMENT.md` and the root `README.md`.

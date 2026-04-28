@@ -127,7 +127,7 @@ Reason:
 
 - Scheduling is a product feature.
 - Cron support is needed.
-- Slice 8 keeps the MVP simple by polling due active schedules from `NodeControl.Worker`.
+- The current implementation keeps the MVP simple by polling due active schedules from `NodeControl.Worker`.
 - Quartz.NET remains a possible later implementation if richer misfire handling or clustering becomes necessary.
 
 ## DEC-011: Keep scheduling domain independent from Quartz

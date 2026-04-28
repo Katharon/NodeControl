@@ -1,108 +1,90 @@
-# Deployment
+# Deployment and Local Runtime
 
-## Deployment Goal
+## Current Status
 
-NodeControl should be easy to run as a self-hosted B2B product.
+NodeControl currently has a reproducible local dev/demo runtime. It does not yet provide a production-ready
+deployment package.
 
-The MVP target is Docker Compose.
+`deploy/` is intentionally minimal and documents the dev/demo posture. The root `docker-compose.dev.yml` starts
+supporting infrastructure only: PostgreSQL and a Keycloak development container. The API, Worker, and frontend are
+run from source with scripts in `scripts/`.
 
-Kubernetes may be added later.
+## Local Dev/Demo Runtime
 
-## MVP Deployment Components
+Prerequisites:
 
-Required services:
+- .NET SDK 10
+- Node.js and npm
+- Docker with Compose support
+- Local .NET tools restored from `.config/dotnet-tools.json`
 
-- NodeControl API
-- NodeControl Worker
-- NodeControl Web
-- PostgreSQL
+Bootstrap:
 
-Development-only service:
-
-- Keycloak dev provider
-
-Optional later services:
-
-- Reverse proxy
-- Object/file storage
-- Metrics stack
-- Log aggregation
-- Secret vault
-
-## Deployment Modes
-
-### Development
-
-Development may include:
-
-- PostgreSQL
-- Keycloak
-- API
-- Worker
-- Web
-
-### Production-like Selfhost
-
-Production-like setup should include:
-
-- PostgreSQL
-- API
-- Worker
-- Web
-- Reverse proxy / TLS termination
-- External OIDC provider
-
-### Demo
-
-Demo setup should include:
-
-- Seed data
-- Dev identity provider
-- Example customer
-- Example managed nodes
-- Example playbook
-- Example schedule
-
-## Production Requirements
-
-Production configuration must validate:
-
-- Fake Auth is disabled.
-- OIDC is configured.
-- HTTPS/cookie settings are safe.
-- Database connection exists.
-- File storage paths are configured.
-- Worker is enabled.
-- Logging is configured.
-
-## File Storage
-
-MVP file storage paths:
-
-```text
-/var/lib/nodecontrol/playbooks/
-/var/lib/nodecontrol/runs/
+```bash
+dotnet tool restore
+./scripts/dev-up.sh
+./scripts/dev-migrate.sh
 ```
 
-These paths must be persisted with Docker volumes.
+Run the app in three terminals:
 
-## Backup Considerations
+```bash
+./scripts/dev-run-api.sh
+./scripts/dev-run-worker.sh
+./scripts/dev-run-frontend.sh
+```
 
-Important data:
+Useful URLs:
 
-- PostgreSQL database
-- Playbook artifact storage
-- JobRun logs
-- Configuration files
+- Frontend: `http://localhost:3000`
+- API: `http://localhost:5257`
+- Current user: `http://localhost:5257/api/v1/me`
+- Keycloak dev container: `http://localhost:18080`
+
+The default Development API configuration uses Fake Auth and signs in as Dev Admin. Keycloak is available for
+OIDC development, but it is not required for the default demo path.
+
+## Scripts
+
+- `scripts/dev-up.sh`: starts PostgreSQL and Keycloak through `docker-compose.dev.yml`.
+- `scripts/dev-down.sh`: stops the development infrastructure and preserves volumes.
+- `scripts/dev-migrate.sh`: restores local `dotnet-ef` if needed and applies EF Core migrations.
+- `scripts/dev-run-api.sh`: starts `NodeControl.Api` in Development mode.
+- `scripts/dev-run-worker.sh`: starts `NodeControl.Worker` in Development mode.
+- `scripts/dev-run-frontend.sh`: starts the Next.js dev server.
+- `scripts/dev-smoke.sh`: runs restore/build/test/lint/build, the API execution-boundary grep, and optional local HTTP checks.
+
+## Runtime Responsibilities
+
+- PostgreSQL stores product data, users, memberships, schedules, run metadata, run log entries, audit logs,
+  templates, and secret metadata.
+- The API exposes HTTP endpoints, validates input, performs authorization, and queues work.
+- The Worker processes queued Runs, due schedules, Hostzustand checks, run workspaces, Ansible execution, logs,
+  and status transitions.
+- The frontend provides the demo/product UI.
+
+The API must never execute Ansible, SSH, TCP checks, shell commands, or process starts as product behavior.
+
+## Production Readiness Gap
+
+Production deployment still needs explicit work:
+
+- Packaged API, Worker, and frontend services
+- Reverse proxy and TLS termination
+- External OIDC provider configuration
+- Secure cookie and host configuration
+- Persistent volume layout for Worker workspaces
+- Backup and restore procedure for PostgreSQL and runtime artifacts
+- Log handling and operational monitoring
+- Production configuration validation and documentation
 
 ## Post-MVP Deployment Features
 
 Potential later features:
 
-- Kubernetes manifests
-- Helm chart
-- External object storage
-- Automated backups
+- Production Docker Compose profile/package
+- Automated database backup guidance
 - Observability stack
-- High availability
-- Multi-worker execution
+- External object/file storage
+- Multi-worker or remote control-node execution model
+- Kubernetes/Helm only if explicitly requested later

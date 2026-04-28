@@ -25,26 +25,36 @@ The main value proposition is:
 
 > Run Ansible workflows safely, repeatedly, and auditably across customer environments without direct terminal work.
 
-## Core Capabilities
+## Current Capabilities
 
-Initial product scope:
+NodeControl is implemented as a working dev/demo product, not just a skeleton. Current capabilities include:
 
 - Customer management
-- User profiles and customer memberships
-- External enterprise authentication through OIDC
+- User profiles, Fake Auth/OIDC authentication, and customer memberships
 - Internal NodeControl roles and permissions
 - Control nodes
 - Managed nodes
 - Inventory groups
 - Playbooks
 - Variable sets
-- Manual jobs
-- Scheduled jobs / cron jobs
+- Actions and manual Runs
+- Scheduled Runs / cron jobs through Worker polling
 - Job run history
 - Job logs
 - Audit logs
-- Health/status overview
-- Docker-based self-hosted deployment
+- Hostzustand / TCP reachability checks processed by the Worker
+- Templates as managed text resources
+- Secrets as protected metadata with safe `secret://...` reference validation
+- User overview for platform admins
+- Run wizard and Run Center demo flow
+- Docker-based local dev infrastructure and shell scripts for bootstrap
+
+Important current boundaries:
+
+- The API never executes Ansible, shell commands, SSH checks, or TCP checks.
+- `NodeControl.Worker` is responsible for queued Run execution, schedule polling, host connection checks, workspaces, logs, and Ansible process execution.
+- Templates and Secrets are not rendered, decrypted into runs, or wired into Ansible execution yet.
+- `deploy/` is dev/demo guidance only; production packaging is not complete.
 
 ## Target Users
 
@@ -124,7 +134,7 @@ Frontend:
 
 Deployment:
 
-- Docker Compose for MVP/self-hosted installations
+- Docker Compose for local dev/demo infrastructure
 - Kubernetes may be added later only if needed
 
 ## Local Dev/Demo Quick Start
@@ -163,6 +173,8 @@ Run the application in three separate terminals:
 ```
 
 Open `http://localhost:3000`. In the default Development configuration, the API uses Fake Auth and signs you in as `Dev Admin`.
+
+For a meaningful demo, start the infrastructure, apply migrations, and run all three app processes: API, Worker, and frontend. Without the Worker, Runs, scheduled Runs, and Hostzustand checks can be queued but will not be processed.
 
 Useful local URLs:
 
@@ -207,6 +219,18 @@ The scripts use these defaults and can be overridden through environment variabl
 
 `deploy/` currently contains dev/demo notes only. It is not a production deployment package.
 
+## Demo Story
+
+A compact reviewer/demo path is:
+
+1. Start local infrastructure with `./scripts/dev-up.sh`.
+2. Apply migrations with `./scripts/dev-migrate.sh`.
+3. Run API, Worker, and frontend with the three `dev-run-*` scripts.
+4. Open `http://localhost:3000` and sign in through Fake Auth as Dev Admin.
+5. Open Dashboard, Customers, Hosts, Actions, Schedules, Runs, Hostzustand, Users, and Audit.
+6. Use the Run wizard to queue a Run, then inspect the Run Center and logs.
+7. Point out customer scoping, internal roles, audit history, and the API/Worker execution boundary.
+
 ## Development Strategy
 
 Development is performed in vertical slices.
@@ -224,17 +248,15 @@ A vertical slice means that one user-visible feature is implemented end-to-end a
 
 Avoid creating speculative abstractions or empty folders before they are needed.
 
-## First Vertical Slices
+## Implemented Slice Themes
 
-1. Project skeleton and documentation
-2. OIDC authentication and current user profile
-3. Customers and memberships
-4. Managed nodes and inventory groups
-5. Playbooks and variable sets
-6. Manual job execution
-7. Scheduled job execution
-8. Dashboard and health overview
-9. Portfolio/demo polish
+The repository has moved beyond the initial skeleton. Implemented slices cover:
+
+- Backend solution, frontend app, Docker dev infrastructure, and documentation
+- Auth/current user, customers, memberships, roles, and permissions
+- Nodes, inventory groups, playbooks, variable sets, actions, runs, schedules, logs, and audit
+- Templates, secrets metadata/reference validation, users, Hostzustand, run wizard, and Run Center
+- Frontend stability, demo surface hardening, and local dev/demo bootstrap scripts
 
 ## Repository Layout
 

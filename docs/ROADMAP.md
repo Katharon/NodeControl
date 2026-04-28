@@ -1,231 +1,101 @@
 # NodeControl Roadmap
 
-## Development Strategy
+## Current Status
 
-NodeControl is developed in vertical slices.
+NodeControl has moved beyond the initial skeleton. The repository now contains a working backend, Worker,
+Next.js frontend, EF Core migrations, integration/unit tests, Docker development infrastructure, and local
+dev/demo bootstrap scripts.
 
-Each slice should deliver one visible capability end-to-end.
+The current product is credible for a local demo and portfolio review, but it is not a production deployment
+package yet.
 
-Avoid building large technical layers before they are needed.
+## Delivered Slice Themes
 
-## Phase 0: Project Contract and Skeleton
+### Foundation
 
-Goal:
+- Documentation and architecture rules
+- Backend projects: Domain, Application, Infrastructure, Api, Worker
+- Frontend app with Next.js App Router, React, TypeScript, MUI, and TanStack Query
+- PostgreSQL persistence through EF Core
+- Docker Compose development infrastructure
 
-The repository has clear documentation, architecture rules, and a startable skeleton.
+### Identity and Tenancy
 
-Deliverables:
+- Fake Auth for fast local demo
+- OIDC support in the API
+- Current user endpoint and user provisioning
+- Internal users, external identities, customer memberships, static roles, and permissions
+- Platform admin user overview
+- Customer-scoped authorization and cross-tenant test coverage
 
-- README.md
-- AGENTS.md
-- PRODUCT.md
-- ARCHITECTURE.md
-- DECISIONS.md
-- ROADMAP.md
-- AUTH.md
-- SCHEDULING.md
-- ANSIBLE_EXECUTION.md
-- CODEX_WORKFLOW.md
-- Empty backend solution skeleton
-- Empty frontend app skeleton
-- Docker Compose development base
+### Inventory and Automation Inputs
 
-No business feature yet.
+- Customers
+- Control Hosts
+- Hosts
+- Inventory groups and inventory preview
+- Inline playbooks
+- Variable sets with YAML/JSON validation
+- Template management as plain text resources
+- Secret metadata management, rotation, and safe `secret://...` reference validation
 
-## Phase 1: Auth and Current User
+### Runs, Scheduling, and Operations
 
-Goal:
+- Actions as reusable execution definitions
+- Manual queued Runs
+- Worker execution pipeline for inline playbooks
+- Generated run workspaces and inventories
+- Captured stdout/stderr/system log entries
+- Run status transitions, cancellation, retry, and Run Center views
+- Database-polled schedules that create scheduled Runs
+- Customer-scoped audit logs
+- Hostzustand checks queued by the API and processed by the Worker as TCP connect attempts
 
-A user can authenticate through a development OIDC provider and the API can identify the current user.
+### Demo and Bootstrap
 
-Deliverables:
+- Dashboard and customer-aware navigation
+- Run wizard
+- Planned placeholder pages for post-MVP surfaces
+- Frontend shell stabilization
+- Local scripts for infrastructure, migrations, API, Worker, frontend, and smoke checks
+- Minimal `deploy/` notes that clearly avoid claiming production readiness
 
-- Dev OIDC configuration
-- Keycloak dev provider or fake auth mode
-- User auto-provisioning
-- ExternalIdentity mapping
-- `GET /api/v1/me`
-- Frontend display of current user
-- Production guard against Fake Auth
+## Current Architecture Boundaries
 
-## Phase 2: Customers and Memberships
+- The API never executes Ansible, SSH, TCP checks, shell commands, or process starts.
+- The Worker is the only process that runs `ansible-playbook` or performs Hostzustand TCP checks.
+- Manual and scheduled Runs use the same queued JobRun execution path.
+- Schedules use a database-backed Worker poller. Quartz.NET is not part of the current implementation.
+- Templates are not rendered or connected to Worker execution yet.
+- Secret values are not returned through the API and are not decrypted into execution yet.
+- Git-backed and artifact-directory playbooks remain post-MVP.
 
-Goal:
+## Next Useful Slices
 
-Customer isolation exists.
+Good next slices should stay small and visible:
 
-Deliverables:
-
-- Customer CRUD
-- CustomerMembership
-- Static roles
-- Permission checks
-- Customer-scoped queries
-- Cross-tenant integration tests
-- Frontend customer list and detail page
-
-## Phase 3: Nodes and Inventory Groups
-
-Goal:
-
-A customer can define target systems and groups.
-
-Deliverables:
-
-- ControlNode
-- ManagedNode
-- InventoryGroup
-- InventoryGroupNode
-- Inventory preview
-- Frontend tables/forms for nodes and groups
-
-## Phase 4: Playbooks and Variable Sets
-
-Goal:
-
-A customer can define automation inputs.
-
-Deliverables:
-
-- Inline YAML playbook
-- VariableSet as YAML/JSON
-- Basic validation
-- Frontend editor fields
-- File storage structure prepared
-
-## Phase 5: Manual Job Execution
-
-Goal:
-
-A user can run a job manually and inspect the result.
-
-Deliverables:
-
-- Job
-- JobRun
-- Worker execution pipeline
-- Ansible workspace generation
-- Inventory generation
-- VariableSet file generation
-- `ansible-playbook` execution
-- stdout/stderr capture
-- JobRun status updates
-- AuditLog entry
-- Frontend run button and JobRun detail page
-
-Current implementation note: manual runs can be queued through the API and processed by `NodeControl.Worker`
-with local `ansible-playbook` execution for inline YAML playbooks. JobRun logs are persisted and exposed
-read-only through the API. Remote control-node dispatch, Quartz, and audit log persistence remain later
-slices.
-
-This is the most important MVP milestone.
-
-## Phase 6: Scheduled Jobs / Cronjobs
-
-Goal:
-
-A job can run cyclically.
-
-Deliverables:
-
-- Schedule entity
-- Cron expression validation
-- Time zone support
-- Worker database poller for due schedules
-- Next run preview
-- Pause/resume/archive schedule
-- Scheduled JobRun creation
-- Frontend schedule management
-
-## Phase 7: Dashboard and Health
-
-Goal:
-
-Operators understand current system state.
-
-Deliverables:
-
-- Dashboard cards
-- Recent JobRuns
-- Failed JobRuns
-- Active Schedules
-- ControlNode health
-- ManagedNode status
-- Basic system health endpoint
-
-Current implementation note: JobRun operational controls allow queued cancellation, running cancellation
-requests, Worker process termination for cancelled runs, and retries for failed, timed-out, or cancelled
-JobRuns. The API only updates JobRun state or creates queued retry JobRuns; Ansible execution and process
-termination remain Worker responsibilities.
-
-Current implementation note: customer-scoped audit logging is available for core operational activity around
-Jobs, manual/scheduled JobRuns, cancellation/retry, and Schedules. Audit logs are read through a dedicated
-customer-scoped Activity Trail and remain separate from technical JobRun logs.
-
-Current implementation note: Templates are available as customer-scoped reusable text/Jinja2/config/script
-resources. They can be listed, created, viewed, updated, archived, and safely validated with lightweight
-plain-text checks. Templates are not rendered, executed, uploaded, or connected to JobRun execution yet.
-
-Current implementation note: Secrets backend/API support is available as a metadata-only customer-scoped
-resource. Secret values are protected before persistence, can be rotated, and are never returned by API
-responses. Secrets are not connected to execution or template rendering yet.
-
-Current implementation note: Secrets now have a customer-scoped frontend and safe reference validation through
-`secret://secret-slug`. Template validation reports reference status, and VariableSet create/update rejects
-missing or archived references. References are metadata-only and are not resolved during execution.
-
-Current implementation note: Hostzustand is available as a customer-scoped host health view. Users with node
-management permission can queue TCP reachability checks for Control Hosts and Hosts. The API only writes queued
-HostConnectionCheck records and reads results; the Worker processes queued checks with a short TCP connect timeout
-and persists succeeded, failed, or timed-out results without SSH authentication, Ansible execution, or secret
-decryption.
-
-## Phase 8: Security and Hardening
-
-Goal:
-
-The MVP becomes more production-like.
-
-Deliverables:
-
-- Authorization review
-- Cross-tenant test coverage
-- Safer secret handling
-- Dangerous operation warnings
-- Log redaction basics
-- Production configuration validation
-- Docker Compose production profile
-
-## Phase 9: Portfolio and Sales Demo
-
-Goal:
-
-NodeControl can be presented convincingly.
-
-Deliverables:
-
-- Demo data
-- Demo script
-- Screenshots
-- Architecture diagram
-- README polish
-- Sales-oriented explanation
-- Interview explanation guide
+- Demo seed data and a scripted demo reset path
+- Screenshots or a short demo guide for reviewers
+- More focused frontend tests around shell, run wizard, and critical empty states
+- Production configuration documentation and deployment hardening
+- Basic operational health endpoint and version display
+- More Worker test coverage for edge cases around cancellation, timeouts, and host checks
 
 ## Post-MVP Features
 
 Potential later features:
 
+- OIDC provider configuration per customer
 - SAML
-- OIDC provider per customer
+- Approval workflow
 - Git-backed playbooks
 - Artifact-directory playbooks
-- Approval workflow
-- Notification integrations
+- Notifications
 - Secret vault integration
-- Role editor
-- Policy engine
 - Live log streaming
+- Dynamic role editor
+- Policy engine
 - Multi-control-node dispatching
-- Kubernetes deployment
+- Production Docker Compose packaging
+- Kubernetes/Helm only if explicitly needed later
 - Billing/licensing

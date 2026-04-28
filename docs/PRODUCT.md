@@ -4,7 +4,8 @@
 
 NodeControl is a self-hosted B2B control plane for Ansible automation.
 
-It allows IT teams and service providers to manage customers, nodes, inventories, playbooks, jobs, schedules, job history, logs, and audit trails through a professional web interface.
+It allows IT teams and service providers to manage customers, hosts, inventories, playbooks, actions, schedules,
+run history, logs, and audit trails through a professional web interface.
 
 NodeControl does not replace Ansible. It wraps Ansible in a safer operational model.
 
@@ -92,9 +93,9 @@ Needs:
 
 ## MVP Scope
 
-The MVP should include:
+The implemented dev/demo MVP currently includes:
 
-- OIDC login with one configured provider
+- Fake Auth for local demo and OIDC support in the API
 - Internal user profile creation
 - Customer management
 - Customer memberships with static roles
@@ -108,8 +109,24 @@ The MVP should include:
 - Job run history
 - Job logs
 - Audit logs
-- Health/status overview
-- Docker Compose deployment
+- Hostzustand / TCP reachability checks processed by the Worker
+- Template management as plain text resources
+- Secret metadata management, rotation, and `secret://...` reference validation
+- Platform admin user overview
+- Run wizard and Run Center
+- Docker Compose local infrastructure and dev/demo scripts
+
+## Current Boundaries
+
+Current implementation boundaries are intentionally explicit:
+
+- NodeControl is still a control plane around Ansible, not an AWX clone.
+- The API queues work and enforces authorization; it never executes Ansible, SSH, TCP checks, shell commands, or process starts.
+- The Worker executes queued Runs, polls schedules, processes Hostzustand checks, creates workspaces, and captures logs.
+- Templates are not rendered or uploaded during execution.
+- Secret values are protected and never returned, but they are not decrypted into Worker execution yet.
+- Git-backed playbooks, artifact-directory playbooks, notifications, approval workflow, and production deployment packaging remain post-MVP.
+- `deploy/` is local dev/demo guidance only at this point.
 
 ## Post-MVP Scope
 
@@ -162,12 +179,13 @@ NodeControl should position itself as:
 
 A strong demo should show:
 
-1. Login through enterprise-style SSO.
-2. Select a customer.
-3. View managed nodes.
-4. Open a playbook.
-5. Run a job manually.
-6. Inspect status and logs.
-7. Create a schedule.
-8. Show audit logs.
-9. Explain customer separation and permissions.
+1. Start the local stack with the scripts in `scripts/`.
+2. Login through Fake Auth as Dev Admin for the local demo.
+3. Select a customer.
+4. View hosts and inventory.
+5. Open a playbook/action.
+6. Run an action manually through the run wizard.
+7. Inspect run status and logs in the Run Center.
+8. Create or inspect a schedule.
+9. Show audit logs.
+10. Explain customer separation, internal permissions, and the API/Worker execution boundary.

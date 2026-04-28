@@ -12,6 +12,19 @@ The architecture follows pragmatic Clean Architecture principles:
 - API exposes HTTP endpoints.
 - Worker executes background jobs.
 
+## Current Implementation Status
+
+The repository currently contains the backend projects, Next.js frontend, EF Core migrations, tests, Docker
+development infrastructure, dev/demo scripts, and a demo-ready product surface.
+
+Implemented product areas include customer and membership management, static roles/permissions, Control Hosts,
+Hosts, inventory groups, playbooks, variable sets, actions, runs, schedules, persisted run logs, audit logs,
+templates, secrets metadata and reference validation, user overview, Hostzustand checks, a run wizard, and a
+Run Center.
+
+The production deployment story is not complete. `deploy/` contains dev/demo notes only, while local bootstrap
+is handled by scripts in `scripts/`.
+
 ## High-Level System
 
 ```text
@@ -122,6 +135,9 @@ Examples:
 
 The API must not execute Ansible directly.
 
+The API also must not perform SSH checks, TCP checks, shell execution, or process starts as product behavior.
+It creates and reads records, validates input, authorizes requests, and leaves execution work to the Worker.
+
 ### NodeControl.Worker
 
 Contains background execution.
@@ -135,6 +151,10 @@ Examples:
 - Run `ansible-playbook`
 - Capture logs
 - Update job run status
+- Process queued HostConnectionCheck records with TCP connect attempts
+
+The current Worker uses PostgreSQL as the coordination point. It polls queued JobRuns, queued host connection
+checks, and due active schedules. There is no message bus in the MVP.
 
 ## Frontend Structure
 
@@ -145,10 +165,12 @@ Main responsibilities:
 - Auth-aware layout
 - Customer navigation
 - Dashboard
-- CRUD screens
-- Job run screens
+- CRUD screens for current resource types
+- Run wizard and Run Center
 - Schedule screens
+- Hostzustand
 - Audit screens
+- Clean planned placeholders for post-MVP surfaces
 
 Recommended libraries:
 
@@ -204,17 +226,17 @@ Variables passed to an Ansible job.
 
 ### Template
 
-A customer-scoped reusable text/Jinja2/config/script template. Slice 12 manages templates as plain text
+A customer-scoped reusable text/Jinja2/config/script template. The current implementation manages templates as plain text
 resources only: NodeControl validates simple structure, stores metadata/content, and audits create/update/archive
-operations. Templates are not executed, rendered, uploaded to hosts, or wired into JobRun execution in this slice.
+operations. Templates are not executed, rendered, uploaded to hosts, or wired into JobRun execution yet.
 
 ### Secret
 
 A customer-scoped protected value such as a password, API token, SSH private key, certificate, or connection
-string. Slice 13a exposes secret metadata only through the API. Plaintext values are accepted on create/rotate,
-protected before persistence, never returned in API responses, and not connected to Templates, Variables, Actions,
-or Worker execution yet. Slice 13bc adds the canonical safe reference syntax `secret://secret-slug`; references
-are validated by customer and active status only, without decrypting or returning secret values.
+string. The current implementation exposes secret metadata only through the API. Plaintext values are accepted on create/rotate,
+protected before persistence, and never returned in API responses. It also adds the canonical safe reference
+syntax `secret://secret-slug`; references are validated by customer and active status only, without decrypting or
+returning secret values. Secret values are not injected into Worker execution yet.
 
 ### Job
 
@@ -289,7 +311,7 @@ with actor, customer, entity, action, outcome, timestamp, and a short message. J
 execution output for a single run and may contain stdout/stderr lines; audit entries must not store Ansible
 stdout/stderr or secret variable values.
 
-Slice 10 records the focused operational audit actions `job.created`, `job.updated`, `job.archived`,
+The current audit implementation records focused operational audit actions including `job.created`, `job.updated`, `job.archived`,
 `job_run.created_manual`, `job_run.cancel_requested`, `job_run.cancelled_queued`, `job_run.retried`,
 `job_run.created_scheduled`, `schedule.created`, `schedule.updated`, `schedule.paused`,
 `schedule.resumed`, and `schedule.archived`. Customer-scoped audit API reads require `ViewAuditLogs`.
@@ -333,6 +355,8 @@ PostgreSQL is the main database.
 
 EF Core is used for persistence.
 
+Migrations are real EF-generated migrations under `src/backend/NodeControl.Infrastructure/Migrations`.
+
 The database stores:
 
 - Product data
@@ -343,16 +367,38 @@ The database stores:
 - Audit logs
 - Schedule definitions
 
-Large logs and playbook artifacts may be stored on the filesystem in the MVP.
+JobRun metadata, log entries, schedules, audit logs, templates, and secret metadata are stored in the database.
+Worker run workspaces are stored on the filesystem.
 
 ## Execution Storage
 
-Recommended MVP paths:
+Current local/dev path:
+
+```text
+src/backend/NodeControl.Worker/.nodecontrol/runs/{jobRunId}/
+```
+
+Production-style paths remain configuration choices and are not packaged as a finished deployment in this repo:
 
 ```text
 /var/lib/nodecontrol/playbooks/{customerId}/{playbookId}/
 /var/lib/nodecontrol/runs/{jobRunId}/
 ```
+
+## Local Dev/Demo Runtime
+
+Use the root scripts for local bootstrap:
+
+```bash
+./scripts/dev-up.sh
+./scripts/dev-migrate.sh
+./scripts/dev-run-api.sh
+./scripts/dev-run-worker.sh
+./scripts/dev-run-frontend.sh
+```
+
+`dev-up.sh` starts PostgreSQL and a Keycloak dev container. The default API development configuration uses Fake
+Auth, so Keycloak is available as a dev/demo provider but is not required for the default local path.
 
 ## Avoided Complexity
 

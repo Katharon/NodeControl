@@ -12,9 +12,9 @@ Examples:
 - Check certificate expiration daily.
 - Apply a baseline configuration every week.
 
-## Slice 8 Decision
+## Current Decision
 
-Slice 8 uses a simple database-backed poller in `NodeControl.Worker`.
+The current implementation uses a simple database-backed poller in `NodeControl.Worker`.
 
 Reason:
 
@@ -23,7 +23,7 @@ Reason:
 - The API manages schedule definitions only.
 - Quartz or another scheduler can still be introduced later if the product needs richer misfire and clustering behavior.
 
-Quartz.NET is not part of Slice 8.
+Quartz.NET is not part of the current implementation.
 
 ## Concepts
 

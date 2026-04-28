@@ -123,7 +123,7 @@ Suggested permissions:
 
 ## Static MVP Role Map
 
-Slice 2 uses a static role-to-permission map. Dynamic role editing is intentionally post-MVP.
+The current implementation uses a static role-to-permission map. Dynamic role editing is intentionally post-MVP.
 
 - Owner has all MVP permissions.
 - Admin has all MVP permissions except ManageMemberships.
@@ -135,7 +135,7 @@ Platform admins can access and manage every customer. Normal users can access on
 
 ## Login Flow
 
-Recommended MVP flow:
+OIDC product flow:
 
 ```text
 1. User opens the Next.js frontend.
@@ -150,6 +150,10 @@ Recommended MVP flow:
 10. Frontend can call /api/v1 endpoints with the session cookie.
 ```
 
+The local default development flow is simpler: `Auth:Mode` is `Fake` in
+`src/backend/NodeControl.Api/appsettings.Development.json`. `/auth/login` redirects to the frontend and the
+Fake Auth handler authenticates requests as the configured Dev Admin user.
+
 ## Token Storage Rule
 
 Do not store access tokens in browser `localStorage`.
@@ -160,7 +164,9 @@ Prefer HttpOnly cookies controlled by the backend.
 
 ### Keycloak Dev Mode
 
-Use Keycloak as a local OIDC provider.
+Keycloak can be used as a local OIDC provider. `docker-compose.dev.yml` starts a Keycloak container on
+`http://localhost:18080`, but the default local scripts use Fake Auth unless API configuration is changed to
+OIDC.
 
 Example dev users:
 
@@ -178,7 +184,19 @@ Rules:
 
 - Fake Auth must never run in production.
 - Production startup must fail if Fake Auth is enabled.
-- Fake Auth should provide a fixed development user.
+- Fake Auth provides the fixed `Dev Admin` development user by default.
+
+The standard dev/demo startup path is:
+
+```bash
+./scripts/dev-up.sh
+./scripts/dev-migrate.sh
+./scripts/dev-run-api.sh
+./scripts/dev-run-worker.sh
+./scripts/dev-run-frontend.sh
+```
+
+Then open `http://localhost:3000` and sign in through Fake Auth.
 
 ## Production Auth Configuration
 
@@ -204,7 +222,7 @@ Production requires:
 
 ## User Management MVP
 
-Slice 15 adds a small demo-ready user overview without adding registration, passwords, invitations, or external
+The current implementation includes a small demo-ready user overview without adding registration, passwords, invitations, or external
 identity-provider administration.
 
 - `GET /api/v1/users` and `GET /api/v1/users/{userId}` are platform-admin-only and expose safe metadata:

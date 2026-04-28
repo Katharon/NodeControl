@@ -21,6 +21,8 @@ Do not ask Codex to build the entire product in one prompt.
 5. Make minimal required changes.
 6. Run relevant tests/build commands.
 7. Update docs if the architecture or behavior changes.
+8. For dev/demo setup changes, keep `README.md`, `docs/DEPLOYMENT.md`, `deploy/README.md`, and `scripts/`
+   aligned.
 
 ## Prompt Pattern
 
@@ -52,14 +54,11 @@ Done when:
 
 Good:
 
-- Create backend solution skeleton.
-- Add Customer entity and minimal API endpoints.
-- Add current user endpoint.
-- Implement CustomerMembership authorization.
-- Add inventory preview.
-- Add manual JobRun creation.
-- Add database-polled schedule creation.
-- Add frontend customer list page.
+- Add one focused API/use case and matching UI surface.
+- Add or refine one customer-scoped product area.
+- Add focused tests for authorization or cross-tenant behavior.
+- Improve one demo workflow without changing backend architecture.
+- Update setup scripts or docs to match the real repository.
 
 Bad:
 
@@ -153,18 +152,15 @@ A useful split is:
 
 Do not let multiple agents modify the same files at the same time unless the task is explicitly coordinated.
 
-## Initial Codex Task Order
+## Historical Slice Order
 
-1. Create documentation and repository skeleton.
-2. Create backend solution skeleton.
-3. Create frontend skeleton.
-4. Add Docker Compose development services.
-5. Add Auth + Current User slice.
-6. Add Customer + Membership slice.
-7. Add Nodes + Inventory slice.
-8. Add Playbook + VariableSet slice.
-9. Add Manual JobRun slice.
-10. Add Schedule slice.
+Early slices created the project contract, backend/frontend skeletons, Docker development services, auth/current
+user, customers/memberships, nodes/inventory, playbooks/variable sets, manual Runs, and schedules. Later slices
+added logs, audit, templates, secrets, users, Hostzustand, run wizard, Run Center, frontend stabilization, and
+dev/demo bootstrap scripts.
+
+For current work, read `docs/ROADMAP.md` and the relevant product docs rather than assuming the repository is
+still in the initial skeleton phase.
 
 ## Done Criteria for Codex Tasks
 

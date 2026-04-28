@@ -42,19 +42,18 @@ A reusable execution template.
 
 One concrete execution.
 
-## MVP Playbook Storage
+## Current Playbook Storage
 
-The database stores playbook metadata.
+The current implementation stores inline playbook definitions through the application/database model and writes
+the selected playbook into each JobRun workspace when a Run is processed.
 
-The filesystem stores playbook content/artifacts.
-
-Suggested path:
+Artifact-directory playbooks remain a later feature. A production-style artifact path could be:
 
 ```text
 /var/lib/nodecontrol/playbooks/{customerId}/{playbookId}/
 ```
 
-For inline YAML playbooks:
+For inline YAML playbooks, a future artifact-backed layout could write:
 
 ```text
 /var/lib/nodecontrol/playbooks/{customerId}/{playbookId}/site.yml
@@ -87,7 +86,7 @@ Suggested path:
 └── stderr.log
 ```
 
-Slice 6 implements local Worker execution for queued manual JobRuns. The workspace root is configured with
+The Worker implements local execution for queued JobRuns. The workspace root is configured with
 `NodeControl:Execution:RunWorkspaceRoot`; development uses `.nodecontrol/runs`, while production-style
 configuration uses `/var/lib/nodecontrol/runs`.
 
@@ -101,7 +100,7 @@ ansible-playbook -i inventory.yml playbook/site.yml -e @vars.yml
 
 The exact implementation belongs to Infrastructure/Worker.
 
-Slice 6 runs `ansible-playbook` from `NodeControl.Worker` only, using `ProcessStartInfo.ArgumentList`
+The Worker runs `ansible-playbook` from `NodeControl.Worker` only, using `ProcessStartInfo.ArgumentList`
 with `UseShellExecute = false`. The executable path is configured with
 `NodeControl:Execution:AnsiblePlaybookPath` and defaults to `ansible-playbook`.
 
@@ -121,7 +120,7 @@ For every JobRun, capture:
 - TriggeredByUserId if manual
 - ScheduleId if scheduled
 
-Slice 7 adds persisted JobRun log entries. The Worker writes System, StdOut, and StdErr entries while a run
+The Worker writes persisted System, StdOut, and StdErr JobRun log entries while a run
 is processed. The API exposes these entries read-only for authorized customer users; it does not execute or
 resume JobRuns.
 
@@ -158,13 +157,14 @@ all:
 
 Do not overbuild dynamic inventory in the MVP.
 
-Slice 3 implements target structure and a read-only inventory preview only.
+The current implementation includes target structure, inventory group assignment, and a read-only inventory preview.
 
-- Control Nodes are modeled as customer-scoped records, but NodeControl does not test SSH connectivity in this slice.
+- Control Nodes are modeled as customer-scoped records. Hostzustand can queue TCP reachability checks, but
+  NodeControl does not perform SSH authentication checks.
 - Managed Nodes are modeled as customer-scoped records and can be linked to Inventory Groups.
 - Inventory Groups generate a YAML preview from active Managed Nodes.
 - Archived Managed Nodes are excluded from preview output.
-- The API still must not execute Ansible; execution remains a later Worker concern.
+- The API still must not execute Ansible; execution belongs to the Worker.
 
 For Worker execution, the selected Job inventory group is rendered to `inventory.yml`. Active managed nodes
 linked to that group become hosts, and archived nodes are excluded. If the group has no active managed nodes,
@@ -186,17 +186,17 @@ MVP rule:
 
 ## Templates
 
-Templates are reusable customer-scoped text/Jinja2/config/script resources. Slice 12 stores and validates
+Templates are reusable customer-scoped text/Jinja2/config/script resources. The current implementation stores and validates
 template content as plain text only. The API and Application layer do not render templates, execute scripts,
 invoke Python/Jinja runtimes, or pass template content into JobRun execution. Future slices may connect
 templates to playbook artifacts or deployment flows, but Worker execution remains unchanged here.
 
 ## Secrets
 
-Secrets are customer-scoped protected values managed through metadata-only API responses. Slice 13a accepts
+Secrets are customer-scoped protected values managed through metadata-only API responses. The current implementation accepts
 plaintext values only on create and rotate, protects them before persistence, and never returns plaintext or
 protected payloads from API responses. Secrets are not resolved during JobRun execution and are not integrated
-with Jobs or Worker workspaces yet. Slice 13bc introduces safe `secret://secret-slug` references for Templates
+with Jobs or Worker workspaces yet. Safe `secret://secret-slug` references are supported for Templates
 and VariableSets. Reference validation checks only same-customer active metadata and never decrypts, renders,
 exports, or passes secret values to Ansible.
 
