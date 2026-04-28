@@ -16,7 +16,7 @@ export default async function RunDetailsPage({ params }: RunDetailsPageProps) {
   const { customerId, runId } = await params;
 
   return (
-    <AppPage>
+    <AppPage maxWidth="xl">
       <Stack sx={{ gap: 2 }}>
         <Button
           href={`/customers/${customerId}/runs`}

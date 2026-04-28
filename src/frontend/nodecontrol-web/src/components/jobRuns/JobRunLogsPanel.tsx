@@ -1,9 +1,22 @@
 "use client";
 
+import FilterListIcon from "@mui/icons-material/FilterList";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import { Alert, Box, Button, Chip, CircularProgress, Paper, Stack, Typography } from "@mui/material";
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  Paper,
+  Stack,
+  ToggleButton,
+  ToggleButtonGroup,
+  Typography,
+} from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
-import { getJobRunLogs, type JobRunLogEntry, type JobRunStatus } from "@/lib/api/jobRuns";
+import { useState } from "react";
+import { getJobRunLogs, type JobRunLogEntry, type JobRunLogStream, type JobRunStatus } from "@/lib/api/jobRuns";
 
 type JobRunLogsPanelProps = {
   customerId: string;
@@ -12,14 +25,26 @@ type JobRunLogsPanelProps = {
 };
 
 const activeStatuses: JobRunStatus[] = ["Queued", "Running", "Cancelling"];
+type StreamFilter = "All" | JobRunLogStream;
 
 export function JobRunLogsPanel({ customerId, jobRunId, status }: JobRunLogsPanelProps) {
+  const [streamFilter, setStreamFilter] = useState<StreamFilter>("All");
   const isActive = activeStatuses.includes(status);
   const logsQuery = useQuery({
     queryKey: ["job-run-logs", customerId, jobRunId],
     queryFn: () => getJobRunLogs(customerId, jobRunId, { limit: 500 }),
-    refetchInterval: isActive ? 2000 : false,
+    refetchInterval: isActive ? 4000 : false,
   });
+  const entries = logsQuery.data?.items ?? [];
+  const visibleEntries = streamFilter === "All"
+    ? entries
+    : entries.filter((entry) => entry.stream === streamFilter);
+  const counts = {
+    All: entries.length,
+    StdOut: entries.filter((entry) => entry.stream === "StdOut").length,
+    StdErr: entries.filter((entry) => entry.stream === "StdErr").length,
+    System: entries.filter((entry) => entry.stream === "System").length,
+  };
 
   return (
     <Paper id="logs" sx={{ p: 3 }}>
@@ -27,22 +52,68 @@ export function JobRunLogsPanel({ customerId, jobRunId, status }: JobRunLogsPane
         <Stack direction={{ xs: "column", sm: "row" }} sx={{ alignItems: { sm: "center" }, justifyContent: "space-between", gap: 1.5 }}>
           <Stack>
             <Typography component="h2" variant="h5">Logs</Typography>
-            <Typography color="text.secondary" variant="body2">Latest persisted run log entries</Typography>
+            <Typography color="text.secondary" variant="body2">
+              Persistierte Run-Ausgabe aus System, stdout und stderr.
+            </Typography>
           </Stack>
-          <Button
-            disabled={logsQuery.isFetching}
-            onClick={() => void logsQuery.refetch()}
-            startIcon={<RefreshIcon />}
-            variant="outlined"
-          >
-            Refresh
-          </Button>
+          <Stack direction="row" sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+            {isActive ? <Chip color="info" label="Auto-refresh 4s" size="small" variant="outlined" /> : null}
+            <Button
+              disabled={logsQuery.isFetching}
+              onClick={() => void logsQuery.refetch()}
+              startIcon={logsQuery.isFetching ? <CircularProgress color="inherit" size={16} /> : <RefreshIcon />}
+              variant="outlined"
+            >
+              Aktualisieren
+            </Button>
+          </Stack>
         </Stack>
 
-        {logsQuery.isPending ? <CircularProgress size={22} /> : null}
-        {logsQuery.isError ? <Alert severity="error">Logs could not be loaded.</Alert> : null}
-        {logsQuery.data?.items.length === 0 ? <Alert severity="info">No log entries have been persisted yet.</Alert> : null}
-        {logsQuery.data?.items.length ? (
+        <Stack direction={{ xs: "column", md: "row" }} sx={{ alignItems: { md: "center" }, justifyContent: "space-between", gap: 1.5 }}>
+          <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
+            <Chip label={`${counts.All} gesamt`} size="small" />
+            <Chip color="success" label={`${counts.StdOut} stdout`} size="small" variant="outlined" />
+            <Chip color="error" label={`${counts.StdErr} stderr`} size="small" variant="outlined" />
+            <Chip color="info" label={`${counts.System} system`} size="small" variant="outlined" />
+          </Stack>
+          <ToggleButtonGroup
+            exclusive
+            onChange={(_event, value: StreamFilter | null) => {
+              if (value) {
+                setStreamFilter(value);
+              }
+            }}
+            size="small"
+            value={streamFilter}
+          >
+            <ToggleButton value="All">
+              <FilterListIcon fontSize="small" sx={{ mr: 0.75 }} />
+              Alle
+            </ToggleButton>
+            <ToggleButton value="System">System</ToggleButton>
+            <ToggleButton value="StdOut">stdout</ToggleButton>
+            <ToggleButton value="StdErr">stderr</ToggleButton>
+          </ToggleButtonGroup>
+        </Stack>
+
+        {logsQuery.isPending ? (
+          <Stack direction="row" sx={{ alignItems: "center", gap: 1.5 }}>
+            <CircularProgress size={22} />
+            <Typography color="text.secondary">Logs werden geladen</Typography>
+          </Stack>
+        ) : null}
+        {logsQuery.isError ? <Alert severity="error">Logs konnten nicht geladen werden.</Alert> : null}
+        {logsQuery.data?.items.length === 0 ? (
+          <Alert severity={isActive ? "info" : "warning"}>
+            {isActive
+              ? "Der Run ist aktiv, aber es wurden noch keine Log-Einträge persistiert."
+              : "Dieser Run hat keine persistierten Log-Einträge."}
+          </Alert>
+        ) : null}
+        {entries.length > 0 && visibleEntries.length === 0 ? (
+          <Alert severity="info">Für diesen Stream gibt es keine Log-Einträge.</Alert>
+        ) : null}
+        {visibleEntries.length ? (
           <Box
             sx={{
               bgcolor: "grey.900",
@@ -55,7 +126,7 @@ export function JobRunLogsPanel({ customerId, jobRunId, status }: JobRunLogsPane
             }}
           >
             <Stack component="ol" sx={{ gap: 0.75, listStyle: "none", m: 0, p: 0 }}>
-              {logsQuery.data.items.map((entry) => (
+              {visibleEntries.map((entry) => (
                 <LogLine entry={entry} key={entry.id} />
               ))}
             </Stack>

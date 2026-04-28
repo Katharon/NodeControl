@@ -1278,7 +1278,7 @@ function ResultStep({
       <Stack direction={{ xs: "column", sm: "row" }} sx={{ gap: 1 }}>
         {runHref && canViewJobRuns ? (
           <Button component={Link} href={runHref} startIcon={<OpenInNewIcon />} variant="contained">
-            Run öffnen
+            Run Center öffnen
           </Button>
         ) : null}
         {logsHref && canViewJobRuns ? (
