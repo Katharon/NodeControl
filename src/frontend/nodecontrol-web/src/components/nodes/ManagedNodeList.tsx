@@ -17,6 +17,7 @@ import {
 } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { ConnectionCheckButton } from "@/components/hostHealth/ConnectionCheckButton";
 import { ManagedNodeForm } from "@/components/nodes/ManagedNodeForm";
 import {
   archiveManagedNode,
@@ -98,15 +99,22 @@ export function ManagedNodeList({ customerId, canManageNodes, showCreateButton =
                   </Stack>
                 </Stack>
                 {canManageNodes ? (
-                  <Button
-                    color="warning"
-                    disabled={archiveMutation.isPending}
-                    onClick={() => archiveMutation.mutate(managedNode.id)}
-                    startIcon={<ArchiveIcon />}
-                    variant="outlined"
-                  >
-                    Archive
-                  </Button>
+                  <Stack direction={{ xs: "column", sm: "row" }} sx={{ gap: 1 }}>
+                    <ConnectionCheckButton
+                      customerId={customerId}
+                      targetId={managedNode.id}
+                      targetType="ManagedNode"
+                    />
+                    <Button
+                      color="warning"
+                      disabled={archiveMutation.isPending}
+                      onClick={() => archiveMutation.mutate(managedNode.id)}
+                      startIcon={<ArchiveIcon />}
+                      variant="outlined"
+                    >
+                      Archive
+                    </Button>
+                  </Stack>
                 ) : null}
               </Stack>
             ))}

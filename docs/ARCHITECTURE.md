@@ -183,6 +183,13 @@ A machine or execution environment from which Ansible is run.
 
 A target system managed by Ansible.
 
+### HostConnectionCheck
+
+An append-only, customer-scoped record for a point-in-time TCP reachability check against a ControlNode or
+ManagedNode endpoint. The API only queues and reads checks; the Worker is responsible for processing queued
+checks and performing the TCP connection attempt. Host connection checks do not run Ansible, perform SSH
+authentication, or decrypt secrets.
+
 ### InventoryGroup
 
 A group of ManagedNodes used to generate Ansible inventory.
@@ -257,6 +264,25 @@ through customer-scoped authorization and never starts Ansible execution.
 JobRun cancellation and retry are operational controls around the same execution pipeline. The API can mark
 queued runs Cancelled, mark running runs Cancelling, and create queued retry runs. The Worker observes
 cancellation requests from the database and is the only process that stops `ansible-playbook`.
+
+## Data Flow: Host Connection Check
+
+```text
+User clicks "Check starten"
+  |
+API checks ManageNodes permission
+  |
+API creates HostConnectionCheck with Status = Queued
+  |
+Worker picks queued HostConnectionCheck
+  |
+Worker attempts TCP connect to hostname:sshPort
+  |
+Worker updates status, duration, and result/error message
+```
+
+The API never performs TCP, SSH, shell, or Ansible checks. Hostzustand uses the persisted check records and the
+latest check per host to show demo-ready reachability state.
 
 Audit logs are persisted separately from JobRun logs. Audit entries are append-only business activity records
 with actor, customer, entity, action, outcome, timestamp, and a short message. JobRun logs remain technical

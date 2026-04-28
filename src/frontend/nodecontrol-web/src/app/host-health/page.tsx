@@ -1,11 +1,14 @@
 import { AppPage } from "@/components/layout/AppPage";
-import { PlaceholderProductPage } from "@/components/layout/PlaceholderProductPage";
+import { ProductRoutePicker } from "@/components/layout/ProductRoutePicker";
+
+export const dynamic = "force-dynamic";
 
 export default function HostHealthPage() {
   return (
     <AppPage>
-      <PlaceholderProductPage
-        description="Hier entsteht eine Übersicht für Erreichbarkeit, letzte Ausführungssignale und Betriebszustand von Hosts."
+      <ProductRoutePicker
+        customerPath="host-health"
+        description="Wähle einen Kunden, um den Hostzustand und Verbindungstests zu öffnen."
         title="Hostzustand"
       />
     </AppPage>

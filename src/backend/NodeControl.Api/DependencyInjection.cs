@@ -11,6 +11,7 @@ using NodeControl.Application.Authorization;
 using NodeControl.Application.Auth;
 using NodeControl.Application.ControlNodes;
 using NodeControl.Application.Customers;
+using NodeControl.Application.HostConnectionChecks;
 using NodeControl.Application.InventoryGroups;
 using NodeControl.Application.JobRuns;
 using NodeControl.Application.Jobs;
@@ -48,6 +49,7 @@ public static class DependencyInjection
         services.AddScoped<CurrentUserService>();
         services.AddScoped<ICustomerAuthorizationService, CustomerAuthorizationService>();
         services.AddScoped<AuditLogService>();
+        services.AddScoped<HostConnectionCheckService>();
         services.AddScoped<CustomerService>();
         services.AddScoped<CustomerMembershipService>();
         services.AddScoped<UserService>();

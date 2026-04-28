@@ -27,6 +27,8 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
 
     public List<ManagedNode> ManagedNodes { get; } = [];
 
+    public List<HostConnectionCheck> HostConnectionChecks { get; } = [];
+
     public List<InventoryGroup> InventoryGroups { get; } = [];
 
     public List<InventoryGroupNode> InventoryGroupNodes { get; } = [];
@@ -167,6 +169,79 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     {
         return Task.FromResult(ManagedNodes.FirstOrDefault(managedNode =>
             managedNode.CustomerId == customerId && managedNode.Name == name));
+    }
+
+    public Task<IReadOnlyList<HostConnectionCheck>> ListHostConnectionChecksAsync(
+        Guid customerId,
+        HostConnectionTargetType? targetType,
+        Guid? controlNodeId,
+        Guid? managedNodeId,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var checks = HostConnectionChecks.Where(check => check.CustomerId == customerId);
+
+        if (targetType is not null)
+        {
+            checks = checks.Where(check => check.TargetType == targetType);
+        }
+
+        if (controlNodeId is not null)
+        {
+            checks = checks.Where(check => check.ControlNodeId == controlNodeId);
+        }
+
+        if (managedNodeId is not null)
+        {
+            checks = checks.Where(check => check.ManagedNodeId == managedNodeId);
+        }
+
+        return Task.FromResult<IReadOnlyList<HostConnectionCheck>>(
+            checks
+                .OrderByDescending(check => check.QueuedAtUtc)
+                .Take(limit)
+                .ToArray());
+    }
+
+    public Task<IReadOnlyList<HostConnectionCheck>> ListLatestHostConnectionChecksAsync(
+        Guid customerId,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        return Task.FromResult<IReadOnlyList<HostConnectionCheck>>(
+            HostConnectionChecks
+                .Where(check => check.CustomerId == customerId)
+                .OrderByDescending(check => check.QueuedAtUtc)
+                .Take(limit)
+                .ToArray());
+    }
+
+    public Task<HostConnectionCheck?> FindHostConnectionCheckAsync(
+        Guid customerId,
+        Guid hostConnectionCheckId,
+        CancellationToken cancellationToken)
+    {
+        return Task.FromResult(HostConnectionChecks.FirstOrDefault(check =>
+            check.CustomerId == customerId && check.Id == hostConnectionCheckId));
+    }
+
+    public Task<HostConnectionCheck?> FindOldestQueuedHostConnectionCheckAsync(CancellationToken cancellationToken)
+    {
+        return Task.FromResult(HostConnectionChecks
+            .Where(check => check.Status == HostConnectionCheckStatus.Queued)
+            .OrderBy(check => check.QueuedAtUtc)
+            .FirstOrDefault());
+    }
+
+    public Task<HostConnectionCheckStatus?> GetHostConnectionCheckStatusAsync(
+        Guid hostConnectionCheckId,
+        CancellationToken cancellationToken)
+    {
+        var status = HostConnectionChecks
+            .Where(check => check.Id == hostConnectionCheckId)
+            .Select(check => (HostConnectionCheckStatus?)check.Status)
+            .FirstOrDefault();
+        return Task.FromResult(status);
     }
 
     public Task<IReadOnlyList<InventoryGroup>> ListActiveInventoryGroupsAsync(
@@ -520,6 +595,11 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     public void AddManagedNode(ManagedNode managedNode)
     {
         ManagedNodes.Add(managedNode);
+    }
+
+    public void AddHostConnectionCheck(HostConnectionCheck hostConnectionCheck)
+    {
+        HostConnectionChecks.Add(hostConnectionCheck);
     }
 
     public void AddInventoryGroup(InventoryGroup inventoryGroup)

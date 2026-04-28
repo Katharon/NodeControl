@@ -17,6 +17,7 @@ import {
 } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { ConnectionCheckButton } from "@/components/hostHealth/ConnectionCheckButton";
 import { ControlNodeForm } from "@/components/nodes/ControlNodeForm";
 import {
   archiveControlNode,
@@ -97,15 +98,22 @@ export function ControlNodeList({ customerId, canManageNodes, showCreateButton =
                   </Stack>
                 </Stack>
                 {canManageNodes ? (
-                  <Button
-                    color="warning"
-                    disabled={archiveMutation.isPending}
-                    onClick={() => archiveMutation.mutate(controlNode.id)}
-                    startIcon={<ArchiveIcon />}
-                    variant="outlined"
-                  >
-                    Archive
-                  </Button>
+                  <Stack direction={{ xs: "column", sm: "row" }} sx={{ gap: 1 }}>
+                    <ConnectionCheckButton
+                      customerId={customerId}
+                      targetId={controlNode.id}
+                      targetType="ControlNode"
+                    />
+                    <Button
+                      color="warning"
+                      disabled={archiveMutation.isPending}
+                      onClick={() => archiveMutation.mutate(controlNode.id)}
+                      startIcon={<ArchiveIcon />}
+                      variant="outlined"
+                    >
+                      Archive
+                    </Button>
+                  </Stack>
                 ) : null}
               </Stack>
             ))}

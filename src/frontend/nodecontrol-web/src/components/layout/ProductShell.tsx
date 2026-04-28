@@ -78,7 +78,7 @@ const navigationGroups: NavigationGroup[] = [
     label: "Inventar & Assets",
     items: [
       { label: "Kunden", href: "/customers", icon: BusinessIcon },
-      { label: "Hostzustand", href: "/host-health", icon: HealthAndSafetyIcon, planned: true },
+      { label: "Hostzustand", href: "/host-health", icon: HealthAndSafetyIcon, scopedSegment: "host-health" },
       { label: "Variablen", href: "/variables", icon: StorageIcon, scopedSegment: "variables" },
       { label: "Cloud-Provider", href: "/cloud-providers", icon: CloudIcon, planned: true },
       { label: "Inventare", href: "/inventories", icon: InventoryIcon, scopedSegment: "inventories" },
@@ -115,6 +115,7 @@ const navigationGroups: NavigationGroup[] = [
 const scopedPathBySegment: Record<string, string> = {
   actions: "actions",
   audit: "audit",
+  "host-health": "host-health",
   hosts: "hosts",
   inventories: "inventories",
   playbooks: "playbooks",

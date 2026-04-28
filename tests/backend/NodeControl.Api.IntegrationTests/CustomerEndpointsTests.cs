@@ -8,7 +8,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NodeControl.Application.Abstractions.Persistence;
 using NodeControl.Application.Customers;
+using NodeControl.Domain.Audit;
 using NodeControl.Domain.Customers;
+using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Users;
 
 namespace NodeControl.Api.IntegrationTests;
@@ -311,6 +313,138 @@ public sealed class CustomerEndpointsTests
     }
 
     [Fact]
+    public async Task Owner_can_queue_control_node_connection_check()
+    {
+        await using var factory = CustomerApiFactory.ForNormalUser();
+        var user = factory.SeedCurrentUser();
+        var customer = Customer.Create("Customer A", "customer-a", null, TestTime);
+        var controlNode = ControlNode.Create(customer.Id, "control-1", "127.0.0.1", 22, null, TestTime);
+        factory.DbContext.AddCustomer(customer);
+        factory.DbContext.AddControlNode(controlNode);
+        factory.DbContext.AddCustomerMembership(CustomerMembership.Create(customer, user, CustomerRole.Owner, TestTime));
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsync(
+            $"/api/v1/customers/{customer.Id}/control-nodes/{controlNode.Id}/connection-checks",
+            null);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("Queued", document.RootElement.GetProperty("status").GetString());
+        Assert.Equal(controlNode.Id, document.RootElement.GetProperty("controlNodeId").GetGuid());
+        Assert.Single(factory.DbContext.HostConnectionChecks);
+    }
+
+    [Fact]
+    public async Task Owner_can_queue_managed_node_connection_check()
+    {
+        await using var factory = CustomerApiFactory.ForNormalUser();
+        var user = factory.SeedCurrentUser();
+        var customer = Customer.Create("Customer A", "customer-a", null, TestTime);
+        var managedNode = ManagedNode.Create(customer.Id, "host_1", "127.0.0.1", 22, null, null, null, TestTime);
+        factory.DbContext.AddCustomer(customer);
+        factory.DbContext.AddManagedNode(managedNode);
+        factory.DbContext.AddCustomerMembership(CustomerMembership.Create(customer, user, CustomerRole.Owner, TestTime));
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsync(
+            $"/api/v1/customers/{customer.Id}/managed-nodes/{managedNode.Id}/connection-checks",
+            null);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Single(factory.DbContext.HostConnectionChecks);
+    }
+
+    [Fact]
+    public async Task Queue_connection_check_requires_manage_nodes_permission()
+    {
+        await using var factory = CustomerApiFactory.ForNormalUser();
+        var user = factory.SeedCurrentUser();
+        var customer = Customer.Create("Customer A", "customer-a", null, TestTime);
+        var managedNode = ManagedNode.Create(customer.Id, "host_1", "127.0.0.1", 22, null, null, null, TestTime);
+        factory.DbContext.AddCustomer(customer);
+        factory.DbContext.AddManagedNode(managedNode);
+        factory.DbContext.AddCustomerMembership(CustomerMembership.Create(customer, user, CustomerRole.Viewer, TestTime));
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsync(
+            $"/api/v1/customers/{customer.Id}/managed-nodes/{managedNode.Id}/connection-checks",
+            null);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Empty(factory.DbContext.HostConnectionChecks);
+    }
+
+    [Fact]
+    public async Task Queue_connection_check_rejects_cross_tenant_managed_node()
+    {
+        await using var factory = CustomerApiFactory.ForNormalUser();
+        var user = factory.SeedCurrentUser();
+        var customerA = Customer.Create("Customer A", "customer-a", null, TestTime);
+        var customerB = Customer.Create("Customer B", "customer-b", null, TestTime);
+        var managedNode = ManagedNode.Create(customerB.Id, "host_1", "127.0.0.1", 22, null, null, null, TestTime);
+        factory.DbContext.AddCustomer(customerA);
+        factory.DbContext.AddCustomer(customerB);
+        factory.DbContext.AddManagedNode(managedNode);
+        factory.DbContext.AddCustomerMembership(CustomerMembership.Create(customerA, user, CustomerRole.Owner, TestTime));
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsync(
+            $"/api/v1/customers/{customerA.Id}/managed-nodes/{managedNode.Id}/connection-checks",
+            null);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Empty(factory.DbContext.HostConnectionChecks);
+    }
+
+    [Fact]
+    public async Task Viewer_can_list_host_connection_checks()
+    {
+        await using var factory = CustomerApiFactory.ForNormalUser();
+        var user = factory.SeedCurrentUser();
+        var customer = Customer.Create("Customer A", "customer-a", null, TestTime);
+        var managedNode = ManagedNode.Create(customer.Id, "host_1", "127.0.0.1", 22, null, null, null, TestTime);
+        var check = HostConnectionCheck.CreateForManagedNode(managedNode, user.Id, TestTime);
+        factory.DbContext.AddCustomer(customer);
+        factory.DbContext.AddManagedNode(managedNode);
+        factory.DbContext.AddHostConnectionCheck(check);
+        factory.DbContext.AddCustomerMembership(CustomerMembership.Create(customer, user, CustomerRole.Viewer, TestTime));
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync($"/api/v1/customers/{customer.Id}/host-connection-checks");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var result = Assert.Single(document.RootElement.EnumerateArray());
+        Assert.Equal(check.Id, result.GetProperty("id").GetGuid());
+    }
+
+    [Fact]
+    public async Task Host_health_summary_is_customer_scoped()
+    {
+        await using var factory = CustomerApiFactory.ForNormalUser();
+        var user = factory.SeedCurrentUser();
+        var customerA = Customer.Create("Customer A", "customer-a", null, TestTime);
+        var customerB = Customer.Create("Customer B", "customer-b", null, TestTime);
+        var visibleNode = ManagedNode.Create(customerA.Id, "host_a", "127.0.0.1", 22, null, null, null, TestTime);
+        var hiddenNode = ManagedNode.Create(customerB.Id, "host_b", "192.0.2.10", 22, null, null, null, TestTime);
+        factory.DbContext.AddCustomer(customerA);
+        factory.DbContext.AddCustomer(customerB);
+        factory.DbContext.AddManagedNode(visibleNode);
+        factory.DbContext.AddManagedNode(hiddenNode);
+        factory.DbContext.AddCustomerMembership(CustomerMembership.Create(customerA, user, CustomerRole.Viewer, TestTime));
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync($"/api/v1/customers/{customerA.Id}/host-health");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var targets = document.RootElement.GetProperty("targets").EnumerateArray().ToArray();
+        Assert.Contains(targets, target => target.GetProperty("targetId").GetGuid() == visibleNode.Id);
+        Assert.DoesNotContain(targets, target => target.GetProperty("targetId").GetGuid() == hiddenNode.Id);
+    }
+
+    [Fact]
     public async Task Owner_can_create_membership_for_selected_user()
     {
         await using var factory = CustomerApiFactory.ForNormalUser();
@@ -418,6 +552,14 @@ public sealed class CustomerEndpointsTests
         public List<Customer> Customers { get; } = [];
 
         public List<CustomerMembership> CustomerMemberships { get; } = [];
+
+        public List<ControlNode> ControlNodes { get; } = [];
+
+        public List<ManagedNode> ManagedNodes { get; } = [];
+
+        public List<HostConnectionCheck> HostConnectionChecks { get; } = [];
+
+        public List<AuditLogEntry> AuditLogEntries { get; } = [];
 
         public Task<ExternalIdentity?> FindExternalIdentityAsync(
             string provider,
@@ -598,6 +740,169 @@ public sealed class CustomerEndpointsTests
             }
         }
 
+        public Task<IReadOnlyList<ControlNode>> ListActiveControlNodesAsync(
+            Guid customerId,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult<IReadOnlyList<ControlNode>>(
+                    ControlNodes
+                        .Where(controlNode => controlNode.CustomerId == customerId
+                            && controlNode.Status == ControlNodeStatus.Active)
+                        .ToArray());
+            }
+        }
+
+        public Task<ControlNode?> FindControlNodeAsync(
+            Guid customerId,
+            Guid controlNodeId,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult(ControlNodes.FirstOrDefault(controlNode =>
+                    controlNode.CustomerId == customerId && controlNode.Id == controlNodeId));
+            }
+        }
+
+        public Task<ControlNode?> FindControlNodeByNameAsync(
+            Guid customerId,
+            string name,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult(ControlNodes.FirstOrDefault(controlNode =>
+                    controlNode.CustomerId == customerId && controlNode.Name == name));
+            }
+        }
+
+        public Task<IReadOnlyList<ManagedNode>> ListActiveManagedNodesAsync(
+            Guid customerId,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult<IReadOnlyList<ManagedNode>>(
+                    ManagedNodes
+                        .Where(managedNode => managedNode.CustomerId == customerId
+                            && managedNode.Status == ManagedNodeStatus.Active)
+                        .ToArray());
+            }
+        }
+
+        public Task<ManagedNode?> FindManagedNodeAsync(
+            Guid customerId,
+            Guid managedNodeId,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult(ManagedNodes.FirstOrDefault(managedNode =>
+                    managedNode.CustomerId == customerId && managedNode.Id == managedNodeId));
+            }
+        }
+
+        public Task<ManagedNode?> FindManagedNodeByNameAsync(
+            Guid customerId,
+            string name,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult(ManagedNodes.FirstOrDefault(managedNode =>
+                    managedNode.CustomerId == customerId && managedNode.Name == name));
+            }
+        }
+
+        public Task<IReadOnlyList<HostConnectionCheck>> ListHostConnectionChecksAsync(
+            Guid customerId,
+            HostConnectionTargetType? targetType,
+            Guid? controlNodeId,
+            Guid? managedNodeId,
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                var checks = HostConnectionChecks.Where(check => check.CustomerId == customerId);
+
+                if (targetType is not null)
+                {
+                    checks = checks.Where(check => check.TargetType == targetType);
+                }
+
+                if (controlNodeId is not null)
+                {
+                    checks = checks.Where(check => check.ControlNodeId == controlNodeId);
+                }
+
+                if (managedNodeId is not null)
+                {
+                    checks = checks.Where(check => check.ManagedNodeId == managedNodeId);
+                }
+
+                return Task.FromResult<IReadOnlyList<HostConnectionCheck>>(
+                    checks
+                        .OrderByDescending(check => check.QueuedAtUtc)
+                        .Take(limit)
+                        .ToArray());
+            }
+        }
+
+        public Task<IReadOnlyList<HostConnectionCheck>> ListLatestHostConnectionChecksAsync(
+            Guid customerId,
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult<IReadOnlyList<HostConnectionCheck>>(
+                    HostConnectionChecks
+                        .Where(check => check.CustomerId == customerId)
+                        .OrderByDescending(check => check.QueuedAtUtc)
+                        .Take(limit)
+                        .ToArray());
+            }
+        }
+
+        public Task<HostConnectionCheck?> FindHostConnectionCheckAsync(
+            Guid customerId,
+            Guid hostConnectionCheckId,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult(HostConnectionChecks.FirstOrDefault(check =>
+                    check.CustomerId == customerId && check.Id == hostConnectionCheckId));
+            }
+        }
+
+        public Task<HostConnectionCheck?> FindOldestQueuedHostConnectionCheckAsync(CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult(HostConnectionChecks
+                    .Where(check => check.Status == HostConnectionCheckStatus.Queued)
+                    .OrderBy(check => check.QueuedAtUtc)
+                    .FirstOrDefault());
+            }
+        }
+
+        public Task<HostConnectionCheckStatus?> GetHostConnectionCheckStatusAsync(
+            Guid hostConnectionCheckId,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult(HostConnectionChecks
+                    .Where(check => check.Id == hostConnectionCheckId)
+                    .Select(check => (HostConnectionCheckStatus?)check.Status)
+                    .FirstOrDefault());
+            }
+        }
+
         public void AddUser(User user)
         {
             lock (syncRoot)
@@ -627,6 +932,38 @@ public sealed class CustomerEndpointsTests
             lock (syncRoot)
             {
                 CustomerMemberships.Add(customerMembership);
+            }
+        }
+
+        public void AddControlNode(ControlNode controlNode)
+        {
+            lock (syncRoot)
+            {
+                ControlNodes.Add(controlNode);
+            }
+        }
+
+        public void AddManagedNode(ManagedNode managedNode)
+        {
+            lock (syncRoot)
+            {
+                ManagedNodes.Add(managedNode);
+            }
+        }
+
+        public void AddHostConnectionCheck(HostConnectionCheck hostConnectionCheck)
+        {
+            lock (syncRoot)
+            {
+                HostConnectionChecks.Add(hostConnectionCheck);
+            }
+        }
+
+        public void AddAuditLogEntry(AuditLogEntry auditLogEntry)
+        {
+            lock (syncRoot)
+            {
+                AuditLogEntries.Add(auditLogEntry);
             }
         }
 

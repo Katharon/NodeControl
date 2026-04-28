@@ -29,6 +29,8 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
 
     public DbSet<ManagedNode> ManagedNodes => Set<ManagedNode>();
 
+    public DbSet<HostConnectionCheck> HostConnectionChecks => Set<HostConnectionCheck>();
+
     public DbSet<InventoryGroup> InventoryGroups => Set<InventoryGroup>();
 
     public DbSet<InventoryGroupNode> InventoryGroupNodes => Set<InventoryGroupNode>();
@@ -296,6 +298,84 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
         return await ManagedNodes.FirstOrDefaultAsync(
             managedNode => managedNode.CustomerId == customerId && managedNode.Name == name,
             cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<HostConnectionCheck>> ListHostConnectionChecksAsync(
+        Guid customerId,
+        HostConnectionTargetType? targetType,
+        Guid? controlNodeId,
+        Guid? managedNodeId,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var checks = HostConnectionChecks
+            .AsNoTracking()
+            .Where(check => check.CustomerId == customerId);
+
+        if (targetType is not null)
+        {
+            checks = checks.Where(check => check.TargetType == targetType);
+        }
+
+        if (controlNodeId is not null)
+        {
+            checks = checks.Where(check => check.ControlNodeId == controlNodeId);
+        }
+
+        if (managedNodeId is not null)
+        {
+            checks = checks.Where(check => check.ManagedNodeId == managedNodeId);
+        }
+
+        return await checks
+            .OrderByDescending(check => check.QueuedAtUtc)
+            .ThenByDescending(check => check.Id)
+            .Take(Math.Clamp(limit, 1, 200))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<HostConnectionCheck>> ListLatestHostConnectionChecksAsync(
+        Guid customerId,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        return await HostConnectionChecks
+            .AsNoTracking()
+            .Where(check => check.CustomerId == customerId)
+            .OrderByDescending(check => check.QueuedAtUtc)
+            .ThenByDescending(check => check.Id)
+            .Take(Math.Clamp(limit, 1, 1000))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<HostConnectionCheck?> FindHostConnectionCheckAsync(
+        Guid customerId,
+        Guid hostConnectionCheckId,
+        CancellationToken cancellationToken)
+    {
+        return await HostConnectionChecks.FirstOrDefaultAsync(
+            check => check.CustomerId == customerId && check.Id == hostConnectionCheckId,
+            cancellationToken);
+    }
+
+    public async Task<HostConnectionCheck?> FindOldestQueuedHostConnectionCheckAsync(CancellationToken cancellationToken)
+    {
+        return await HostConnectionChecks
+            .Where(check => check.Status == HostConnectionCheckStatus.Queued)
+            .OrderBy(check => check.QueuedAtUtc)
+            .ThenBy(check => check.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<HostConnectionCheckStatus?> GetHostConnectionCheckStatusAsync(
+        Guid hostConnectionCheckId,
+        CancellationToken cancellationToken)
+    {
+        return await HostConnectionChecks
+            .AsNoTracking()
+            .Where(check => check.Id == hostConnectionCheckId)
+            .Select(check => (HostConnectionCheckStatus?)check.Status)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<InventoryGroup>> ListActiveInventoryGroupsAsync(
@@ -715,6 +795,11 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
     public void AddManagedNode(ManagedNode managedNode)
     {
         ManagedNodes.Add(managedNode);
+    }
+
+    public void AddHostConnectionCheck(HostConnectionCheck hostConnectionCheck)
+    {
+        HostConnectionChecks.Add(hostConnectionCheck);
     }
 
     public void AddInventoryGroup(InventoryGroup inventoryGroup)

@@ -174,6 +174,12 @@ Current implementation note: Secrets now have a customer-scoped frontend and saf
 `secret://secret-slug`. Template validation reports reference status, and VariableSet create/update rejects
 missing or archived references. References are metadata-only and are not resolved during execution.
 
+Current implementation note: Hostzustand is available as a customer-scoped host health view. Users with node
+management permission can queue TCP reachability checks for Control Hosts and Hosts. The API only writes queued
+HostConnectionCheck records and reads results; the Worker processes queued checks with a short TCP connect timeout
+and persists succeeded, failed, or timed-out results without SSH authentication, Ansible execution, or secret
+decryption.
+
 ## Phase 8: Security and Hardening
 
 Goal:

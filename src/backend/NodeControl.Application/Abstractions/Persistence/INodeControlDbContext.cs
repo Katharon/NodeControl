@@ -98,6 +98,45 @@ public interface INodeControlDbContext
         throw new NotSupportedException();
     }
 
+    Task<IReadOnlyList<HostConnectionCheck>> ListHostConnectionChecksAsync(
+        Guid customerId,
+        HostConnectionTargetType? targetType,
+        Guid? controlNodeId,
+        Guid? managedNodeId,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<IReadOnlyList<HostConnectionCheck>> ListLatestHostConnectionChecksAsync(
+        Guid customerId,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<HostConnectionCheck?> FindHostConnectionCheckAsync(
+        Guid customerId,
+        Guid hostConnectionCheckId,
+        CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<HostConnectionCheck?> FindOldestQueuedHostConnectionCheckAsync(CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<HostConnectionCheckStatus?> GetHostConnectionCheckStatusAsync(
+        Guid hostConnectionCheckId,
+        CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
     Task<IReadOnlyList<InventoryGroup>> ListActiveInventoryGroupsAsync(Guid customerId, CancellationToken cancellationToken)
     {
         throw new NotSupportedException();
@@ -296,6 +335,11 @@ public interface INodeControlDbContext
     }
 
     void AddManagedNode(ManagedNode managedNode)
+    {
+        throw new NotSupportedException();
+    }
+
+    void AddHostConnectionCheck(HostConnectionCheck hostConnectionCheck)
     {
         throw new NotSupportedException();
     }
