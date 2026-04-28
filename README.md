@@ -127,6 +127,86 @@ Deployment:
 - Docker Compose for MVP/self-hosted installations
 - Kubernetes may be added later only if needed
 
+## Local Dev/Demo Quick Start
+
+Prerequisites:
+
+- .NET SDK 10
+- Node.js and npm
+- Docker with Compose support
+- Local .NET tools restored from `.config/dotnet-tools.json`
+
+Restore the local .NET tools:
+
+```bash
+dotnet tool restore
+```
+
+Start the local PostgreSQL and Keycloak development services:
+
+```bash
+./scripts/dev-up.sh
+```
+
+Apply the existing EF Core migrations to the local PostgreSQL database:
+
+```bash
+./scripts/dev-migrate.sh
+```
+
+Run the application in three separate terminals:
+
+```bash
+./scripts/dev-run-api.sh
+./scripts/dev-run-worker.sh
+./scripts/dev-run-frontend.sh
+```
+
+Open `http://localhost:3000`. In the default Development configuration, the API uses Fake Auth and signs you in as `Dev Admin`.
+
+Useful local URLs:
+
+- Frontend: `http://localhost:3000`
+- API: `http://localhost:5257`
+- Current user check: `http://localhost:5257/api/v1/me`
+- Keycloak dev provider: `http://localhost:18080`
+
+Run the local validation and smoke checks:
+
+```bash
+./scripts/dev-smoke.sh
+```
+
+Stop the local infrastructure when you are done:
+
+```bash
+./scripts/dev-down.sh
+```
+
+`dev-down.sh` preserves Docker volumes. If you need to reset the database, use Docker Compose manually and be explicit about removing volumes.
+
+## Dev/Demo Scripts
+
+The `scripts/` directory contains small shell scripts for repeatable local workflows:
+
+- `dev-up.sh` starts the Docker Compose development infrastructure.
+- `dev-down.sh` stops the development infrastructure without deleting volumes.
+- `dev-migrate.sh` runs `dotnet ef database update` against `NodeControlDbContext`.
+- `dev-run-api.sh` starts the API in Development mode on `http://localhost:5257`.
+- `dev-run-worker.sh` starts the Worker in Development mode.
+- `dev-run-frontend.sh` starts the Next.js dev server and points it at the local API.
+- `dev-smoke.sh` runs backend restore/build/test, frontend lint/build, the API execution-boundary grep, and optional HTTP checks when local services are running.
+
+The scripts use these defaults and can be overridden through environment variables:
+
+- `NODECONTROL_CONNECTION_STRING`
+- `NODECONTROL_API_URL`
+- `NODECONTROL_FRONTEND_URL`
+- `NODECONTROL_API_ORIGIN`
+- `ASPNETCORE_URLS`
+
+`deploy/` currently contains dev/demo notes only. It is not a production deployment package.
+
 ## Development Strategy
 
 Development is performed in vertical slices.
@@ -173,6 +253,4 @@ nodecontrol/
 
 ## Current Status
 
-This repository starts with architecture and product documentation only.
-
-No application code should be generated before the initial project contract is accepted.
+NodeControl is implemented through small vertical slices. The current repository includes backend, Worker, frontend, tests, EF Core migrations, Docker-based local infrastructure, and dev/demo bootstrap scripts.
