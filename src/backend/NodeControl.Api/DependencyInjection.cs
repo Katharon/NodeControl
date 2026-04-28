@@ -50,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<AuditLogService>();
         services.AddScoped<CustomerService>();
         services.AddScoped<CustomerMembershipService>();
+        services.AddScoped<UserService>();
         services.AddScoped<UserLookupService>();
         services.AddScoped<ControlNodeService>();
         services.AddScoped<ManagedNodeService>();

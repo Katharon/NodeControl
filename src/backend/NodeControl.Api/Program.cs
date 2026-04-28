@@ -18,6 +18,7 @@ app.UseAuthorization();
 app.MapGet("/", () => "Hello World!");
 app.MapAuthEndpoints();
 app.MapMeEndpoints();
+app.MapUsersEndpoints();
 app.MapCustomersEndpoints();
 app.MapCustomerMembershipsEndpoints();
 app.MapCustomerUserLookupEndpoints();

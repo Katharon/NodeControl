@@ -16,6 +16,69 @@ namespace NodeControl.Api.IntegrationTests;
 public sealed class CustomerEndpointsTests
 {
     [Fact]
+    public async Task Platform_admin_can_list_users()
+    {
+        await using var factory = new CustomerApiFactory(isPlatformAdmin: true);
+        factory.SeedCurrentUser();
+        var targetUser = User.Create("Demo Operator", "operator@nodecontrol.local", false, TestTime);
+        factory.DbContext.AddUser(targetUser);
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync("/api/v1/users?q=operator");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var result = Assert.Single(document.RootElement.EnumerateArray());
+        Assert.Equal(targetUser.Id, result.GetProperty("id").GetGuid());
+        Assert.Equal("Demo Operator", result.GetProperty("displayName").GetString());
+        Assert.Equal("operator@nodecontrol.local", result.GetProperty("email").GetString());
+        Assert.True(result.GetProperty("isActive").GetBoolean());
+        Assert.False(result.GetProperty("isPlatformAdmin").GetBoolean());
+        Assert.True(result.TryGetProperty("createdAt", out _));
+        Assert.True(result.TryGetProperty("lastLoginAt", out _));
+        Assert.False(result.TryGetProperty("normalizedEmail", out _));
+    }
+
+    [Fact]
+    public async Task Normal_user_cannot_list_users()
+    {
+        await using var factory = CustomerApiFactory.ForNormalUser();
+        factory.SeedCurrentUser();
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync("/api/v1/users");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Platform_admin_can_get_user_detail()
+    {
+        await using var factory = new CustomerApiFactory(isPlatformAdmin: true);
+        factory.SeedCurrentUser();
+        var targetUser = User.Create("Demo Operator", "operator@nodecontrol.local", false, TestTime);
+        factory.DbContext.AddUser(targetUser);
+        factory.DbContext.AddExternalIdentity(ExternalIdentity.Create(
+            targetUser,
+            "fake",
+            "demo-operator",
+            targetUser.Email,
+            targetUser.DisplayName,
+            TestTime));
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync($"/api/v1/users/{targetUser.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(targetUser.Id, document.RootElement.GetProperty("id").GetGuid());
+        var externalIdentity = Assert.Single(document.RootElement.GetProperty("externalIdentities").EnumerateArray());
+        Assert.Equal("fake", externalIdentity.GetProperty("provider").GetString());
+        Assert.Equal("demo-operator", externalIdentity.GetProperty("subject").GetString());
+        Assert.False(externalIdentity.TryGetProperty("emailAtLogin", out _));
+    }
+
+    [Fact]
     public async Task Platform_admin_can_list_all_active_customers()
     {
         await using var factory = new CustomerApiFactory(isPlatformAdmin: true);
@@ -156,6 +219,63 @@ public sealed class CustomerEndpointsTests
         Assert.False(result.TryGetProperty("normalizedEmail", out _));
         Assert.False(result.TryGetProperty("createdAt", out _));
         Assert.False(result.TryGetProperty("lastLoginAt", out _));
+    }
+
+    [Fact]
+    public async Task Membership_candidates_exclude_existing_active_members()
+    {
+        await using var factory = CustomerApiFactory.ForNormalUser();
+        var user = factory.SeedCurrentUser();
+        var customer = Customer.Create("Customer A", "customer-a", null, TestTime);
+        var targetUser = User.Create("Demo Operator", "operator@nodecontrol.local", false, TestTime);
+        var existingUser = User.Create("Existing Operator", "existing@nodecontrol.local", false, TestTime);
+        factory.DbContext.AddCustomer(customer);
+        factory.DbContext.AddUser(targetUser);
+        factory.DbContext.AddUser(existingUser);
+        factory.DbContext.AddCustomerMembership(CustomerMembership.Create(customer, user, CustomerRole.Owner, TestTime));
+        factory.DbContext.AddCustomerMembership(CustomerMembership.Create(customer, existingUser, CustomerRole.Operator, TestTime));
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync($"/api/v1/customers/{customer.Id}/membership-candidates?query=operator");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Contains(document.RootElement.EnumerateArray(), element =>
+            element.GetProperty("id").GetGuid() == targetUser.Id);
+        Assert.DoesNotContain(document.RootElement.EnumerateArray(), element =>
+            element.GetProperty("id").GetGuid() == existingUser.Id);
+    }
+
+    [Fact]
+    public async Task Membership_candidate_search_requires_manage_memberships_permission()
+    {
+        await using var factory = CustomerApiFactory.ForNormalUser();
+        var user = factory.SeedCurrentUser();
+        var customer = Customer.Create("Customer A", "customer-a", null, TestTime);
+        factory.DbContext.AddCustomer(customer);
+        factory.DbContext.AddCustomerMembership(CustomerMembership.Create(customer, user, CustomerRole.Admin, TestTime));
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync($"/api/v1/customers/{customer.Id}/membership-candidates?query=normal");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Membership_candidate_search_is_customer_scoped()
+    {
+        await using var factory = CustomerApiFactory.ForNormalUser();
+        var user = factory.SeedCurrentUser();
+        var customerA = Customer.Create("Customer A", "customer-a", null, TestTime);
+        var customerB = Customer.Create("Customer B", "customer-b", null, TestTime);
+        factory.DbContext.AddCustomer(customerA);
+        factory.DbContext.AddCustomer(customerB);
+        factory.DbContext.AddCustomerMembership(CustomerMembership.Create(customerA, user, CustomerRole.Owner, TestTime));
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync($"/api/v1/customers/{customerB.Id}/membership-candidates?query=normal");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
@@ -319,6 +439,46 @@ public sealed class CustomerEndpointsTests
             }
         }
 
+        public Task<IReadOnlyList<User>> ListUsersAsync(
+            string? query,
+            bool includeInactive,
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                var normalizedQuery = string.IsNullOrWhiteSpace(query)
+                    ? string.Empty
+                    : query.Trim().ToUpperInvariant();
+
+                return Task.FromResult<IReadOnlyList<User>>(
+                    Users
+                        .Where(user => (includeInactive || user.IsActive)
+                            && (normalizedQuery.Length == 0
+                                || user.NormalizedEmail.Contains(normalizedQuery)
+                                || user.DisplayName.ToUpperInvariant().Contains(normalizedQuery)))
+                        .OrderBy(user => user.DisplayName)
+                        .ThenBy(user => user.Email)
+                        .Take(Math.Clamp(limit, 1, 200))
+                        .ToArray());
+            }
+        }
+
+        public Task<IReadOnlyList<ExternalIdentity>> ListExternalIdentitiesForUsersAsync(
+            IReadOnlyCollection<Guid> userIds,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult<IReadOnlyList<ExternalIdentity>>(
+                    ExternalIdentities
+                        .Where(externalIdentity => userIds.Contains(externalIdentity.UserId))
+                        .OrderBy(externalIdentity => externalIdentity.Provider)
+                        .ThenBy(externalIdentity => externalIdentity.Subject)
+                        .ToArray());
+            }
+        }
+
         public Task<IReadOnlyList<User>> SearchUsersAsync(
             string? query,
             int limit,
@@ -339,6 +499,35 @@ public sealed class CustomerEndpointsTests
                         .OrderBy(user => user.DisplayName)
                         .ThenBy(user => user.Email)
                         .Take(limit)
+                        .ToArray());
+            }
+        }
+
+        public Task<IReadOnlyList<User>> SearchMembershipCandidateUsersAsync(
+            Guid customerId,
+            string? query,
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                var normalizedQuery = string.IsNullOrWhiteSpace(query)
+                    ? string.Empty
+                    : query.Trim().ToUpperInvariant();
+
+                return Task.FromResult<IReadOnlyList<User>>(
+                    Users
+                        .Where(user => user.IsActive
+                            && !CustomerMemberships.Any(membership =>
+                                membership.CustomerId == customerId
+                                && membership.UserId == user.Id
+                                && membership.IsActive)
+                            && (normalizedQuery.Length == 0
+                                || user.NormalizedEmail.Contains(normalizedQuery)
+                                || user.DisplayName.ToUpperInvariant().Contains(normalizedQuery)))
+                        .OrderBy(user => user.DisplayName)
+                        .ThenBy(user => user.Email)
+                        .Take(Math.Clamp(limit, 1, 50))
                         .ToArray());
             }
         }

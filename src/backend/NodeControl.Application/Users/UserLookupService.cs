@@ -11,12 +11,29 @@ public sealed class UserLookupService(
     INodeControlDbContext dbContext,
     ICustomerAuthorizationService authorizationService)
 {
-    private const int MaxResults = 20;
+    private const int DefaultLimit = 20;
+    private const int MaxLimit = 50;
 
     public async Task<CustomerServiceResult<IReadOnlyList<UserLookupDto>>> SearchUsersAsync(
         CurrentUserDto currentUser,
         Guid customerId,
         string? query,
+        int? limit = null,
+        CancellationToken cancellationToken = default)
+    {
+        return await SearchMembershipCandidatesAsync(
+            currentUser,
+            customerId,
+            query,
+            limit,
+            cancellationToken);
+    }
+
+    public async Task<CustomerServiceResult<IReadOnlyList<UserLookupDto>>> SearchMembershipCandidatesAsync(
+        CurrentUserDto currentUser,
+        Guid customerId,
+        string? query,
+        int? limit = null,
         CancellationToken cancellationToken = default)
     {
         var authorization = await authorizationService.AuthorizeAsync(
@@ -30,7 +47,13 @@ public sealed class UserLookupService(
             return CustomerServiceResult<IReadOnlyList<UserLookupDto>>.FromAuthorization(authorization);
         }
 
-        var users = await dbContext.SearchUsersAsync(query, MaxResults, cancellationToken);
+        var normalizedQuery = query?.Trim();
+        var users = await dbContext.SearchMembershipCandidateUsersAsync(
+            customerId,
+            normalizedQuery?.Length >= 2 ? normalizedQuery : null,
+            Math.Clamp(limit ?? DefaultLimit, 1, MaxLimit),
+            cancellationToken);
+
         return CustomerServiceResult<IReadOnlyList<UserLookupDto>>.Ok(users.Select(MapUser).ToArray());
     }
 

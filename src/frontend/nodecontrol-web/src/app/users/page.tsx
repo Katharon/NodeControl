@@ -1,13 +1,12 @@
 import { AppPage } from "@/components/layout/AppPage";
-import { PlaceholderProductPage } from "@/components/layout/PlaceholderProductPage";
+import { UserList } from "@/components/users/UserList";
+
+export const dynamic = "force-dynamic";
 
 export default function UsersPage() {
   return (
-    <AppPage>
-      <PlaceholderProductPage
-        description="Benutzerverwaltung und Einladungen folgen später. Aktuell entstehen Benutzer über die OIDC-Anmeldung."
-        title="Benutzer"
-      />
+    <AppPage maxWidth="lg">
+      <UserList />
     </AppPage>
   );
 }

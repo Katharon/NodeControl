@@ -18,6 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
+import { ApiError } from "@/lib/api/apiClient";
 import {
   type CreateCustomerMembershipInput,
   customerRoles,
@@ -42,6 +43,7 @@ type MembershipFormProps = {
 
 export function MembershipForm({ customerId, existingUserIds, onSubmit }: MembershipFormProps) {
   const [userSearch, setUserSearch] = useState("");
+  const [selectedUser, setSelectedUser] = useState<UserLookupResult | null>(null);
   const existingUserIdSet = useMemo(() => new Set(existingUserIds), [existingUserIds]);
   const usersQuery = useQuery({
     queryKey: ["customer-user-lookup", customerId, userSearch],
@@ -63,12 +65,15 @@ export function MembershipForm({ customerId, existingUserIds, onSubmit }: Member
     },
   });
   const selectedUserId = useWatch({ control, name: "userId" });
+  const searchForbidden = usersQuery.error instanceof ApiError && usersQuery.error.status === 403;
 
   return (
     <Stack
       component="form"
       onSubmit={handleSubmit(async (values) => {
         await onSubmit(values);
+        setSelectedUser(null);
+        setUserSearch("");
         reset();
       })}
       sx={{ gap: 2 }}
@@ -77,8 +82,6 @@ export function MembershipForm({ customerId, existingUserIds, onSubmit }: Member
         control={control}
         name="userId"
         render={({ field }) => {
-          const selectedUser =
-            usersQuery.data?.find((user) => user.id === field.value) ?? null;
           const options =
             usersQuery.data?.filter((user) => !existingUserIdSet.has(user.id)) ?? [];
 
@@ -88,9 +91,12 @@ export function MembershipForm({ customerId, existingUserIds, onSubmit }: Member
               getOptionLabel={(option) => `${option.displayName} (${option.email})`}
               inputValue={userSearch}
               isOptionEqualToValue={(option, value) => option.id === value.id}
-              loading={usersQuery.isPending}
-              noOptionsText="Keine bestehenden Plattformbenutzer gefunden."
-              onChange={(_, value) => field.onChange(value?.id ?? "")}
+              loading={usersQuery.isFetching}
+              noOptionsText="Keine auswählbaren Benutzer gefunden."
+              onChange={(_, value) => {
+                setSelectedUser(value);
+                field.onChange(value?.id ?? "");
+              }}
               onInputChange={(_, value) => setUserSearch(value)}
               options={options}
               renderInput={(params) => (
@@ -99,16 +105,16 @@ export function MembershipForm({ customerId, existingUserIds, onSubmit }: Member
                   error={Boolean(errors.userId)}
                   helperText={
                     errors.userId?.message ??
-                    "Wähle einen bestehenden Plattformbenutzer aus. Benutzerverwaltung und Einladungen folgen später."
+                    "Wähle einen bestehenden Plattformbenutzer aus."
                   }
                   inputRef={field.ref}
-                  label="User ID (existing platform user)"
+                  label="Benutzer suchen"
                   slotProps={{
                     input: {
                       ...params.slotProps.input,
                       endAdornment: (
                         <>
-                          {usersQuery.isPending ? <CircularProgress size={18} /> : null}
+                          {usersQuery.isFetching ? <CircularProgress size={18} /> : null}
                           {params.slotProps.input.endAdornment}
                         </>
                       ),
@@ -138,7 +144,11 @@ export function MembershipForm({ customerId, existingUserIds, onSubmit }: Member
         }}
       />
       {usersQuery.isError ? (
-        <Alert severity="error">Benutzer konnten nicht geladen werden.</Alert>
+        <Alert severity={searchForbidden ? "warning" : "error"}>
+          {searchForbidden
+            ? "Benutzersuche ist nur mit Berechtigung zur Mitgliederverwaltung verfügbar."
+            : "Benutzer konnten nicht geladen werden."}
+        </Alert>
       ) : null}
       {usersQuery.isSuccess && usersQuery.data.length === 0 ? (
         <Alert severity="info">
@@ -160,7 +170,7 @@ export function MembershipForm({ customerId, existingUserIds, onSubmit }: Member
         ))}
       </TextField>
       <Button
-        disabled={!selectedUserId || isSubmitting || usersQuery.isPending}
+        disabled={!selectedUserId || isSubmitting || usersQuery.isPending || searchForbidden}
         startIcon={<PersonAddIcon />}
         sx={{ alignSelf: "flex-start" }}
         type="submit"

@@ -21,7 +21,32 @@ public interface INodeControlDbContext
 
     Task<User?> FindUserAsync(Guid id, CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<User>> ListUsersAsync(
+        string? query,
+        bool includeInactive,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<IReadOnlyList<ExternalIdentity>> ListExternalIdentitiesForUsersAsync(
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
     Task<IReadOnlyList<User>> SearchUsersAsync(string? query, int limit, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<IReadOnlyList<User>> SearchMembershipCandidateUsersAsync(
+        Guid customerId,
+        string? query,
+        int limit,
+        CancellationToken cancellationToken)
     {
         throw new NotSupportedException();
     }

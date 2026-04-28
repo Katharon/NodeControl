@@ -202,6 +202,19 @@ Production requires:
 5. Disabled users must not access the system.
 6. Disabled memberships must not grant access.
 
+## User Management MVP
+
+Slice 15 adds a small demo-ready user overview without adding registration, passwords, invitations, or external
+identity-provider administration.
+
+- `GET /api/v1/users` and `GET /api/v1/users/{userId}` are platform-admin-only and expose safe metadata:
+  display name, email, active state, platform-admin state, timestamps, and a minimal external identity summary.
+- Customer membership forms use `GET /api/v1/customers/{customerId}/membership-candidates` to search existing
+  active users by display name or email.
+- Membership candidate search uses the existing `ManageMemberships` permission for the target customer and excludes
+  users who are already active members of that customer.
+- Creating a membership still uses the existing user id contract. This slice does not create users by email.
+
 ## Post-MVP Auth Features
 
 Potential later features:

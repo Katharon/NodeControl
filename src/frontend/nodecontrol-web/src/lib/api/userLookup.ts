@@ -14,8 +14,10 @@ export function searchUsersForCustomerMembership(customerId: string, query: stri
     searchParams.set("query", query.trim());
   }
 
+  searchParams.set("limit", "20");
+
   const queryString = searchParams.toString();
   return apiGet<UserLookupResult[]>(
-    `/api/v1/customers/${customerId}/users/lookup${queryString ? `?${queryString}` : ""}`,
+    `/api/v1/customers/${customerId}/membership-candidates${queryString ? `?${queryString}` : ""}`,
   );
 }

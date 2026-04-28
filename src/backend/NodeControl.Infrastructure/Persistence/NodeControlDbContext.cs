@@ -69,6 +69,54 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
         return await Users.FirstOrDefaultAsync(user => user.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<User>> ListUsersAsync(
+        string? query,
+        bool includeInactive,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var normalizedQuery = string.IsNullOrWhiteSpace(query)
+            ? string.Empty
+            : query.Trim().ToUpperInvariant();
+
+        var users = Users.AsNoTracking();
+
+        if (!includeInactive)
+        {
+            users = users.Where(user => user.IsActive);
+        }
+
+        if (normalizedQuery.Length > 0)
+        {
+            users = users.Where(user =>
+                user.NormalizedEmail.Contains(normalizedQuery)
+                || user.DisplayName.ToUpper().Contains(normalizedQuery));
+        }
+
+        return await users
+            .OrderBy(user => user.DisplayName)
+            .ThenBy(user => user.Email)
+            .Take(Math.Clamp(limit, 1, 200))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ExternalIdentity>> ListExternalIdentitiesForUsersAsync(
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken cancellationToken)
+    {
+        if (userIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await ExternalIdentities
+            .AsNoTracking()
+            .Where(externalIdentity => userIds.Contains(externalIdentity.UserId))
+            .OrderBy(externalIdentity => externalIdentity.Provider)
+            .ThenBy(externalIdentity => externalIdentity.Subject)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<User>> SearchUsersAsync(
         string? query,
         int limit,
@@ -81,6 +129,38 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
         var users = Users
             .AsNoTracking()
             .Where(user => user.IsActive);
+
+        if (normalizedQuery.Length > 0)
+        {
+            users = users.Where(user =>
+                user.NormalizedEmail.Contains(normalizedQuery)
+                || user.DisplayName.ToUpper().Contains(normalizedQuery));
+        }
+
+        return await users
+            .OrderBy(user => user.DisplayName)
+            .ThenBy(user => user.Email)
+            .Take(Math.Clamp(limit, 1, 50))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<User>> SearchMembershipCandidateUsersAsync(
+        Guid customerId,
+        string? query,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var normalizedQuery = string.IsNullOrWhiteSpace(query)
+            ? string.Empty
+            : query.Trim().ToUpperInvariant();
+
+        var users = Users
+            .AsNoTracking()
+            .Where(user => user.IsActive
+                && !CustomerMemberships.Any(membership =>
+                    membership.CustomerId == customerId
+                    && membership.UserId == user.Id
+                    && membership.IsActive));
 
         if (normalizedQuery.Length > 0)
         {

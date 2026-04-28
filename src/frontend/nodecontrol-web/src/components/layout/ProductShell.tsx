@@ -103,7 +103,7 @@ const navigationGroups: NavigationGroup[] = [
   {
     label: "Administration",
     items: [
-      { label: "Benutzer", href: "/users", icon: GroupsIcon, planned: true },
+      { label: "Benutzer", href: "/users", icon: GroupsIcon },
       { label: "Audit", href: "/audit", icon: HistoryIcon, scopedSegment: "audit" },
       { label: "Master-Key", href: "/master-key", icon: KeyIcon, planned: true },
       { label: "Sicherheit", href: "/security", icon: SecurityIcon, planned: true },

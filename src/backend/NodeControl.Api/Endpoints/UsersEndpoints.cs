@@ -3,19 +3,19 @@ using NodeControl.Application.Users;
 
 namespace NodeControl.Api.Endpoints;
 
-public static class CustomerUserLookupEndpoints
+public static class UsersEndpoints
 {
-    public static IEndpointRouteBuilder MapCustomerUserLookupEndpoints(this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapUsersEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var customerGroup = endpoints.MapGroup("/api/v1/customers/{customerId:guid}")
+        var group = endpoints.MapGroup("/api/v1/users")
             .RequireAuthorization();
 
-        customerGroup.MapGet("/membership-candidates", async (
-            Guid customerId,
-            string? query,
+        group.MapGet("/", async (
+            string? q,
+            bool? includeInactive,
             int? limit,
             CurrentUserService currentUserService,
-            UserLookupService userLookupService,
+            UserService userService,
             CancellationToken cancellationToken) =>
         {
             var currentUser = await currentUserService.GetCurrentUserAsync(cancellationToken);
@@ -24,20 +24,17 @@ public static class CustomerUserLookupEndpoints
                 return Results.Unauthorized();
             }
 
-            var result = await userLookupService.SearchMembershipCandidatesAsync(
+            var result = await userService.ListUsersAsync(
                 currentUser,
-                customerId,
-                query,
-                limit,
+                new UserListQuery(q, includeInactive ?? false, limit),
                 cancellationToken);
             return CustomersEndpoints.ToResult(result);
         });
 
-        customerGroup.MapGet("/users/lookup", async (
-            Guid customerId,
-            string? query,
+        group.MapGet("/{userId:guid}", async (
+            Guid userId,
             CurrentUserService currentUserService,
-            UserLookupService userLookupService,
+            UserService userService,
             CancellationToken cancellationToken) =>
         {
             var currentUser = await currentUserService.GetCurrentUserAsync(cancellationToken);
@@ -46,11 +43,7 @@ public static class CustomerUserLookupEndpoints
                 return Results.Unauthorized();
             }
 
-            var result = await userLookupService.SearchUsersAsync(
-                currentUser,
-                customerId,
-                query,
-                cancellationToken: cancellationToken);
+            var result = await userService.GetUserAsync(currentUser, userId, cancellationToken);
             return CustomersEndpoints.ToResult(result);
         });
 
