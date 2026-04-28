@@ -24,6 +24,8 @@ import {
   archiveInventoryGroup,
   createInventoryGroup,
   getInventoryGroups,
+  getInventoryPreview,
+  type InventoryPreview,
 } from "@/lib/api/inventoryGroups";
 
 type InventoryGroupListProps = {
@@ -36,6 +38,8 @@ export function InventoryGroupList({ customerId, canManageNodes }: InventoryGrou
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [previewGroupId, setPreviewGroupId] = useState<string | null>(null);
+  const [previewResult, setPreviewResult] = useState<InventoryPreview | null>(null);
+  const [previewHasError, setPreviewHasError] = useState(false);
   const groupsQuery = useQuery({
     queryKey: ["inventory-groups", customerId],
     queryFn: () => getInventoryGroups(customerId),
@@ -55,6 +59,22 @@ export function InventoryGroupList({ customerId, canManageNodes }: InventoryGrou
       await queryClient.invalidateQueries({ queryKey: ["inventory-groups", customerId] });
     },
   });
+  const previewMutation = useMutation({
+    mutationFn: (inventoryGroupId: string) => getInventoryPreview(customerId, inventoryGroupId),
+    onError: () => {
+      setPreviewResult(null);
+      setPreviewHasError(true);
+    },
+    onSuccess: (preview) => {
+      setPreviewResult(preview);
+      setPreviewHasError(false);
+    },
+    onSettled: (_data, _error, inventoryGroupId) => {
+      void queryClient.invalidateQueries({
+        queryKey: ["inventory-preview", customerId, inventoryGroupId],
+      });
+    },
+  });
 
   if (groupsQuery.isPending) {
     return <CircularProgress size={22} />;
@@ -67,6 +87,7 @@ export function InventoryGroupList({ customerId, canManageNodes }: InventoryGrou
   const selectedGroup =
     groupsQuery.data.find((group) => group.id === selectedGroupId) ?? groupsQuery.data[0];
   const previewGroup = groupsQuery.data.find((group) => group.id === previewGroupId) ?? null;
+  const previewLoadingGroupId = previewMutation.isPending ? previewGroupId : null;
 
   return (
     <Stack sx={{ gap: 2 }}>
@@ -84,7 +105,7 @@ export function InventoryGroupList({ customerId, canManageNodes }: InventoryGrou
       {groupsQuery.data.length === 0 ? (
         <Alert severity="info">Noch keine Inventare definiert.</Alert>
       ) : (
-        <Paper>
+        <Paper variant="outlined" sx={{ bgcolor: "background.paper" }}>
           <Stack divider={<Divider />}>
             {groupsQuery.data.map((group) => (
               <Stack
@@ -95,7 +116,9 @@ export function InventoryGroupList({ customerId, canManageNodes }: InventoryGrou
                 <Stack direction="row" sx={{ alignItems: "center", gap: 1.5 }}>
                   <InventoryIcon color="primary" />
                   <Stack>
-                    <Typography sx={{ fontWeight: 700 }}>{group.name}</Typography>
+                    <Typography color="text.primary" sx={{ fontWeight: 700 }}>
+                      {group.name}
+                    </Typography>
                     <Typography color="text.secondary" variant="body2">
                       {group.managedNodeIds.length} Hosts
                     </Typography>
@@ -103,13 +126,22 @@ export function InventoryGroupList({ customerId, canManageNodes }: InventoryGrou
                 </Stack>
                 <Stack direction="row" sx={{ gap: 1 }}>
                   <Button
+                    disabled={previewMutation.isPending}
                     onClick={() => {
                       setSelectedGroupId(group.id);
                       setPreviewGroupId(group.id);
+                      setPreviewResult(null);
+                      setPreviewHasError(false);
+                      previewMutation.mutate(group.id);
                     }}
+                    startIcon={
+                      previewLoadingGroupId === group.id ? (
+                        <CircularProgress color="inherit" size={16} />
+                      ) : undefined
+                    }
                     variant="outlined"
                   >
-                    Vorschau
+                    {previewLoadingGroupId === group.id ? "Lädt..." : "Vorschau"}
                   </Button>
                   {canManageNodes ? (
                     <Button
@@ -152,14 +184,16 @@ export function InventoryGroupList({ customerId, canManageNodes }: InventoryGrou
       <Dialog
         fullWidth
         maxWidth="md"
-        onClose={() => setPreviewGroupId(null)}
-        open={Boolean(previewGroup)}
+        onClose={() => {
+          setPreviewGroupId(null);
+          setPreviewResult(null);
+          setPreviewHasError(false);
+        }}
+        open={Boolean(previewGroup) && !previewMutation.isPending}
       >
         <DialogTitle>Inventarvorschau{previewGroup ? `: ${previewGroup.name}` : ""}</DialogTitle>
-        <DialogContent>
-          {previewGroup ? (
-            <InventoryPreviewCard customerId={customerId} inventoryGroupId={previewGroup.id} />
-          ) : null}
+        <DialogContent sx={{ pb: 3 }}>
+          <InventoryPreviewCard hasError={previewHasError} preview={previewResult} />
         </DialogContent>
       </Dialog>
     </Stack>

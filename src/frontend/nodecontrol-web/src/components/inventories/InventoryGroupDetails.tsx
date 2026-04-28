@@ -69,12 +69,14 @@ export function InventoryGroupDetails({
   const unlinkedNodes = managedNodes.filter((node) => !inventoryGroup.managedNodeIds.includes(node.id));
 
   return (
-    <Paper sx={{ p: 3 }}>
+    <Paper variant="outlined" sx={{ bgcolor: "background.paper", p: 3 }}>
       <Stack sx={{ gap: 2 }}>
         <Typography component="h3" variant="h6">
           {inventoryGroup.name}
         </Typography>
-        {inventoryGroup.description ? <Typography>{inventoryGroup.description}</Typography> : null}
+        {inventoryGroup.description ? (
+          <Typography color="text.secondary">{inventoryGroup.description}</Typography>
+        ) : null}
 
         {canManageNodes ? (
           <Stack direction={{ xs: "column", sm: "row" }} sx={{ gap: 1.5 }}>
@@ -114,7 +116,9 @@ export function InventoryGroupDetails({
                 key={node.id}
                 sx={{ alignItems: "center", justifyContent: "space-between", gap: 2 }}
               >
-                <Typography>{node.name}</Typography>
+                <Typography color="text.primary" sx={{ fontWeight: 600 }}>
+                  {node.name}
+                </Typography>
                 {canManageNodes ? (
                   <Button
                     color="warning"

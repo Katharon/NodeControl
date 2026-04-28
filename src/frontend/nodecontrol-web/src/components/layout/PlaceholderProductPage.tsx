@@ -12,11 +12,11 @@ export function PlaceholderProductPage({ title, description }: PlaceholderProduc
         <Typography component="h1" variant="h4">
           {title}
         </Typography>
-        <Chip color="info" label="Geplant" size="small" />
+        <Chip color="info" label="Noch nicht implementiert" size="small" />
       </Stack>
       <Paper sx={{ p: 3 }}>
         <Stack sx={{ gap: 2 }}>
-          <Alert severity="info">Noch nicht implementiert.</Alert>
+          <Alert severity="info">Noch nicht implementiert</Alert>
           <Typography color="text.secondary">{description}</Typography>
         </Stack>
       </Paper>

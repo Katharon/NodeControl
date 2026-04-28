@@ -6,6 +6,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Divider,
   Paper,
@@ -64,9 +65,14 @@ export function CurrentUserCard() {
         <Stack direction="row" sx={{ alignItems: "center", gap: 1.5 }}>
           <PersonIcon color="primary" />
           <Box>
-            <Typography component="h1" variant="h5">
-              {currentUser.displayName}
-            </Typography>
+            <Stack direction="row" sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+              <Typography component="h2" variant="h5">
+                {currentUser.displayName}
+              </Typography>
+              {currentUser.authProvider === "fake" ? (
+                <Chip color="info" label="Dev Admin" size="small" />
+              ) : null}
+            </Stack>
             <Typography color="text.secondary">{currentUser.email}</Typography>
           </Box>
         </Stack>

@@ -35,11 +35,11 @@ public static class AuthEndpoints
     {
         if (authOptions.UseFakeAuth)
         {
-            return Results.Redirect("/login");
+            return Results.Redirect("/");
         }
 
         return Results.SignOut(
-            new AuthenticationProperties { RedirectUri = "/login" },
+            new AuthenticationProperties { RedirectUri = "/" },
             [CookieAuthenticationDefaults.AuthenticationScheme]);
     }
 }

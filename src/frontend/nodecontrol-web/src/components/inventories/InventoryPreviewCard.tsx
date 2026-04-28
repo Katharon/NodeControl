@@ -1,36 +1,21 @@
-"use client";
-
-import { Alert, CircularProgress, Paper, Stack, Typography } from "@mui/material";
-import { useQuery } from "@tanstack/react-query";
-import { getInventoryPreview } from "@/lib/api/inventoryGroups";
+import { Alert, Paper, Stack, Typography } from "@mui/material";
+import type { InventoryPreview } from "@/lib/api/inventoryGroups";
 
 type InventoryPreviewCardProps = {
-  customerId: string;
-  inventoryGroupId: string;
+  preview: InventoryPreview | null;
+  hasError: boolean;
 };
 
-export function InventoryPreviewCard({ customerId, inventoryGroupId }: InventoryPreviewCardProps) {
-  const previewQuery = useQuery({
-    queryKey: ["inventory-preview", customerId, inventoryGroupId],
-    queryFn: () => getInventoryPreview(customerId, inventoryGroupId),
-  });
-
-  if (previewQuery.isPending) {
-    return (
-      <Paper variant="outlined" sx={{ bgcolor: "background.paper", p: 2 }}>
-        <Stack direction="row" sx={{ alignItems: "center", gap: 2 }}>
-          <CircularProgress size={22} />
-          <Typography color="text.secondary">Inventarvorschau wird geladen.</Typography>
-        </Stack>
-      </Paper>
-    );
-  }
-
-  if (previewQuery.isError) {
+export function InventoryPreviewCard({ preview, hasError }: InventoryPreviewCardProps) {
+  if (hasError) {
     return <Alert severity="error">Inventarvorschau konnte nicht geladen werden.</Alert>;
   }
 
-  const content = previewQuery.data.content.trim();
+  if (!preview) {
+    return <Alert severity="info">Noch keine Inventarvorschau geladen.</Alert>;
+  }
+
+  const content = preview.content.trim();
 
   if (!content) {
     return <Alert severity="info">Diese Inventarvorschau enthält noch keine Hosts.</Alert>;
@@ -40,13 +25,16 @@ export function InventoryPreviewCard({ customerId, inventoryGroupId }: Inventory
     <Paper variant="outlined" sx={{ bgcolor: "background.paper", color: "text.primary", p: 2 }}>
       <Stack sx={{ gap: 1 }}>
         <Typography color="text.secondary" variant="body2">
-          {previewQuery.data.format}
+          Format: {preview.format}
         </Typography>
         <Typography
           component="pre"
           sx={{
-            bgcolor: "action.hover",
+            bgcolor: "background.default",
+            border: 1,
+            borderColor: "divider",
             borderRadius: 1,
+            color: "text.primary",
             fontFamily: "monospace",
             fontSize: 14,
             m: 0,

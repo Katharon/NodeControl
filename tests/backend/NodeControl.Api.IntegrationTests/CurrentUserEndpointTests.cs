@@ -49,6 +49,21 @@ public sealed class CurrentUserEndpointTests
     }
 
     [Fact]
+    public async Task Fake_logout_returns_to_landing_page()
+    {
+        await using var factory = new AuthWebApplicationFactory();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+
+        using var response = await client.PostAsync("/auth/logout", null);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/", response.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
     public void Fake_auth_cannot_be_used_in_production()
     {
         var configuration = new ConfigurationBuilder()

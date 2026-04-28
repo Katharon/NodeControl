@@ -27,6 +27,7 @@ import WorkIcon from "@mui/icons-material/Work";
 import {
   Box,
   Button,
+  Chip,
   Divider,
   List,
   ListItemButton,
@@ -52,6 +53,7 @@ type NavigationItem = {
   label: string;
   href: string;
   icon: SvgIconComponent;
+  planned?: boolean;
   scopedSegment?: string;
 };
 
@@ -76,9 +78,9 @@ const navigationGroups: NavigationGroup[] = [
     label: "Inventar & Assets",
     items: [
       { label: "Kunden", href: "/customers", icon: BusinessIcon },
-      { label: "Hostzustand", href: "/host-health", icon: HealthAndSafetyIcon },
+      { label: "Hostzustand", href: "/host-health", icon: HealthAndSafetyIcon, planned: true },
       { label: "Variablen", href: "/variables", icon: StorageIcon, scopedSegment: "variables" },
-      { label: "Cloud-Provider", href: "/cloud-providers", icon: CloudIcon },
+      { label: "Cloud-Provider", href: "/cloud-providers", icon: CloudIcon, planned: true },
       { label: "Inventare", href: "/inventories", icon: InventoryIcon, scopedSegment: "inventories" },
       { label: "Templates", href: "/templates", icon: AccountTreeIcon, scopedSegment: "templates" },
     ],
@@ -86,26 +88,26 @@ const navigationGroups: NavigationGroup[] = [
   {
     label: "Onboarding & Quellen",
     items: [
-      { label: "Git-Repos", href: "/git-repos", icon: GitHubIcon },
-      { label: "Collections", href: "/collections", icon: ExtensionIcon },
-      { label: "Import", href: "/import", icon: UploadFileIcon },
+      { label: "Git-Repos", href: "/git-repos", icon: GitHubIcon, planned: true },
+      { label: "Collections", href: "/collections", icon: ExtensionIcon, planned: true },
+      { label: "Import", href: "/import", icon: UploadFileIcon, planned: true },
     ],
   },
   {
     label: "Geheimnisse & Benachrichtigungen",
     items: [
       { label: "Secrets", href: "/secrets", icon: VpnKeyIcon, scopedSegment: "secrets" },
-      { label: "Benachrichtigungen", href: "/notifications", icon: NotificationsIcon },
+      { label: "Benachrichtigungen", href: "/notifications", icon: NotificationsIcon, planned: true },
     ],
   },
   {
     label: "Administration",
     items: [
-      { label: "Benutzer", href: "/users", icon: GroupsIcon },
+      { label: "Benutzer", href: "/users", icon: GroupsIcon, planned: true },
       { label: "Audit", href: "/audit", icon: HistoryIcon, scopedSegment: "audit" },
-      { label: "Master-Key", href: "/master-key", icon: KeyIcon },
-      { label: "Sicherheit", href: "/security", icon: SecurityIcon },
-      { label: "System", href: "/system", icon: SettingsIcon },
+      { label: "Master-Key", href: "/master-key", icon: KeyIcon, planned: true },
+      { label: "Sicherheit", href: "/security", icon: SecurityIcon, planned: true },
+      { label: "System", href: "/system", icon: SettingsIcon, planned: true },
     ],
   },
 ];
@@ -205,7 +207,14 @@ export function ProductShell({ children }: ProductShellProps) {
                           <ListItemIcon sx={{ minWidth: 34 }}>
                             <Icon color={active ? "primary" : "inherit"} fontSize="small" />
                           </ListItemIcon>
-                          <ListItemText primary={item.label} />
+                          <ListItemText
+                            primary={item.label}
+                            secondary={item.planned ? "Noch nicht implementiert" : undefined}
+                            slotProps={{
+                              primary: { variant: "body2" },
+                              secondary: { variant: "caption" },
+                            }}
+                          />
                         </ListItemButton>
                       );
                     })}
@@ -231,11 +240,23 @@ export function ProductShell({ children }: ProductShellProps) {
               direction={{ xs: "column", sm: "row" }}
               sx={{ alignItems: { sm: "center" }, justifyContent: "space-between", gap: 1.5 }}
             >
-              <Typography color="text.secondary" variant="body2">
-                {currentUserQuery.data
-                  ? `${currentUserQuery.data.displayName} · ${currentUserQuery.data.email}`
-                  : "Nicht angemeldet"}
-              </Typography>
+              <Stack
+                direction="row"
+                sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}
+              >
+                <Typography color="text.secondary" variant="body2">
+                  {currentUserQuery.isPending
+                    ? "Benutzer wird geladen..."
+                    : currentUserQuery.isError
+                      ? "Benutzer konnte nicht geladen werden"
+                      : currentUserQuery.data
+                        ? `${currentUserQuery.data.displayName} · ${currentUserQuery.data.email}`
+                        : "Nicht angemeldet"}
+                </Typography>
+                {currentUserQuery.data?.authProvider === "fake" ? (
+                  <Chip color="info" label="Fake Auth" size="small" variant="outlined" />
+                ) : null}
+              </Stack>
               {currentUserQuery.data ? (
                 <Box component="form" action="/auth/logout" method="post">
                   <Button startIcon={<LogoutIcon />} type="submit" variant="outlined">

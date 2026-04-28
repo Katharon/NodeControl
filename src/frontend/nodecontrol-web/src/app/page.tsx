@@ -1,5 +1,4 @@
-import DashboardIcon from "@mui/icons-material/Dashboard";
-import { Box, Button, Container, Stack, Typography } from "@mui/material";
+import { Box, Container, Stack, Typography } from "@mui/material";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { AppProviders } from "@/lib/app/AppProviders";
 
@@ -18,15 +17,11 @@ export default function Home() {
               Run Ansible workflows safely through a customer-aware control
               plane.
             </Typography>
-            <Stack direction="row" sx={{ flexWrap: "wrap", gap: 2 }}>
+            <Stack sx={{ alignItems: "flex-start", gap: 1 }}>
               <LoginButton />
-              <Button
-                href="/dashboard"
-                startIcon={<DashboardIcon />}
-                variant="outlined"
-              >
-                Dashboard
-              </Button>
+              <Typography color="text.secondary" variant="body2">
+                In der Demo meldest du dich als Dev Admin an.
+              </Typography>
             </Stack>
           </Stack>
         </Container>

@@ -16,7 +16,7 @@ import {
 } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import {
   type CreateCustomerMembershipInput,
@@ -62,6 +62,7 @@ export function MembershipForm({ customerId, existingUserIds, onSubmit }: Member
       role: "Viewer",
     },
   });
+  const selectedUserId = useWatch({ control, name: "userId" });
 
   return (
     <Stack
@@ -88,7 +89,7 @@ export function MembershipForm({ customerId, existingUserIds, onSubmit }: Member
               inputValue={userSearch}
               isOptionEqualToValue={(option, value) => option.id === value.id}
               loading={usersQuery.isPending}
-              noOptionsText="Keine passenden Benutzer gefunden."
+              noOptionsText="Keine bestehenden Plattformbenutzer gefunden."
               onChange={(_, value) => field.onChange(value?.id ?? "")}
               onInputChange={(_, value) => setUserSearch(value)}
               options={options}
@@ -98,10 +99,10 @@ export function MembershipForm({ customerId, existingUserIds, onSubmit }: Member
                   error={Boolean(errors.userId)}
                   helperText={
                     errors.userId?.message ??
-                    "Suche nach E-Mail-Adresse oder Anzeigename."
+                    "Wähle einen bestehenden Plattformbenutzer aus. Benutzerverwaltung und Einladungen folgen später."
                   }
                   inputRef={field.ref}
-                  label="Benutzer"
+                  label="User ID (existing platform user)"
                   slotProps={{
                     input: {
                       ...params.slotProps.input,
@@ -141,8 +142,8 @@ export function MembershipForm({ customerId, existingUserIds, onSubmit }: Member
       ) : null}
       {usersQuery.isSuccess && usersQuery.data.length === 0 ? (
         <Alert severity="info">
-          Es gibt noch keine auswählbaren Benutzer. Benutzerverwaltung und Einladungen
-          folgen in einem späteren Slice.
+          Es gibt noch keine auswählbaren Plattformbenutzer. Aktuell entstehen Benutzer
+          durch Anmeldung; Benutzerverwaltung und Einladungen folgen in einem späteren Slice.
         </Alert>
       ) : null}
       {usersQuery.isSuccess && usersQuery.data.length > 0 && !hasAvailableUsers ? (
@@ -159,7 +160,7 @@ export function MembershipForm({ customerId, existingUserIds, onSubmit }: Member
         ))}
       </TextField>
       <Button
-        disabled={isSubmitting || usersQuery.isPending}
+        disabled={!selectedUserId || isSubmitting || usersQuery.isPending}
         startIcon={<PersonAddIcon />}
         sx={{ alignSelf: "flex-start" }}
         type="submit"
