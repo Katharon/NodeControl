@@ -22,7 +22,7 @@ export function JobRunLogsPanel({ customerId, jobRunId, status }: JobRunLogsPane
   });
 
   return (
-    <Paper sx={{ p: 3 }}>
+    <Paper id="logs" sx={{ p: 3 }}>
       <Stack sx={{ gap: 2 }}>
         <Stack direction={{ xs: "column", sm: "row" }} sx={{ alignItems: { sm: "center" }, justifyContent: "space-between", gap: 1.5 }}>
           <Stack>

@@ -17,6 +17,7 @@ import KeyIcon from "@mui/icons-material/Key";
 import LogoutIcon from "@mui/icons-material/Logout";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import SecurityIcon from "@mui/icons-material/Security";
 import SettingsIcon from "@mui/icons-material/Settings";
@@ -67,6 +68,7 @@ const navigationGroups: NavigationGroup[] = [
     label: "Täglicher Betrieb",
     items: [
       { label: "Dashboard", href: "/dashboard", icon: DashboardIcon },
+      { label: "Ausführungsassistent", href: "/run-wizard", icon: RocketLaunchIcon, scopedSegment: "run-wizard" },
       { label: "Runs", href: "/runs", icon: ReceiptLongIcon, scopedSegment: "runs" },
       { label: "Hosts", href: "/hosts", icon: HubIcon, scopedSegment: "hosts" },
       { label: "Playbooks", href: "/playbooks", icon: ArticleIcon, scopedSegment: "playbooks" },
@@ -119,6 +121,7 @@ const scopedPathBySegment: Record<string, string> = {
   hosts: "hosts",
   inventories: "inventories",
   playbooks: "playbooks",
+  "run-wizard": "run-wizard",
   runs: "runs",
   schedules: "schedules",
   secrets: "secrets",
