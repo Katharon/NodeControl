@@ -42,7 +42,7 @@ import type { SvgIconComponent } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { getMyCustomers } from "@/lib/api/customers";
 import { getCurrentUser } from "@/lib/auth/currentUser";
 
@@ -129,8 +129,14 @@ const scopedPathBySegment: Record<string, string> = {
   variables: "variables",
 };
 
+const noopSubscribe = () => () => {};
+const clientSnapshot = () => true;
+const serverSnapshot = () => false;
+
 export function ProductShell({ children }: ProductShellProps) {
   const pathname = usePathname();
+  const isHydrated = useSyncExternalStore(noopSubscribe, clientSnapshot, serverSnapshot);
+  const clientPathname = isHydrated ? pathname : "";
   const currentUserQuery = useQuery({ queryKey: ["current-user"], queryFn: getCurrentUser });
   const customersQuery = useQuery({ queryKey: ["my-customers"], queryFn: getMyCustomers });
   const singleCustomerId = customersQuery.data?.length === 1 ? customersQuery.data[0]?.id : null;
@@ -145,12 +151,17 @@ export function ProductShell({ children }: ProductShellProps) {
   }
 
   function isActive(item: NavigationItem) {
-    if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
+    if (!clientPathname) {
+      return false;
+    }
+
+    if (clientPathname === item.href || clientPathname.startsWith(`${item.href}/`)) {
       return true;
     }
 
     return item.scopedSegment
-      ? pathname.includes(`/${item.scopedSegment}`) || legacySegmentActive(pathname, item.scopedSegment)
+      ? clientPathname.includes(`/${item.scopedSegment}`) ||
+          legacySegmentActive(clientPathname, item.scopedSegment)
       : false;
   }
 
@@ -213,7 +224,7 @@ export function ProductShell({ children }: ProductShellProps) {
                           </ListItemIcon>
                           <ListItemText
                             primary={item.label}
-                            secondary={item.planned ? "Noch nicht implementiert" : undefined}
+                            secondary={item.planned ? "Geplant" : undefined}
                             slotProps={{
                               primary: { variant: "body2" },
                               secondary: { variant: "caption" },

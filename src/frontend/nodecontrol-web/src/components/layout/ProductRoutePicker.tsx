@@ -4,6 +4,7 @@ import BusinessIcon from "@mui/icons-material/Business";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { Alert, Button, CircularProgress, Paper, Stack, Typography } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
+import { ApiError } from "@/lib/api/apiClient";
 import { getMyCustomers } from "@/lib/api/customers";
 
 type ProductRoutePickerProps = {
@@ -14,14 +15,7 @@ type ProductRoutePickerProps = {
 
 export function ProductRoutePicker({ title, description, customerPath }: ProductRoutePickerProps) {
   const customersQuery = useQuery({ queryKey: ["my-customers"], queryFn: getMyCustomers });
-
-  if (customersQuery.isPending) {
-    return <CircularProgress size={22} />;
-  }
-
-  if (customersQuery.isError) {
-    return <Alert severity="error">Kunden konnten nicht geladen werden.</Alert>;
-  }
+  const unauthorized = customersQuery.error instanceof ApiError && customersQuery.error.status === 401;
 
   return (
     <Stack sx={{ gap: 2 }}>
@@ -32,10 +26,53 @@ export function ProductRoutePicker({ title, description, customerPath }: Product
         <Typography color="text.secondary">{description}</Typography>
       </Stack>
 
-      {customersQuery.data.length === 0 ? (
-        <Alert severity="info">Für deinen Account sind noch keine Kunden verfügbar.</Alert>
-      ) : (
-        <Paper>
+      {customersQuery.isPending ? (
+        <Paper variant="outlined" sx={{ p: 3 }}>
+          <Stack direction="row" sx={{ alignItems: "center", gap: 2 }}>
+            <CircularProgress size={22} />
+            <Typography>Kundenbereiche werden geladen</Typography>
+          </Stack>
+        </Paper>
+      ) : null}
+
+      {customersQuery.isError ? (
+        <Alert
+          action={
+            unauthorized ? (
+              <Button color="inherit" href="/auth/login" size="small">
+                Sign in
+              </Button>
+            ) : (
+              <Button color="inherit" onClick={() => void customersQuery.refetch()} size="small">
+                Erneut laden
+              </Button>
+            )
+          }
+          severity={unauthorized ? "info" : "error"}
+        >
+          {unauthorized
+            ? "Melde dich an, um Kundenbereiche zu öffnen."
+            : "Kundenbereiche konnten nicht geladen werden."}
+        </Alert>
+      ) : null}
+
+      {customersQuery.isSuccess && customersQuery.data.length === 0 ? (
+        <Paper variant="outlined" sx={{ p: 3 }}>
+          <Stack sx={{ gap: 1.5 }}>
+            <Typography component="h2" variant="h6">
+              Kein Kundenbereich verfügbar
+            </Typography>
+            <Typography color="text.secondary">
+              Dieser Bereich ist kundengebunden. Sobald dein Account Zugriff auf einen Kunden hat,
+              erscheint hier der passende Einstieg.
+            </Typography>
+            <Button href="/customers" sx={{ alignSelf: "flex-start" }} variant="outlined">
+              Kunden öffnen
+            </Button>
+          </Stack>
+        </Paper>
+      ) : customersQuery.isSuccess ? (
+        <Paper variant="outlined">
           <Stack>
             {customersQuery.data.map((customer) => (
               <Stack
@@ -71,7 +108,7 @@ export function ProductRoutePicker({ title, description, customerPath }: Product
             ))}
           </Stack>
         </Paper>
-      )}
+      ) : null}
     </Stack>
   );
 }

@@ -77,7 +77,7 @@ export function CustomerDetailsCard({ customerId }: CustomerDetailsCardProps) {
             <Typography color="text.secondary">{customer.slug}</Typography>
             {customer.description ? <Typography>{customer.description}</Typography> : null}
           </Stack>
-          <Stack direction="row" sx={{ gap: 1 }}>
+          <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
             {canViewNodes ? (
               <Button startIcon={<HubIcon />} href={`/customers/${customer.id}/hosts`} variant="outlined">
                 Hosts
