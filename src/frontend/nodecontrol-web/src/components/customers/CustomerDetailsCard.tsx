@@ -1,10 +1,15 @@
 "use client";
 
+import ArticleIcon from "@mui/icons-material/Article";
 import GroupsIcon from "@mui/icons-material/Groups";
+import HealthAndSafetyIcon from "@mui/icons-material/HealthAndSafety";
 import HistoryIcon from "@mui/icons-material/History";
 import HubIcon from "@mui/icons-material/Hub";
+import InventoryIcon from "@mui/icons-material/Inventory";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
 import ScheduleIcon from "@mui/icons-material/Schedule";
+import StorageIcon from "@mui/icons-material/Storage";
 import WorkIcon from "@mui/icons-material/Work";
 import {
   Alert,
@@ -78,9 +83,38 @@ export function CustomerDetailsCard({ customerId }: CustomerDetailsCardProps) {
             {customer.description ? <Typography>{customer.description}</Typography> : null}
           </Stack>
           <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
+            {canViewJobs ? (
+              <Button
+                startIcon={<RocketLaunchIcon />}
+                href={`/customers/${customer.id}/run-wizard`}
+                variant="contained"
+              >
+                Run Wizard
+              </Button>
+            ) : null}
             {canViewNodes ? (
               <Button startIcon={<HubIcon />} href={`/customers/${customer.id}/hosts`} variant="outlined">
                 Hosts
+              </Button>
+            ) : null}
+            {canViewNodes ? (
+              <Button startIcon={<HealthAndSafetyIcon />} href={`/customers/${customer.id}/host-health`} variant="outlined">
+                Hostzustand
+              </Button>
+            ) : null}
+            {canViewNodes ? (
+              <Button startIcon={<InventoryIcon />} href={`/customers/${customer.id}/inventories`} variant="outlined">
+                Inventare
+              </Button>
+            ) : null}
+            {canViewJobs ? (
+              <Button startIcon={<ArticleIcon />} href={`/customers/${customer.id}/playbooks`} variant="outlined">
+                Playbooks
+              </Button>
+            ) : null}
+            {canViewJobs ? (
+              <Button startIcon={<StorageIcon />} href={`/customers/${customer.id}/variables`} variant="outlined">
+                Variablen
               </Button>
             ) : null}
             {canViewJobs ? (

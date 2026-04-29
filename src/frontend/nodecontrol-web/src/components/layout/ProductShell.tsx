@@ -3,26 +3,18 @@
 import AccountTreeIcon from "@mui/icons-material/AccountTree";
 import ArticleIcon from "@mui/icons-material/Article";
 import BusinessIcon from "@mui/icons-material/Business";
-import CloudIcon from "@mui/icons-material/Cloud";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import DnsIcon from "@mui/icons-material/Dns";
-import ExtensionIcon from "@mui/icons-material/Extension";
-import GitHubIcon from "@mui/icons-material/GitHub";
 import GroupsIcon from "@mui/icons-material/Groups";
 import HealthAndSafetyIcon from "@mui/icons-material/HealthAndSafety";
 import HistoryIcon from "@mui/icons-material/History";
 import HubIcon from "@mui/icons-material/Hub";
 import InventoryIcon from "@mui/icons-material/Inventory";
-import KeyIcon from "@mui/icons-material/Key";
 import LogoutIcon from "@mui/icons-material/Logout";
-import NotificationsIcon from "@mui/icons-material/Notifications";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
 import ScheduleIcon from "@mui/icons-material/Schedule";
-import SecurityIcon from "@mui/icons-material/Security";
-import SettingsIcon from "@mui/icons-material/Settings";
 import StorageIcon from "@mui/icons-material/Storage";
-import UploadFileIcon from "@mui/icons-material/UploadFile";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import WorkIcon from "@mui/icons-material/Work";
 import {
@@ -54,7 +46,6 @@ type NavigationItem = {
   label: string;
   href: string;
   icon: SvgIconComponent;
-  planned?: boolean;
   scopedSegment?: string;
 };
 
@@ -65,51 +56,33 @@ type NavigationGroup = {
 
 const navigationGroups: NavigationGroup[] = [
   {
-    label: "Täglicher Betrieb",
+    label: "Showcase Flow",
     items: [
       { label: "Dashboard", href: "/dashboard", icon: DashboardIcon },
+      { label: "Kunden", href: "/customers", icon: BusinessIcon },
       { label: "Ausführungsassistent", href: "/run-wizard", icon: RocketLaunchIcon, scopedSegment: "run-wizard" },
       { label: "Runs", href: "/runs", icon: ReceiptLongIcon, scopedSegment: "runs" },
+      { label: "Audit", href: "/audit", icon: HistoryIcon, scopedSegment: "audit" },
+    ],
+  },
+  {
+    label: "Automation",
+    items: [
       { label: "Hosts", href: "/hosts", icon: HubIcon, scopedSegment: "hosts" },
+      { label: "Hostzustand", href: "/host-health", icon: HealthAndSafetyIcon, scopedSegment: "host-health" },
+      { label: "Inventare", href: "/inventories", icon: InventoryIcon, scopedSegment: "inventories" },
       { label: "Playbooks", href: "/playbooks", icon: ArticleIcon, scopedSegment: "playbooks" },
+      { label: "Variablen", href: "/variables", icon: StorageIcon, scopedSegment: "variables" },
       { label: "Actions", href: "/actions", icon: WorkIcon, scopedSegment: "actions" },
       { label: "Schedules", href: "/schedules", icon: ScheduleIcon, scopedSegment: "schedules" },
     ],
   },
   {
-    label: "Inventar & Assets",
+    label: "Betrieb & Verwaltung",
     items: [
-      { label: "Kunden", href: "/customers", icon: BusinessIcon },
-      { label: "Hostzustand", href: "/host-health", icon: HealthAndSafetyIcon, scopedSegment: "host-health" },
-      { label: "Variablen", href: "/variables", icon: StorageIcon, scopedSegment: "variables" },
-      { label: "Cloud-Provider", href: "/cloud-providers", icon: CloudIcon, planned: true },
-      { label: "Inventare", href: "/inventories", icon: InventoryIcon, scopedSegment: "inventories" },
       { label: "Templates", href: "/templates", icon: AccountTreeIcon, scopedSegment: "templates" },
-    ],
-  },
-  {
-    label: "Onboarding & Quellen",
-    items: [
-      { label: "Git-Repos", href: "/git-repos", icon: GitHubIcon, planned: true },
-      { label: "Collections", href: "/collections", icon: ExtensionIcon, planned: true },
-      { label: "Import", href: "/import", icon: UploadFileIcon, planned: true },
-    ],
-  },
-  {
-    label: "Geheimnisse & Benachrichtigungen",
-    items: [
       { label: "Secrets", href: "/secrets", icon: VpnKeyIcon, scopedSegment: "secrets" },
-      { label: "Benachrichtigungen", href: "/notifications", icon: NotificationsIcon, planned: true },
-    ],
-  },
-  {
-    label: "Administration",
-    items: [
       { label: "Benutzer", href: "/users", icon: GroupsIcon },
-      { label: "Audit", href: "/audit", icon: HistoryIcon, scopedSegment: "audit" },
-      { label: "Master-Key", href: "/master-key", icon: KeyIcon, planned: true },
-      { label: "Sicherheit", href: "/security", icon: SecurityIcon, planned: true },
-      { label: "System", href: "/system", icon: SettingsIcon, planned: true },
     ],
   },
 ];
@@ -224,10 +197,8 @@ export function ProductShell({ children }: ProductShellProps) {
                           </ListItemIcon>
                           <ListItemText
                             primary={item.label}
-                            secondary={item.planned ? "Geplant" : undefined}
                             slotProps={{
                               primary: { variant: "body2" },
-                              secondary: { variant: "caption" },
                             }}
                           />
                         </ListItemButton>
