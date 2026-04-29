@@ -93,7 +93,7 @@ Needs:
 
 ## MVP Scope
 
-The implemented dev/demo MVP currently includes:
+The implemented dev/demo MVP is a customer-scoped automation control plane. It currently includes:
 
 - Fake Auth for local demo and OIDC support in the API
 - Internal user profile creation
@@ -116,6 +116,17 @@ The implemented dev/demo MVP currently includes:
 - Run wizard and Run Center
 - Docker Compose local infrastructure and dev/demo scripts
 
+## Supporting MVP Surfaces
+
+These product areas exist in the current MVP, but their scope is intentionally limited:
+
+- Templates are managed text resources. They are not rendered, uploaded, or wired into Worker execution.
+- Secrets store protected values and expose safe metadata/reference behavior. Secret values are never returned by the
+  API, and runtime secret injection is Post-MVP.
+- Platform admin user overview is a review and administration aid for existing users, not user registration,
+  invitation, password management, or identity-provider administration.
+- The local showcase/bootstrap flow demonstrates real API and Worker paths, but it is not production packaging.
+
 ## Current Boundaries
 
 Current implementation boundaries are intentionally explicit:
@@ -123,29 +134,36 @@ Current implementation boundaries are intentionally explicit:
 - NodeControl is still a control plane around Ansible, not an AWX clone.
 - The API queues work and enforces authorization; it never executes Ansible, SSH, TCP checks, shell commands, or process starts.
 - The Worker executes queued Runs, polls schedules, processes Hostzustand checks, creates workspaces, and captures logs.
-- Templates are not rendered or uploaded during execution.
-- Secret values are protected and never returned, but they are not decrypted into Worker execution yet.
-- Git-backed playbooks, artifact-directory playbooks, notifications, approval workflow, and production deployment packaging remain post-MVP.
+- Git-backed playbooks, artifact-directory playbooks, imports, Ansible Collections management, cloud-provider inventory,
+  notifications, approval workflow, advanced secret runtime integration, and production deployment packaging remain Post-MVP.
 - `deploy/` is local dev/demo guidance only at this point.
+
+For the explicit implemented/supporting/deferred split, see `docs/MVP_BOUNDARY.md`.
 
 ## Post-MVP Scope
 
-Later features may include:
+Post-MVP work is directional, not a hidden product promise. Likely expansion paths include:
 
+- Production configuration and deployment hardening
+- Basic operational health/version visibility
+- Stronger Worker edge-case coverage and operational recovery behavior
+- Secret runtime integration and key lifecycle work
+- Git-backed playbooks and artifact-directory playbooks
+- Import workflows for existing inventories or automation definitions
+- Ansible Collections dependency tracking
+- Notification integrations
+- Cloud-provider integrations as inventory sources
+- Broader system and security administration surfaces
+- Approval workflow
+- Multi-control-node dispatching
 - SAML
 - OIDC provider per customer
-- Approval workflow
-- Git-backed playbooks
-- Artifact-directory playbooks
-- Secret vault integration
-- Notification integrations
 - Live log streaming
 - Role customization
 - Policy engine
 - Licensing
 - Billing
-- Kubernetes deployment
-- Multi-control-node dispatching
+- Kubernetes/Helm only if explicitly chosen later
 - Plugin system
 
 ## Explicit Non-Goals for MVP

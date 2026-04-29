@@ -5,7 +5,7 @@ export default function NotificationsPage() {
   return (
     <AppPage>
       <PlaceholderProductPage
-        description="Benachrichtigungen werden später über Run-Ergebnisse, Fehler und wichtige Systemereignisse informieren."
+        description="Benachrichtigungen bleiben Post-MVP. Aktuell sind Run Center, Logs und Audit die primären Nachvollziehbarkeitsflächen."
         title="Benachrichtigungen"
       />
     </AppPage>

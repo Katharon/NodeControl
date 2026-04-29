@@ -5,7 +5,7 @@ export default function GitReposPage() {
   return (
     <AppPage>
       <PlaceholderProductPage
-        description="Git-Repos sind für spätere playbook- und artifact-basierte Workflows vorgesehen."
+        description="Git-Repos gehören zu späteren playbook- und artifact-basierten Workflows. Der MVP verwendet bewusst Inline-Playbooks."
         title="Git-Repos"
       />
     </AppPage>

@@ -27,7 +27,8 @@ The main value proposition is:
 
 ## Current Capabilities
 
-NodeControl is implemented as a working dev/demo product, not just a skeleton. Current capabilities include:
+NodeControl is implemented as a working dev/demo product, not just a skeleton. The current MVP is a
+customer-scoped automation control plane with a complete local demo loop. Current capabilities include:
 
 - Customer management
 - User profiles, Fake Auth/OIDC authentication, and customer memberships
@@ -49,12 +50,22 @@ NodeControl is implemented as a working dev/demo product, not just a skeleton. C
 - Run wizard and Run Center demo flow
 - Docker-based local dev infrastructure and shell scripts for bootstrap
 
+Supporting MVP surfaces have intentionally narrow scope:
+
+- Templates are managed text resources only; they are not rendered, uploaded, or connected to execution.
+- Secrets expose protected metadata and safe `secret://...` references only; secret values are not returned or
+  decrypted into Worker execution yet.
+- The platform admin user overview is not a full identity-provider administration system.
+
 Important current boundaries:
 
 - The API never executes Ansible, shell commands, SSH checks, or TCP checks.
 - `NodeControl.Worker` is responsible for queued Run execution, schedule polling, host connection checks, workspaces, logs, and Ansible process execution.
-- Templates and Secrets are not rendered, decrypted into runs, or wired into Ansible execution yet.
 - `deploy/` is dev/demo guidance only; production packaging is not complete.
+- Git-backed playbooks, artifact-directory playbooks, imports, cloud integrations, notifications, advanced secret
+  runtime integration, and broader system/security administration are Post-MVP directions.
+
+See `docs/MVP_BOUNDARY.md` for the explicit current-vs-Post-MVP boundary.
 
 ## Target Users
 
@@ -135,7 +146,7 @@ Frontend:
 Deployment:
 
 - Docker Compose for local dev/demo infrastructure
-- Kubernetes may be added later only if needed
+- Production packaging is Post-MVP; Kubernetes/Helm are not part of the MVP
 
 ## Local Dev/Demo Quick Start
 

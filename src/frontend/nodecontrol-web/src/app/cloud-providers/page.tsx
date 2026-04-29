@@ -5,7 +5,7 @@ export default function CloudProvidersPage() {
   return (
     <AppPage>
       <PlaceholderProductPage
-        description="Cloud-Provider werden später als Quelle für Hosts und Inventardaten angebunden."
+        description="Cloud-Provider sind als spätere Inventarquellen denkbar. Im MVP werden Hosts und Inventare bewusst direkt in NodeControl gepflegt."
         title="Cloud-Provider"
       />
     </AppPage>

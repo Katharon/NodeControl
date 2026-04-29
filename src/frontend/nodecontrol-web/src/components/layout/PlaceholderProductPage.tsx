@@ -11,8 +11,8 @@ type PlaceholderProductPageProps = {
 export function PlaceholderProductPage({
   title,
   description,
-  currentBoundary = "Der aktuelle MVP konzentriert sich auf Kunden, Hosts, Inventare, Playbooks, Variablen, Actions, Runs, Schedules, Secrets, Templates und Audit.",
-  scopeNote = "Diese Route bleibt erreichbar, ist aber bewusst nicht Teil der primären Demo-Navigation.",
+  currentBoundary = "Der aktuelle MVP umfasst Kunden, Benutzer/Mitgliedschaften, Hosts, Hostzustand, Inventare, Playbooks, Variablen, Actions, Runs, Logs, Schedules, Secrets, Templates und Audit.",
+  scopeNote = "Diese Route ist bewusst als Post-MVP-Fläche sichtbar, damit die Produktgrenze transparent bleibt.",
 }: PlaceholderProductPageProps) {
   return (
     <Stack sx={{ gap: 2 }}>

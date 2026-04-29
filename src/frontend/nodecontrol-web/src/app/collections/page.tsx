@@ -5,7 +5,7 @@ export default function CollectionsPage() {
   return (
     <AppPage>
       <PlaceholderProductPage
-        description="Collections werden später helfen, externe Ansible-Abhängigkeiten nachvollziehbar zu verwalten."
+        description="Collections bleiben Post-MVP. Der aktuelle Fokus liegt auf kontrollierten Inline-Playbooks und nachvollziehbaren Runs."
         title="Collections"
       />
     </AppPage>

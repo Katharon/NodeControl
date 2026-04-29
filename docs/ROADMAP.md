@@ -6,8 +6,12 @@ NodeControl has moved beyond the initial skeleton. The repository now contains a
 Next.js frontend, EF Core migrations, integration/unit tests, Docker development infrastructure, and local
 dev/demo bootstrap scripts.
 
-The current product is credible for a local demo and portfolio review, but it is not a production deployment
-package yet.
+The current product is a hardened dev/demo MVP: a customer-scoped Ansible control plane with users,
+memberships, hosts, inventories, playbooks, variable sets, Actions, Runs, logs, schedules, Hostzustand,
+secrets/templates metadata surfaces, audit, and an Acme showcase flow. It is credible for a local demo and
+portfolio review, but it is not a production deployment package yet.
+
+The explicit current/supporting/Post-MVP boundary is maintained in `docs/MVP_BOUNDARY.md`.
 
 ## Delivered Slice Themes
 
@@ -55,11 +59,20 @@ package yet.
 
 - Dashboard and customer-aware navigation
 - Run wizard
-- Planned placeholder pages for post-MVP surfaces
+- Planned placeholder pages that clearly mark Post-MVP surfaces
 - Frontend shell stabilization
 - Local scripts for infrastructure, migrations, API, Worker, frontend, and smoke checks
 - API-driven Acme showcase seed flow for hosts, inventory, playbook, variables, action, paused schedule, and optional queued Run
 - Minimal `deploy/` notes that clearly avoid claiming production readiness
+
+### MVP Hardening
+
+- Explicit permission checks for sensitive operations
+- Customer-scoped lookup patterns for list/detail/action flows
+- Secret metadata responses without raw secret values
+- Lightweight response-time redaction for obvious sensitive log/error patterns
+- Confirmation guardrails for cancel, retry, archive, pause/resume, and secret archive flows
+- Clearer forbidden/not-found messaging in core user-facing areas
 
 ## Current Architecture Boundaries
 
@@ -69,33 +82,46 @@ package yet.
 - Schedules use a database-backed Worker poller. Quartz.NET is not part of the current implementation.
 - Templates are not rendered or connected to Worker execution yet.
 - Secret values are not returned through the API and are not decrypted into execution yet.
-- Git-backed and artifact-directory playbooks remain post-MVP.
+- Git-backed and artifact-directory playbooks remain Post-MVP.
 
-## Next Useful Slices
+## Near-Term Expansion Paths
 
-Good next slices should stay small and visible:
+Good next slices should stay small, visible, and aligned with the control-plane boundary:
 
-- Screenshots or a short demo guide for reviewers
-- More focused frontend tests around shell, run wizard, and critical empty states
+- Screenshots or a short reviewer demo guide
+- More focused frontend tests around shell, run wizard, permissions, and critical empty states
 - Production configuration documentation and deployment hardening
 - Basic operational health endpoint and version display
 - More Worker test coverage for edge cases around cancellation, timeouts, and host checks
+- Secret runtime integration design before any execution-time decryption work
+- Git/artifact playbook design before adding repository-backed execution
 
-## Post-MVP Features
+These are likely next steps, not commitments. Each should be delivered as a vertical slice with authorization,
+customer scoping, tests, and documentation.
 
-Potential later features:
+## Deferred Post-MVP Areas
 
-- OIDC provider configuration per customer
-- SAML
-- Approval workflow
+These areas are intentionally outside the current MVP and should not be treated as partially implemented just
+because some placeholder routes or docs mention them:
+
 - Git-backed playbooks
 - Artifact-directory playbooks
+- Ansible Collections dependency management
+- Import workflows
+- Cloud-provider inventory integrations
 - Notifications
-- Secret vault integration
+- Advanced secret/key lifecycle and external secret-vault integration
+- Broader security and system administration surfaces
+- Approval workflow
 - Live log streaming
+- OIDC provider configuration per customer
+- SAML
 - Dynamic role editor
 - Policy engine
 - Multi-control-node dispatching
 - Production Docker Compose packaging
 - Kubernetes/Helm only if explicitly needed later
 - Billing/licensing
+
+Exploratory or business-model ideas such as plugin systems, marketplace behavior, licensing, and billing should
+remain deferred until the core self-hosted operations story is mature.

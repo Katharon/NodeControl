@@ -5,7 +5,7 @@ export default function MasterKeyPage() {
   return (
     <AppPage>
       <PlaceholderProductPage
-        description="Master-Key-Verwaltung ist für spätere Betriebs- und Wiederherstellungsprozesse rund um geschützte Werte vorgesehen."
+        description="Master-Key-Verwaltung ist eine spätere Betriebs- und Wiederherstellungsfläche. Im MVP bleiben Secrets auf geschützte Werte, Rotation und sichere Referenzen begrenzt."
         title="Master-Key"
       />
     </AppPage>

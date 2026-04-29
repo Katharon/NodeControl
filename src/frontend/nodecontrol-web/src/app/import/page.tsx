@@ -5,7 +5,7 @@ export default function ImportPage() {
   return (
     <AppPage>
       <PlaceholderProductPage
-        description="Import wird später bestehende Hosts, Inventare und Automationsdefinitionen kontrolliert übernehmen."
+        description="Import bleibt Post-MVP. Der MVP hält die Datenanlage bewusst explizit, kundenbezogen und auditierbar."
         title="Import"
       />
     </AppPage>

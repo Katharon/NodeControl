@@ -5,7 +5,7 @@ export default function SecurityPage() {
   return (
     <AppPage>
       <PlaceholderProductPage
-        description="Sicherheit bündelt später Härtung, Auth-Konfiguration und sicherheitsrelevante Betriebseinstellungen."
+        description="Sicherheit bündelt später weitergehende Härtung und Auth-Konfiguration. Der MVP setzt bereits auf OIDC-Fähigkeit, interne Berechtigungen und kundenbezogene Prüfungen."
         title="Sicherheit"
       />
     </AppPage>
