@@ -6,6 +6,7 @@ using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Playbooks;
+using NodeControl.Domain.Templates;
 using NodeControl.Domain.VariableSets;
 
 namespace NodeControl.Application.JobRuns;
@@ -26,13 +27,16 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
         IReadOnlyList<ManagedNode> managedNodes,
         Playbook playbook,
         VariableSet? variableSet,
+        IReadOnlyList<JobRunTemplateArtifact> templateArtifacts,
+        IReadOnlyDictionary<string, string> secretValuesBySlug,
         CancellationToken cancellationToken = default)
     {
         if (job.CustomerId != jobRun.CustomerId
             || controlNode.CustomerId != jobRun.CustomerId
             || inventoryGroup.CustomerId != jobRun.CustomerId
             || playbook.CustomerId != jobRun.CustomerId
-            || variableSet is not null && variableSet.CustomerId != jobRun.CustomerId)
+            || variableSet is not null && variableSet.CustomerId != jobRun.CustomerId
+            || templateArtifacts.Any(templateArtifact => templateArtifact.Template.CustomerId != jobRun.CustomerId))
         {
             return JobRunWorkspaceBuildResult.Failed("JobRun references resources outside its customer.");
         }
@@ -83,7 +87,10 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
         Directory.CreateDirectory(playbookDirectory);
 
         await File.WriteAllTextAsync(inventoryPath, BuildInventoryYaml(inventoryGroup, managedNodes), cancellationToken);
-        await File.WriteAllTextAsync(variablePath, variableSet is null ? "{}" : variableSet.Content, cancellationToken);
+        await File.WriteAllTextAsync(
+            variablePath,
+            variableSet is null ? "{}" : ResolveSecretReferences(variableSet.Content, secretValuesBySlug),
+            cancellationToken);
 
         if (playbook.SourceType == PlaybookSourceType.InlineYaml)
         {
@@ -101,6 +108,12 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
             playbookFileName = artifactResult.PlaybookFileName!;
         }
 
+        var templateResult = await WriteTemplateArtifactsAsync(templateArtifacts, playbookDirectory, secretValuesBySlug, cancellationToken);
+        if (!templateResult.Succeeded)
+        {
+            return JobRunWorkspaceBuildResult.Failed(templateResult.ErrorMessage ?? "Template artifacts could not be materialized.");
+        }
+
         await File.WriteAllTextAsync(stdoutLogPath, string.Empty, cancellationToken);
         await File.WriteAllTextAsync(stderrLogPath, string.Empty, cancellationToken);
 
@@ -113,6 +126,75 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
             playbookFileName,
             stdoutLogPath,
             stderrLogPath));
+    }
+
+    private async Task<ArtifactPlaybookWriteResult> WriteTemplateArtifactsAsync(
+        IReadOnlyList<JobRunTemplateArtifact> templateArtifacts,
+        string playbookDirectory,
+        IReadOnlyDictionary<string, string> secretValuesBySlug,
+        CancellationToken cancellationToken)
+    {
+        if (templateArtifacts.Count == 0)
+        {
+            return ArtifactPlaybookWriteResult.Ok(string.Empty, string.Empty);
+        }
+
+        var playbookRoot = Path.GetFullPath(playbookDirectory);
+        var seenPaths = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var templateArtifact in templateArtifacts)
+        {
+            string relativePath;
+            try
+            {
+                relativePath = NormalizeArtifactPath(templateArtifact.Path);
+            }
+            catch (ArgumentException exception)
+            {
+                return ArtifactPlaybookWriteResult.Failed(exception.Message);
+            }
+
+            if (!seenPaths.Add(relativePath))
+            {
+                return ArtifactPlaybookWriteResult.Failed("Template artifact path is duplicated.");
+            }
+
+            if (templateArtifact.Template.Status != TemplateStatus.Active)
+            {
+                return ArtifactPlaybookWriteResult.Failed("Template artifact references an unavailable template.");
+            }
+
+            var absolutePath = Path.GetFullPath(Path.Combine(playbookRoot, relativePath));
+            if (!absolutePath.StartsWith(playbookRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            {
+                return ArtifactPlaybookWriteResult.Failed("Template artifact path is invalid.");
+            }
+
+            if (File.Exists(absolutePath))
+            {
+                return ArtifactPlaybookWriteResult.Failed("Template artifact path conflicts with an existing playbook file.");
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(absolutePath)!);
+            await File.WriteAllTextAsync(
+                absolutePath,
+                ResolveSecretReferences(templateArtifact.Template.Content, secretValuesBySlug),
+                cancellationToken);
+        }
+
+        return ArtifactPlaybookWriteResult.Ok(string.Empty, string.Empty);
+    }
+
+    private static string ResolveSecretReferences(
+        string content,
+        IReadOnlyDictionary<string, string> secretValuesBySlug)
+    {
+        var resolved = content;
+        foreach (var (slug, value) in secretValuesBySlug)
+        {
+            resolved = resolved.Replace($"secret://{slug}", value, StringComparison.Ordinal);
+        }
+
+        return resolved;
     }
 
     private async Task<ArtifactPlaybookWriteResult> WriteArtifactFilesAsync(

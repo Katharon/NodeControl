@@ -13,11 +13,17 @@ export type Job = {
   inventoryGroupId: string;
   playbookId: string;
   variableSetId: string | null;
+  templateArtifacts: JobTemplateArtifact[];
   status: JobStatus;
   defaultTimeoutSeconds: number;
   createdAt: string;
   updatedAt: string | null;
   archivedAt: string | null;
+};
+
+export type JobTemplateArtifact = {
+  templateId: string;
+  path: string;
 };
 
 export type JobInput = {
@@ -29,6 +35,7 @@ export type JobInput = {
   playbookId: string;
   variableSetId?: string | null;
   defaultTimeoutSeconds: number;
+  templateArtifacts?: JobTemplateArtifact[];
 };
 
 export function getJobs(customerId: string) {

@@ -2,6 +2,7 @@ using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Playbooks;
+using NodeControl.Domain.Templates;
 using NodeControl.Domain.VariableSets;
 
 namespace NodeControl.Application.Abstractions.Execution;
@@ -16,8 +17,14 @@ public interface IJobRunWorkspaceBuilder
         IReadOnlyList<ManagedNode> managedNodes,
         Playbook playbook,
         VariableSet? variableSet,
+        IReadOnlyList<JobRunTemplateArtifact> templateArtifacts,
+        IReadOnlyDictionary<string, string> secretValuesBySlug,
         CancellationToken cancellationToken = default);
 }
+
+public sealed record JobRunTemplateArtifact(
+    Template Template,
+    string Path);
 
 public sealed record JobRunWorkspace(
     string WorkspacePath,

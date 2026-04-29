@@ -10,6 +10,7 @@ import { getControlNodes } from "@/lib/api/controlNodes";
 import { getInventoryGroups } from "@/lib/api/inventoryGroups";
 import type { Job, JobInput } from "@/lib/api/jobs";
 import { getPlaybooks } from "@/lib/api/playbooks";
+import { getTemplates } from "@/lib/api/templates";
 import { getVariableSets } from "@/lib/api/variableSets";
 
 const slugPattern = /^[a-z0-9][a-z0-9-]{1,99}$/;
@@ -22,6 +23,8 @@ const jobSchema = z.object({
   inventoryGroupId: z.string().uuid(),
   playbookId: z.string().uuid(),
   variableSetId: z.string(),
+  templateArtifactTemplateId: z.string(),
+  templateArtifactPath: z.string().trim().max(500).optional(),
   defaultTimeoutSeconds: z.number().int().min(30).max(86400),
 });
 
@@ -39,6 +42,7 @@ export function JobForm({ customerId, job, submitLabel, onSubmit }: JobFormProps
   const inventoryGroupsQuery = useQuery({ queryKey: ["inventory-groups", customerId], queryFn: () => getInventoryGroups(customerId) });
   const playbooksQuery = useQuery({ queryKey: ["playbooks", customerId], queryFn: () => getPlaybooks(customerId) });
   const variableSetsQuery = useQuery({ queryKey: ["variable-sets", customerId], queryFn: () => getVariableSets(customerId) });
+  const templatesQuery = useQuery({ queryKey: ["templates", customerId], queryFn: () => getTemplates(customerId) });
   const {
     formState: { errors, isSubmitting },
     handleSubmit,
@@ -53,15 +57,17 @@ export function JobForm({ customerId, job, submitLabel, onSubmit }: JobFormProps
       inventoryGroupId: job?.inventoryGroupId ?? "",
       playbookId: job?.playbookId ?? "",
       variableSetId: job?.variableSetId ?? "",
+      templateArtifactTemplateId: job?.templateArtifacts[0]?.templateId ?? "",
+      templateArtifactPath: job?.templateArtifacts[0]?.path ?? "",
       defaultTimeoutSeconds: job?.defaultTimeoutSeconds ?? 1800,
     },
   });
 
-  if (controlNodesQuery.isPending || inventoryGroupsQuery.isPending || playbooksQuery.isPending || variableSetsQuery.isPending) {
+  if (controlNodesQuery.isPending || inventoryGroupsQuery.isPending || playbooksQuery.isPending || variableSetsQuery.isPending || templatesQuery.isPending) {
     return <CircularProgress size={22} />;
   }
 
-  if (controlNodesQuery.isError || inventoryGroupsQuery.isError || playbooksQuery.isError || variableSetsQuery.isError) {
+  if (controlNodesQuery.isError || inventoryGroupsQuery.isError || playbooksQuery.isError || variableSetsQuery.isError || templatesQuery.isError) {
     return <Alert severity="error">Action-Formulardaten konnten nicht geladen werden.</Alert>;
   }
 
@@ -78,6 +84,9 @@ export function JobForm({ customerId, job, submitLabel, onSubmit }: JobFormProps
           playbookId: values.playbookId,
           variableSetId: values.variableSetId || null,
           defaultTimeoutSeconds: values.defaultTimeoutSeconds,
+          templateArtifacts: values.templateArtifactTemplateId && values.templateArtifactPath
+            ? [{ templateId: values.templateArtifactTemplateId, path: values.templateArtifactPath }]
+            : [],
         }),
       )}
       sx={{ gap: 2 }}
@@ -98,6 +107,16 @@ export function JobForm({ customerId, job, submitLabel, onSubmit }: JobFormProps
         <MenuItem value="">None</MenuItem>
         {variableSetsQuery.data.map((variableSet) => <MenuItem key={variableSet.id} value={variableSet.id}>{variableSet.name}</MenuItem>)}
       </TextField>
+      <TextField label="Template Artifact" select {...register("templateArtifactTemplateId")}>
+        <MenuItem value="">None</MenuItem>
+        {templatesQuery.data.map((template) => <MenuItem key={template.id} value={template.id}>{template.name}</MenuItem>)}
+      </TextField>
+      <TextField
+        error={Boolean(errors.templateArtifactPath)}
+        helperText={errors.templateArtifactPath?.message}
+        label="Template Artifact Path"
+        {...register("templateArtifactPath")}
+      />
       <TextField
         error={Boolean(errors.defaultTimeoutSeconds)}
         helperText={errors.defaultTimeoutSeconds?.message}

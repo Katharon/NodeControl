@@ -11,6 +11,7 @@ using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Playbooks;
+using NodeControl.Domain.Templates;
 using NodeControl.Domain.VariableSets;
 
 namespace NodeControl.Application.Jobs;
@@ -71,7 +72,13 @@ public sealed class JobService(
             return CustomerServiceResult<JobDto>.Conflict();
         }
 
-        if (!await ReferencesAreActiveAsync(customerId, request.ControlNodeId, request.InventoryGroupId, request.PlaybookId, request.VariableSetId, cancellationToken))
+        var templateArtifacts = NormalizeTemplateArtifacts(request.TemplateArtifacts);
+        if (templateArtifacts is null)
+        {
+            return CustomerServiceResult<JobDto>.BadRequest();
+        }
+
+        if (!await ReferencesAreActiveAsync(customerId, request.ControlNodeId, request.InventoryGroupId, request.PlaybookId, request.VariableSetId, templateArtifacts, cancellationToken))
         {
             return CustomerServiceResult<JobDto>.BadRequest();
         }
@@ -88,7 +95,8 @@ public sealed class JobService(
                 request.PlaybookId,
                 request.VariableSetId,
                 request.DefaultTimeoutSeconds,
-                clock.UtcNow);
+                clock.UtcNow,
+                SerializeTemplateArtifacts(templateArtifacts));
 
             dbContext.AddJob(job);
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -127,7 +135,13 @@ public sealed class JobService(
             return CustomerServiceResult<JobDto>.Conflict();
         }
 
-        if (!await ReferencesAreActiveAsync(customerId, request.ControlNodeId, request.InventoryGroupId, request.PlaybookId, request.VariableSetId, cancellationToken))
+        var templateArtifacts = NormalizeTemplateArtifacts(request.TemplateArtifacts);
+        if (templateArtifacts is null)
+        {
+            return CustomerServiceResult<JobDto>.BadRequest();
+        }
+
+        if (!await ReferencesAreActiveAsync(customerId, request.ControlNodeId, request.InventoryGroupId, request.PlaybookId, request.VariableSetId, templateArtifacts, cancellationToken))
         {
             return CustomerServiceResult<JobDto>.BadRequest();
         }
@@ -143,7 +157,8 @@ public sealed class JobService(
                 request.PlaybookId,
                 request.VariableSetId,
                 request.DefaultTimeoutSeconds,
-                clock.UtcNow);
+                clock.UtcNow,
+                SerializeTemplateArtifacts(templateArtifacts));
             await dbContext.SaveChangesAsync(cancellationToken);
             await WriteJobAuditAsync(currentUser, job, "job.updated", $"Job '{job.Name}' was updated.", cancellationToken);
 
@@ -213,6 +228,7 @@ public sealed class JobService(
         Guid inventoryGroupId,
         Guid playbookId,
         Guid? variableSetId,
+        IReadOnlyList<JobTemplateArtifactDto> templateArtifacts,
         CancellationToken cancellationToken)
     {
         var controlNode = await dbContext.FindControlNodeAsync(customerId, controlNodeId, cancellationToken);
@@ -242,6 +258,15 @@ public sealed class JobService(
             }
         }
 
+        foreach (var templateArtifact in templateArtifacts)
+        {
+            var template = await dbContext.FindTemplateAsync(customerId, templateArtifact.TemplateId, cancellationToken);
+            if (template?.Status != TemplateStatus.Active)
+            {
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -266,10 +291,85 @@ public sealed class JobService(
             job.InventoryGroupId,
             job.PlaybookId,
             job.VariableSetId,
+            DeserializeTemplateArtifacts(job.TemplateArtifactsJson),
             job.Status,
             job.DefaultTimeoutSeconds,
             job.CreatedAt,
             job.UpdatedAt,
             job.ArchivedAt);
+    }
+
+    private static IReadOnlyList<JobTemplateArtifactDto>? NormalizeTemplateArtifacts(
+        IReadOnlyList<JobTemplateArtifactDto>? templateArtifacts)
+    {
+        if (templateArtifacts is null || templateArtifacts.Count == 0)
+        {
+            return [];
+        }
+
+        if (templateArtifacts.Count > 20)
+        {
+            return null;
+        }
+
+        var normalized = new List<JobTemplateArtifactDto>(templateArtifacts.Count);
+        foreach (var templateArtifact in templateArtifacts)
+        {
+            if (templateArtifact.TemplateId == Guid.Empty)
+            {
+                return null;
+            }
+
+            if (!TryNormalizeTemplateArtifactPath(templateArtifact.Path, out var path))
+            {
+                return null;
+            }
+
+            normalized.Add(new JobTemplateArtifactDto(templateArtifact.TemplateId, path));
+        }
+
+        return normalized
+            .GroupBy(artifact => artifact.Path, StringComparer.Ordinal)
+            .Any(group => group.Count() > 1)
+            ? null
+            : normalized;
+    }
+
+    private static bool TryNormalizeTemplateArtifactPath(string? path, out string normalized)
+    {
+        normalized = string.Empty;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        normalized = path.Trim().Replace('\\', '/');
+        if (normalized.Length > 500
+            || normalized.StartsWith("/", StringComparison.Ordinal)
+            || normalized.EndsWith("/", StringComparison.Ordinal)
+            || Path.IsPathRooted(normalized)
+            || normalized.Split('/').Any(part => string.IsNullOrWhiteSpace(part) || part == "." || part == ".."))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static string? SerializeTemplateArtifacts(IReadOnlyList<JobTemplateArtifactDto> templateArtifacts)
+    {
+        return templateArtifacts.Count == 0
+            ? null
+            : JsonSerializer.Serialize(templateArtifacts);
+    }
+
+    internal static IReadOnlyList<JobTemplateArtifactDto> DeserializeTemplateArtifacts(string? templateArtifactsJson)
+    {
+        if (string.IsNullOrWhiteSpace(templateArtifactsJson))
+        {
+            return [];
+        }
+
+        return NormalizeTemplateArtifacts(JsonSerializer.Deserialize<IReadOnlyList<JobTemplateArtifactDto>>(templateArtifactsJson)) ?? [];
     }
 }

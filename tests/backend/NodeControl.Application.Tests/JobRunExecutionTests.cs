@@ -2,13 +2,17 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NodeControl.Application.Abstractions.Execution;
 using NodeControl.Application.Abstractions.Persistence;
+using NodeControl.Application.Abstractions.Security;
 using NodeControl.Application.Abstractions.Time;
 using NodeControl.Application.JobRuns;
+using NodeControl.Application.Secrets;
 using NodeControl.Domain.Customers;
 using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Playbooks;
+using NodeControl.Domain.Secrets;
+using NodeControl.Domain.Templates;
 using NodeControl.Domain.Users;
 using NodeControl.Domain.VariableSets;
 using NodeControl.Worker.JobRuns;
@@ -17,6 +21,9 @@ namespace NodeControl.Application.Tests;
 
 public sealed class JobRunExecutionTests
 {
+    private static readonly IReadOnlyDictionary<string, string> EmptySecrets =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
     [Fact]
     public async Task JobRunWorkspaceBuilder_creates_workspace_for_job_run()
     {
@@ -28,7 +35,9 @@ public sealed class JobRunExecutionTests
             fixture.InventoryGroup,
             [fixture.ManagedNode],
             fixture.Playbook,
-            fixture.VariableSet);
+            fixture.VariableSet,
+            [],
+            EmptySecrets);
 
         Assert.True(result.Succeeded);
         Assert.True(Directory.Exists(result.Workspace!.WorkspacePath));
@@ -47,7 +56,9 @@ public sealed class JobRunExecutionTests
             fixture.InventoryGroup,
             [fixture.ManagedNode],
             fixture.Playbook,
-            fixture.VariableSet);
+            fixture.VariableSet,
+            [],
+            EmptySecrets);
 
         var inventory = await File.ReadAllTextAsync(result.Workspace!.InventoryPath);
         Assert.Contains("web:", inventory);
@@ -68,7 +79,9 @@ public sealed class JobRunExecutionTests
             fixture.InventoryGroup,
             [fixture.ManagedNode],
             fixture.Playbook,
-            fixture.VariableSet);
+            fixture.VariableSet,
+            [],
+            EmptySecrets);
 
         Assert.Equal("vars.yml", result.Workspace!.VariableFileName);
         Assert.Equal("app_name: nodecontrol\n", await File.ReadAllTextAsync(result.Workspace.VariablePath));
@@ -86,7 +99,9 @@ public sealed class JobRunExecutionTests
             fixture.InventoryGroup,
             [fixture.ManagedNode],
             fixture.Playbook,
-            fixture.VariableSet);
+            fixture.VariableSet,
+            [],
+            EmptySecrets);
 
         Assert.Equal("vars.json", result.Workspace!.VariableFileName);
         Assert.Equal("{\"appName\":\"nodecontrol\"}", await File.ReadAllTextAsync(result.Workspace.VariablePath));
@@ -104,7 +119,9 @@ public sealed class JobRunExecutionTests
             fixture.InventoryGroup,
             [fixture.ManagedNode],
             fixture.Playbook,
-            null);
+            null,
+            [],
+            EmptySecrets);
 
         Assert.Equal("vars.yml", result.Workspace!.VariableFileName);
         Assert.Equal("{}", await File.ReadAllTextAsync(result.Workspace.VariablePath));
@@ -122,7 +139,9 @@ public sealed class JobRunExecutionTests
             fixture.InventoryGroup,
             [fixture.ManagedNode],
             fixture.Playbook,
-            fixture.VariableSet);
+            fixture.VariableSet,
+            [],
+            EmptySecrets);
 
         Assert.Equal(fixture.Playbook.InlineContent, await File.ReadAllTextAsync(result.Workspace!.PlaybookPath));
         Assert.Equal("playbook/site.yml", result.Workspace.PlaybookFileName);
@@ -140,7 +159,9 @@ public sealed class JobRunExecutionTests
             fixture.InventoryGroup,
             [fixture.ManagedNode],
             fixture.Playbook,
-            fixture.VariableSet);
+            fixture.VariableSet,
+            [],
+            EmptySecrets);
 
         Assert.True(result.Succeeded);
         Assert.Equal("playbook/site.yml", result.Workspace!.PlaybookFileName);
@@ -148,6 +169,69 @@ public sealed class JobRunExecutionTests
             "- hosts: all\n  roles:\n    - app\n",
             await File.ReadAllTextAsync(result.Workspace.PlaybookPath));
         Assert.True(File.Exists(Path.Combine(result.Workspace.WorkspacePath, "playbook", "roles", "app", "tasks", "main.yml")));
+    }
+
+    [Fact]
+    public async Task JobRunWorkspaceBuilder_materializes_template_artifacts_and_secret_references()
+    {
+        using var fixture = ExecutionFixture.Create();
+        var template = Template.Create(
+            fixture.Customer.Id,
+            "App config",
+            "app-config",
+            null,
+            TemplateType.ConfigFile,
+            "token=secret://api-token\n",
+            "ini",
+            TestTime);
+
+        var result = await fixture.CreateWorkspaceBuilder().BuildAsync(
+            fixture.JobRun,
+            fixture.Job,
+            fixture.ControlNode,
+            fixture.InventoryGroup,
+            [fixture.ManagedNode],
+            fixture.Playbook,
+            fixture.VariableSet,
+            [new JobRunTemplateArtifact(template, "templates/app.conf")],
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["api-token"] = "resolved-secret-value"
+            });
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(
+            "token=resolved-secret-value\n",
+            await File.ReadAllTextAsync(Path.Combine(result.Workspace!.WorkspacePath, "playbook", "templates", "app.conf")));
+    }
+
+    [Fact]
+    public async Task JobRunExecutionService_resolves_secret_references_only_during_worker_materialization_and_redacts_logs()
+    {
+        using var fixture = ExecutionFixture.Create(
+            variableContent: "api_token: secret://api-token\n",
+            templateArtifactPath: "templates/app.conf",
+            templateContent: "token=secret://api-token\n",
+            protectedSecretValue: "protected:resolved-secret-value");
+        var service = fixture.CreateExecutionService(new FakeAnsibleRunner(
+            request =>
+            {
+                Assert.Equal(
+                    "api_token: resolved-secret-value\n",
+                    File.ReadAllText(Path.Combine(request.WorkspacePath, request.VariableFileName)));
+                Assert.Equal(
+                    "token=resolved-secret-value\n",
+                    File.ReadAllText(Path.Combine(request.WorkspacePath, "playbook", "templates", "app.conf")));
+                return new AnsiblePlaybookRunResult(1, false, false, "failed with resolved-secret-value");
+            },
+            StdoutLines: ["stdout resolved-secret-value"],
+            StderrLines: ["stderr resolved-secret-value"]));
+
+        await service.ExecuteAsync(fixture.JobRun);
+
+        Assert.Equal(JobRunStatus.Failed, fixture.JobRun.Status);
+        Assert.DoesNotContain("resolved-secret-value", fixture.JobRun.ErrorMessage);
+        Assert.DoesNotContain(fixture.Db.JobRunLogEntries, entry => entry.Message.Contains("resolved-secret-value", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -162,7 +246,9 @@ public sealed class JobRunExecutionTests
             fixture.InventoryGroup,
             [],
             fixture.Playbook,
-            fixture.VariableSet);
+            fixture.VariableSet,
+            [],
+            EmptySecrets);
 
         Assert.False(result.Succeeded);
         Assert.Contains("no active managed nodes", result.ErrorMessage);
@@ -408,9 +494,26 @@ public sealed class JobRunExecutionTests
             IReadOnlyList<ManagedNode> managedNodes,
             Playbook playbook,
             VariableSet? variableSet,
+            IReadOnlyList<JobRunTemplateArtifact> templateArtifacts,
+            IReadOnlyDictionary<string, string> secretValuesBySlug,
             CancellationToken cancellationToken = default)
         {
             return Task.FromResult(JobRunWorkspaceBuildResult.Failed(errorMessage));
+        }
+    }
+
+    private sealed class FakeSecretProtector : ISecretProtector
+    {
+        public string Protect(string plaintext)
+        {
+            return $"protected:{plaintext}";
+        }
+
+        public string Unprotect(string protectedValue)
+        {
+            return protectedValue.StartsWith("protected:", StringComparison.Ordinal)
+                ? protectedValue["protected:".Length..]
+                : protectedValue;
         }
     }
 
@@ -431,6 +534,8 @@ public sealed class JobRunExecutionTests
             ManagedNode managedNode,
             Playbook playbook,
             VariableSet? variableSet,
+            Template? template,
+            Secret? secret,
             Job job,
             JobRun jobRun)
         {
@@ -443,6 +548,8 @@ public sealed class JobRunExecutionTests
             ManagedNode = managedNode;
             Playbook = playbook;
             VariableSet = variableSet;
+            Template = template;
+            Secret = secret;
             Job = job;
             JobRun = jobRun;
         }
@@ -465,6 +572,10 @@ public sealed class JobRunExecutionTests
 
         public VariableSet? VariableSet { get; }
 
+        public Template? Template { get; }
+
+        public Secret? Secret { get; }
+
         public Job Job { get; }
 
         public JobRun JobRun { get; }
@@ -474,7 +585,10 @@ public sealed class JobRunExecutionTests
             VariableSetFormat variableFormat = VariableSetFormat.Yaml,
             string variableContent = "app_name: nodecontrol\n",
             bool addJobRun = true,
-            bool artifactPlaybook = false)
+            bool artifactPlaybook = false,
+            string? templateArtifactPath = null,
+            string? templateContent = null,
+            string? protectedSecretValue = null)
         {
             var workspaceRoot = Path.Combine(Path.GetTempPath(), "nodecontrol-tests", Guid.NewGuid().ToString("N"));
             var db = new NodeControlTestDbContext();
@@ -506,6 +620,30 @@ public sealed class JobRunExecutionTests
             var variableSet = includeVariableSet
                 ? VariableSet.Create(customer.Id, "Defaults", "defaults", null, variableFormat, variableContent, false, TestTime)
                 : null;
+            var template = templateArtifactPath is not null
+                ? Template.Create(
+                    customer.Id,
+                    "App config",
+                    "app-config",
+                    null,
+                    TemplateType.ConfigFile,
+                    templateContent ?? "enabled=true\n",
+                    "ini",
+                    TestTime)
+                : null;
+            var secret = protectedSecretValue is not null
+                ? Secret.Create(
+                    customer.Id,
+                    "API Token",
+                    "api-token",
+                    null,
+                    SecretKind.ApiToken,
+                    protectedSecretValue,
+                    TestTime)
+                : null;
+            var templateArtifactsJson = template is null
+                ? null
+                : $"[{{\"TemplateId\":\"{template.Id:D}\",\"Path\":\"{templateArtifactPath}\"}}]";
             var job = Job.Create(
                 customer.Id,
                 "Deploy",
@@ -516,7 +654,8 @@ public sealed class JobRunExecutionTests
                 playbook.Id,
                 variableSet?.Id,
                 1800,
-                TestTime);
+                TestTime,
+                templateArtifactsJson);
             var jobRun = JobRun.CreateManual(job, user.Id, TestTime);
 
             db.AddUser(user);
@@ -529,6 +668,14 @@ public sealed class JobRunExecutionTests
             if (variableSet is not null)
             {
                 db.AddVariableSet(variableSet);
+            }
+            if (template is not null)
+            {
+                db.AddTemplate(template);
+            }
+            if (secret is not null)
+            {
+                db.AddSecret(secret);
             }
 
             db.AddJob(job);
@@ -547,6 +694,8 @@ public sealed class JobRunExecutionTests
                 managedNode,
                 playbook,
                 variableSet,
+                template,
+                secret,
                 job,
                 jobRun);
         }
@@ -571,6 +720,8 @@ public sealed class JobRunExecutionTests
                 Db,
                 workspaceBuilder ?? CreateWorkspaceBuilder(),
                 runner,
+                new SecretReferenceParser(),
+                new FakeSecretProtector(),
                 new TestClock());
         }
 
@@ -580,6 +731,8 @@ public sealed class JobRunExecutionTests
             services.AddSingleton<INodeControlDbContext>(Db);
             services.AddSingleton<IClock>(new TestClock());
             services.AddSingleton<IJobRunWorkspaceBuilder>(CreateWorkspaceBuilder());
+            services.AddSingleton(new SecretReferenceParser());
+            services.AddSingleton<ISecretProtector>(new FakeSecretProtector());
             services.AddSingleton(runner);
             services.AddScoped<JobRunExecutionService>();
             return services.BuildServiceProvider();

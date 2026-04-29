@@ -1,9 +1,14 @@
 using NodeControl.Application.Abstractions.Execution;
 using NodeControl.Application.Abstractions.Persistence;
+using NodeControl.Application.Abstractions.Security;
 using NodeControl.Application.Abstractions.Time;
+using NodeControl.Application.Jobs;
+using NodeControl.Application.Secrets;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Playbooks;
+using NodeControl.Domain.Secrets;
+using NodeControl.Domain.Templates;
 using NodeControl.Domain.VariableSets;
 
 namespace NodeControl.Application.JobRuns;
@@ -12,6 +17,8 @@ public sealed class JobRunExecutionService(
     INodeControlDbContext dbContext,
     IJobRunWorkspaceBuilder workspaceBuilder,
     IAnsiblePlaybookRunner ansibleRunner,
+    SecretReferenceParser secretReferenceParser,
+    ISecretProtector secretProtector,
     IClock clock)
 {
     private readonly SemaphoreSlim logWriteLock = new(1, 1);
@@ -61,6 +68,8 @@ public sealed class JobRunExecutionService(
                 executionContext.ManagedNodes!,
                 executionContext.Playbook!,
                 executionContext.VariableSet,
+                executionContext.TemplateArtifacts!,
+                executionContext.SecretValuesBySlug!,
                 cancellationToken);
 
             if (!buildResult.Succeeded)
@@ -86,8 +95,8 @@ public sealed class JobRunExecutionService(
                     workspace.StdoutLogPath,
                     workspace.StderrLogPath,
                     TimeSpan.FromSeconds(executionContext.Job!.DefaultTimeoutSeconds),
-                    (line, token) => AppendLogAsync(jobRun, JobRunLogStream.StdOut, JobRunLogLevel.Info, line, token),
-                    (line, token) => AppendLogAsync(jobRun, JobRunLogStream.StdErr, JobRunLogLevel.Error, line, token),
+                    (line, token) => AppendLogAsync(jobRun, JobRunLogStream.StdOut, JobRunLogLevel.Info, line, token, executionContext.SecretValuesBySlug!.Values),
+                    (line, token) => AppendLogAsync(jobRun, JobRunLogStream.StdErr, JobRunLogLevel.Error, line, token, executionContext.SecretValuesBySlug!.Values),
                     token => dbContext.IsJobRunCancellationRequestedAsync(jobRun.Id, token)),
                 cancellationToken);
 
@@ -96,14 +105,14 @@ public sealed class JobRunExecutionService(
                 var errorMessage = runResult.ErrorMessage ?? "JobRun was cancelled.";
                 await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Warning, "Cancellation observed by worker.", cancellationToken);
                 await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Warning, "ansible-playbook terminated because cancellation was requested.", cancellationToken);
-                jobRun.MarkCancelled(runResult.ExitCode, errorMessage, clock.UtcNow);
+                jobRun.MarkCancelled(runResult.ExitCode, RedactForStorage(errorMessage, executionContext.SecretValuesBySlug!.Values), clock.UtcNow);
                 await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Warning, "JobRun cancelled.", cancellationToken);
             }
             else if (runResult.TimedOut)
             {
                 var errorMessage = runResult.ErrorMessage ?? "ansible-playbook execution timed out.";
-                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken);
-                jobRun.MarkTimedOut(runResult.ExitCode, errorMessage, clock.UtcNow);
+                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken, executionContext.SecretValuesBySlug!.Values);
+                jobRun.MarkTimedOut(runResult.ExitCode, RedactForStorage(errorMessage, executionContext.SecretValuesBySlug!.Values), clock.UtcNow);
             }
             else if (runResult.ExitCode == 0)
             {
@@ -114,8 +123,8 @@ public sealed class JobRunExecutionService(
             {
                 var errorMessage = runResult.ErrorMessage
                     ?? $"ansible-playbook exited with code {runResult.ExitCode?.ToString() ?? "unknown"}.";
-                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken);
-                jobRun.MarkFailed(runResult.ExitCode, errorMessage, clock.UtcNow);
+                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken, executionContext.SecretValuesBySlug!.Values);
+                jobRun.MarkFailed(runResult.ExitCode, RedactForStorage(errorMessage, executionContext.SecretValuesBySlug!.Values), clock.UtcNow);
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -137,7 +146,8 @@ public sealed class JobRunExecutionService(
         JobRunLogStream stream,
         JobRunLogLevel level,
         string message,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IEnumerable<string>? secretValues = null)
     {
         if (string.IsNullOrWhiteSpace(message))
         {
@@ -148,7 +158,13 @@ public sealed class JobRunExecutionService(
         try
         {
             var sequence = await dbContext.GetNextJobRunLogSequenceAsync(jobRun.Id, cancellationToken);
-            dbContext.AddJobRunLogEntry(JobRunLogEntry.Create(jobRun, sequence, clock.UtcNow, stream, level, message));
+            dbContext.AddJobRunLogEntry(JobRunLogEntry.Create(
+                jobRun,
+                sequence,
+                clock.UtcNow,
+                stream,
+                level,
+                RedactForStorage(message, secretValues)));
             await dbContext.SaveChangesAsync(cancellationToken);
         }
         finally
@@ -206,6 +222,153 @@ public sealed class JobRunExecutionService(
             return JobRunExecutionContext.Failed("Inventory group contains managed nodes outside the JobRun customer.");
         }
 
-        return JobRunExecutionContext.Ok(job, controlNode, inventoryGroup, managedNodes, playbook, variableSet);
+        var templateArtifacts = await LoadTemplateArtifactsAsync(jobRun.CustomerId, job.TemplateArtifactsJson, cancellationToken);
+        if (!templateArtifacts.Succeeded)
+        {
+            return JobRunExecutionContext.Failed(templateArtifacts.ErrorMessage!);
+        }
+
+        var secretValues = await ResolveSecretReferencesAsync(jobRun.CustomerId, variableSet, templateArtifacts.Artifacts!, cancellationToken);
+        if (!secretValues.Succeeded)
+        {
+            return JobRunExecutionContext.Failed(secretValues.ErrorMessage!);
+        }
+
+        return JobRunExecutionContext.Ok(
+            job,
+            controlNode,
+            inventoryGroup,
+            managedNodes,
+            playbook,
+            variableSet,
+            templateArtifacts.Artifacts!,
+            secretValues.SecretValuesBySlug!);
+    }
+
+    private async Task<TemplateArtifactLoadResult> LoadTemplateArtifactsAsync(
+        Guid customerId,
+        string? templateArtifactsJson,
+        CancellationToken cancellationToken)
+    {
+        var definitions = JobService.DeserializeTemplateArtifacts(templateArtifactsJson);
+        if (definitions.Count == 0)
+        {
+            return TemplateArtifactLoadResult.Ok([]);
+        }
+
+        var artifacts = new List<JobRunTemplateArtifact>(definitions.Count);
+        foreach (var definition in definitions)
+        {
+            var template = await dbContext.FindTemplateAsync(customerId, definition.TemplateId, cancellationToken);
+            if (template?.Status != TemplateStatus.Active || template.CustomerId != customerId)
+            {
+                return TemplateArtifactLoadResult.Failed("JobRun references an unavailable template artifact.");
+            }
+
+            artifacts.Add(new JobRunTemplateArtifact(template, definition.Path));
+        }
+
+        return TemplateArtifactLoadResult.Ok(artifacts);
+    }
+
+    private async Task<SecretReferenceResolutionResult> ResolveSecretReferencesAsync(
+        Guid customerId,
+        VariableSet? variableSet,
+        IReadOnlyList<JobRunTemplateArtifact> templateArtifacts,
+        CancellationToken cancellationToken)
+    {
+        var slugs = new HashSet<string>(StringComparer.Ordinal);
+        if (variableSet is not null)
+        {
+            foreach (var slug in secretReferenceParser.ParseDistinctSlugs(variableSet.Content))
+            {
+                slugs.Add(slug);
+            }
+        }
+
+        foreach (var templateArtifact in templateArtifacts)
+        {
+            foreach (var slug in secretReferenceParser.ParseDistinctSlugs(templateArtifact.Template.Content))
+            {
+                slugs.Add(slug);
+            }
+        }
+
+        if (slugs.Count == 0)
+        {
+            return SecretReferenceResolutionResult.Ok(new Dictionary<string, string>(StringComparer.Ordinal));
+        }
+
+        var secretValuesBySlug = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var slug in slugs.Order(StringComparer.Ordinal))
+        {
+            var secret = await dbContext.FindSecretBySlugAsync(customerId, slug, cancellationToken);
+            if (secret?.Status != SecretStatus.Active || secret.CustomerId != customerId)
+            {
+                return SecretReferenceResolutionResult.Failed($"Secret reference 'secret://{slug}' is unavailable for execution.");
+            }
+
+            try
+            {
+                secretValuesBySlug[slug] = secretProtector.Unprotect(secret.ProtectedValue);
+            }
+            catch (Exception)
+            {
+                return SecretReferenceResolutionResult.Failed($"Secret reference 'secret://{slug}' could not be resolved for execution.");
+            }
+        }
+
+        return SecretReferenceResolutionResult.Ok(secretValuesBySlug);
+    }
+
+    private static string RedactForStorage(string value, IEnumerable<string>? secretValues)
+    {
+        var redacted = JobRunLogRedactor.Redact(value) ?? value;
+        if (secretValues is null)
+        {
+            return redacted;
+        }
+
+        foreach (var secretValue in secretValues)
+        {
+            if (!string.IsNullOrEmpty(secretValue))
+            {
+                redacted = redacted.Replace(secretValue, "[REDACTED]", StringComparison.Ordinal);
+            }
+        }
+
+        return redacted;
+    }
+
+    private sealed record TemplateArtifactLoadResult(
+        bool Succeeded,
+        IReadOnlyList<JobRunTemplateArtifact>? Artifacts,
+        string? ErrorMessage)
+    {
+        public static TemplateArtifactLoadResult Ok(IReadOnlyList<JobRunTemplateArtifact> artifacts)
+        {
+            return new TemplateArtifactLoadResult(true, artifacts, null);
+        }
+
+        public static TemplateArtifactLoadResult Failed(string errorMessage)
+        {
+            return new TemplateArtifactLoadResult(false, null, errorMessage);
+        }
+    }
+
+    private sealed record SecretReferenceResolutionResult(
+        bool Succeeded,
+        IReadOnlyDictionary<string, string>? SecretValuesBySlug,
+        string? ErrorMessage)
+    {
+        public static SecretReferenceResolutionResult Ok(IReadOnlyDictionary<string, string> secretValuesBySlug)
+        {
+            return new SecretReferenceResolutionResult(true, secretValuesBySlug, null);
+        }
+
+        public static SecretReferenceResolutionResult Failed(string errorMessage)
+        {
+            return new SecretReferenceResolutionResult(false, null, errorMessage);
+        }
     }
 }

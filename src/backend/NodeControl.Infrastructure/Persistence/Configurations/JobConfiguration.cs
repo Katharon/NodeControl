@@ -54,6 +54,10 @@ public sealed class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.Property(job => job.VariableSetId)
             .HasColumnName("variable_set_id");
 
+        builder.Property(job => job.TemplateArtifactsJson)
+            .HasColumnName("template_artifacts_json")
+            .HasColumnType("jsonb");
+
         builder.Property(job => job.Status)
             .HasColumnName("status")
             .HasConversion<string>()

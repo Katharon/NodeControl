@@ -216,3 +216,17 @@ Reason:
 
 - OIDC covers the first professional integration path.
 - SAML may matter for enterprise customers later.
+
+## DEC-019: Resolve execution secret references only in the Worker
+
+Status: Accepted
+
+Actions may reference managed templates as relative run workspace artifacts. VariableSets and those configured
+template artifacts may contain `secret://...` references.
+
+Reason:
+
+- The API remains non-operational and never decrypts execution secrets.
+- Secret references stay as references at rest in normal definitions.
+- The Worker already owns run workspace materialization and is the right boundary for producing execution-ready files.
+- Persisted run logs and API-facing models must not expose resolved secret values.

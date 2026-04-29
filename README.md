@@ -44,17 +44,18 @@ customer-scoped automation control plane with a complete local demo loop. Curren
 - Job logs
 - Audit logs
 - Hostzustand / TCP reachability checks processed by the Worker
-- Templates as managed text resources
-- Secrets as protected metadata with safe `secret://...` reference validation
+- Templates as managed text resources that can be materialized into Worker run workspaces through Actions
+- Secrets as protected metadata with safe `secret://...` reference validation and Worker-side execution resolution
 - User overview for platform admins
 - Run wizard and Run Center demo flow
 - Docker-based local dev infrastructure and shell scripts for bootstrap
 
 Supporting MVP surfaces have intentionally narrow scope:
 
-- Templates are managed text resources only; they are not rendered, uploaded, or connected to execution.
-- Secrets expose protected metadata and safe `secret://...` references only; secret values are not returned or
-  decrypted into Worker execution yet.
+- Templates are materialized as configured run workspace files only; NodeControl does not provide a full template
+  orchestration or remote upload system.
+- Secrets expose protected metadata and safe `secret://...` references through the API. Secret values are not returned
+  and are resolved only by the Worker while preparing execution artifacts.
 - The platform admin user overview is not a full identity-provider administration system.
 
 Important current boundaries:

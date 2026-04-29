@@ -25,6 +25,7 @@ public sealed class Job
         Guid inventoryGroupId,
         Guid playbookId,
         Guid? variableSetId,
+        string? templateArtifactsJson,
         int defaultTimeoutSeconds,
         DateTimeOffset createdAt)
     {
@@ -37,6 +38,7 @@ public sealed class Job
         InventoryGroupId = inventoryGroupId;
         PlaybookId = playbookId;
         VariableSetId = variableSetId;
+        TemplateArtifactsJson = NormalizeTemplateArtifactsJson(templateArtifactsJson);
         Status = JobStatus.Active;
         DefaultTimeoutSeconds = defaultTimeoutSeconds;
         CreatedAt = createdAt;
@@ -60,6 +62,8 @@ public sealed class Job
 
     public Guid? VariableSetId { get; private set; }
 
+    public string? TemplateArtifactsJson { get; private set; }
+
     public JobStatus Status { get; private set; }
 
     public int DefaultTimeoutSeconds { get; private set; }
@@ -80,7 +84,8 @@ public sealed class Job
         Guid playbookId,
         Guid? variableSetId,
         int defaultTimeoutSeconds,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        string? templateArtifactsJson = null)
     {
         Validate(name, slug, controlNodeId, inventoryGroupId, playbookId, defaultTimeoutSeconds);
         return new Job(
@@ -93,6 +98,7 @@ public sealed class Job
             inventoryGroupId,
             playbookId,
             variableSetId,
+            templateArtifactsJson,
             defaultTimeoutSeconds,
             createdAt);
     }
@@ -106,7 +112,8 @@ public sealed class Job
         Guid playbookId,
         Guid? variableSetId,
         int defaultTimeoutSeconds,
-        DateTimeOffset updatedAt)
+        DateTimeOffset updatedAt,
+        string? templateArtifactsJson = null)
     {
         Validate(name, slug, controlNodeId, inventoryGroupId, playbookId, defaultTimeoutSeconds);
         Name = name.Trim();
@@ -116,6 +123,7 @@ public sealed class Job
         InventoryGroupId = inventoryGroupId;
         PlaybookId = playbookId;
         VariableSetId = variableSetId;
+        TemplateArtifactsJson = NormalizeTemplateArtifactsJson(templateArtifactsJson);
         DefaultTimeoutSeconds = defaultTimeoutSeconds;
         UpdatedAt = updatedAt;
     }
@@ -165,5 +173,20 @@ public sealed class Job
         {
             throw new ArgumentException("A resource id is required.", parameterName);
         }
+    }
+
+    private static string? NormalizeTemplateArtifactsJson(string? templateArtifactsJson)
+    {
+        if (string.IsNullOrWhiteSpace(templateArtifactsJson))
+        {
+            return null;
+        }
+
+        if (templateArtifactsJson.Length > 20000)
+        {
+            throw new ArgumentException("Template artifact definitions are too large.", nameof(templateArtifactsJson));
+        }
+
+        return templateArtifactsJson;
     }
 }

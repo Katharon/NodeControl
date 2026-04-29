@@ -12,4 +12,9 @@ public sealed class DataProtectionSecretProtector(IDataProtectionProvider dataPr
     {
         return protector.Protect(plaintext);
     }
+
+    public string Unprotect(string protectedValue)
+    {
+        return protector.Unprotect(protectedValue);
+    }
 }

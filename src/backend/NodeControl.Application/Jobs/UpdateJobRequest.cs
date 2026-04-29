@@ -8,4 +8,5 @@ public sealed record UpdateJobRequest(
     Guid InventoryGroupId,
     Guid PlaybookId,
     Guid? VariableSetId,
-    int DefaultTimeoutSeconds = 1800);
+    int DefaultTimeoutSeconds = 1800,
+    IReadOnlyList<JobTemplateArtifactDto>? TemplateArtifacts = null);

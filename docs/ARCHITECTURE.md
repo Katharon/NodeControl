@@ -19,7 +19,7 @@ development infrastructure, dev/demo scripts, and a demo-ready product surface.
 
 Implemented product areas include customer and membership management, static roles/permissions, Control Hosts,
 Hosts, inventory groups, playbooks, variable sets, actions, runs, schedules, persisted run logs, audit logs,
-templates, secrets metadata and reference validation, user overview, Hostzustand checks, a run wizard, and a
+templates, secrets metadata and Worker-side reference resolution, user overview, Hostzustand checks, a run wizard, and a
 Run Center.
 
 The production deployment story is not complete. `deploy/` contains dev/demo notes only, while local bootstrap
@@ -228,9 +228,11 @@ Variables passed to an Ansible job.
 
 ### Template
 
-A customer-scoped reusable text/Jinja2/config/script template. The current implementation manages templates as plain text
-resources only: NodeControl validates simple structure, stores metadata/content, and audits create/update/archive
-operations. Templates are not executed, rendered, uploaded to hosts, or wired into JobRun execution yet.
+A customer-scoped reusable text/Jinja2/config/script template. NodeControl validates simple structure, stores
+metadata/content, and audits create/update/archive operations. Actions can reference templates as execution artifacts:
+the Worker materializes configured template content as files under the per-Run playbook workspace before Ansible starts.
+NodeControl still does not execute templates as scripts, upload them directly to hosts, or provide a full template
+orchestration system.
 
 ### Secret
 
@@ -238,7 +240,9 @@ A customer-scoped protected value such as a password, API token, SSH private key
 string. The current implementation exposes secret metadata only through the API. Plaintext values are accepted on create/rotate,
 protected before persistence, and never returned in API responses. It also adds the canonical safe reference
 syntax `secret://secret-slug`; references are validated by customer and active status only, without decrypting or
-returning secret values. Secret values are not injected into Worker execution yet.
+returning secret values. During JobRun preparation, the Worker resolves active same-customer references found in
+VariableSets and configured template artifacts, writes the resulting execution files into the run workspace, and redacts
+resolved values from persisted run logs.
 
 ### Job
 

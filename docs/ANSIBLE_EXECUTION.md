@@ -187,29 +187,39 @@ VariableSets may be stored as YAML or JSON content.
 
 They are written into the JobRun workspace as `vars.yml` or `vars.json` depending on the VariableSet format.
 
-Sensitive values need special care.
+If the Worker sees `secret://...` references in the selected VariableSet, it resolves those references while writing the
+workspace file. The API stores and validates references only; it does not decrypt secrets or create execution-ready
+variable files.
 
-MVP rule:
+Rules:
 
 - Do not log variable content.
 - Do not expose secret variable values through API responses.
-- Prefer not implementing advanced secret storage until the execution path works.
+- Resolve secret references only in the Worker execution path.
 
 ## Templates
 
-Templates are reusable customer-scoped text/Jinja2/config/script resources. The current implementation stores and validates
-template content as plain text only. The API and Application layer do not render templates, execute scripts,
-invoke Python/Jinja runtimes, or pass template content into JobRun execution. Future slices may connect
-templates to playbook artifacts or deployment flows, but Worker execution remains unchanged here.
+Templates are reusable customer-scoped text/Jinja2/config/script resources. Actions may map managed templates to
+relative file paths under `playbook/` in the per-Run workspace. During workspace preparation, the Worker materializes
+those files and resolves any `secret://...` references in the template content.
+
+This is intentionally narrow:
+
+- The API stores template content and Action mappings only.
+- The Worker writes execution-ready files into the run workspace.
+- NodeControl does not run a separate Jinja/Python template engine in this slice.
+- Template artifact paths must be relative and must not overwrite existing playbook files.
 
 ## Secrets
 
-Secrets are customer-scoped protected values managed through metadata-only API responses. The current implementation accepts
-plaintext values only on create and rotate, protects them before persistence, and never returns plaintext or
-protected payloads from API responses. Secrets are not resolved during JobRun execution and are not integrated
-with Jobs or Worker workspaces yet. Safe `secret://secret-slug` references are supported for Templates
-and VariableSets. Reference validation checks only same-customer active metadata and never decrypts, renders,
-exports, or passes secret values to Ansible.
+Secrets are customer-scoped protected values managed through metadata-only API responses. Plaintext values are accepted
+only on create and rotate, protected before persistence, and never returned from normal API responses.
+
+Safe `secret://secret-slug` references are supported for Templates and VariableSets. Reference validation checks
+same-customer active metadata without decrypting. During JobRun execution, only the Worker decrypts active referenced
+secrets and substitutes them while materializing `vars.yml` / `vars.json` and configured template artifact files.
+Resolved values may exist in the local run workspace as execution-ready artifacts, but they are redacted from persisted
+run logs and are not returned in API-facing models.
 
 ## Dangerous Execution Concerns
 

@@ -369,6 +369,11 @@ public sealed class SecretsServiceTests
             nextValue++;
             return $"protected-{nextValue}";
         }
+
+        public string Unprotect(string protectedValue)
+        {
+            return protectedValue;
+        }
     }
 
     private sealed class TestClock : IClock

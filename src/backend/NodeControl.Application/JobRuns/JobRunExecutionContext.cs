@@ -3,6 +3,7 @@ using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Playbooks;
 using NodeControl.Domain.VariableSets;
+using NodeControl.Application.Abstractions.Execution;
 
 namespace NodeControl.Application.JobRuns;
 
@@ -14,6 +15,8 @@ internal sealed record JobRunExecutionContext(
     IReadOnlyList<ManagedNode>? ManagedNodes,
     Playbook? Playbook,
     VariableSet? VariableSet,
+    IReadOnlyList<JobRunTemplateArtifact>? TemplateArtifacts,
+    IReadOnlyDictionary<string, string>? SecretValuesBySlug,
     string? ErrorMessage)
 {
     public static JobRunExecutionContext Ok(
@@ -22,13 +25,15 @@ internal sealed record JobRunExecutionContext(
         InventoryGroup inventoryGroup,
         IReadOnlyList<ManagedNode> managedNodes,
         Playbook playbook,
-        VariableSet? variableSet)
+        VariableSet? variableSet,
+        IReadOnlyList<JobRunTemplateArtifact> templateArtifacts,
+        IReadOnlyDictionary<string, string> secretValuesBySlug)
     {
-        return new JobRunExecutionContext(true, job, controlNode, inventoryGroup, managedNodes, playbook, variableSet, null);
+        return new JobRunExecutionContext(true, job, controlNode, inventoryGroup, managedNodes, playbook, variableSet, templateArtifacts, secretValuesBySlug, null);
     }
 
     public static JobRunExecutionContext Failed(string errorMessage)
     {
-        return new JobRunExecutionContext(false, null, null, null, null, null, null, errorMessage);
+        return new JobRunExecutionContext(false, null, null, null, null, null, null, null, null, errorMessage);
     }
 }

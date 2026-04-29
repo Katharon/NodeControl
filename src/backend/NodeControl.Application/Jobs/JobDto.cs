@@ -12,6 +12,7 @@ public sealed record JobDto(
     Guid InventoryGroupId,
     Guid PlaybookId,
     Guid? VariableSetId,
+    IReadOnlyList<JobTemplateArtifactDto> TemplateArtifacts,
     JobStatus Status,
     int DefaultTimeoutSeconds,
     DateTimeOffset CreatedAt,

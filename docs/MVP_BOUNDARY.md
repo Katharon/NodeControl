@@ -23,9 +23,10 @@ operational loop end to end:
 
 These areas are implemented, but their current scope is deliberately narrow:
 
-- Templates are managed text resources. They are not rendered, uploaded to hosts, or connected to execution.
+- Templates are managed text resources that Actions can map to relative run workspace files. They are not uploaded
+  directly to hosts and do not provide a full orchestration system.
 - Secrets store protected metadata and accept create/rotate values. API responses expose metadata and
-  `secret://...` references only; secret values are not decrypted into Worker execution yet.
+  `secret://...` references only; values are resolved only by the Worker during execution workspace preparation.
 - User overview is a platform-admin review surface, not a full identity administration system.
 - `deploy/` and the dev scripts support local development and demo. They are not a production packaging story.
 
@@ -39,7 +40,7 @@ current MVP:
 - Import workflows for existing inventories or automation definitions
 - Cloud-provider integrations as inventory sources
 - Notifications for run outcomes and operational events
-- Advanced secret runtime integration, key rotation, recovery flows, or Vault-style integrations
+- External secret providers, key recovery flows, or Vault-style integrations
 - Broader security and system administration surfaces
 - Health/version endpoints and production deployment hardening
 - Approval workflows, live log streaming, dynamic roles, policy engine, billing, licensing, and plugin systems

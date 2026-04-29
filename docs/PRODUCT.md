@@ -110,8 +110,8 @@ The implemented dev/demo MVP is a customer-scoped automation control plane. It c
 - Job logs
 - Audit logs
 - Hostzustand / TCP reachability checks processed by the Worker
-- Template management as plain text resources
-- Secret metadata management, rotation, and `secret://...` reference validation
+- Template management as plain text resources with Action-linked workspace materialization
+- Secret metadata management, rotation, `secret://...` reference validation, and Worker-side execution resolution
 - Platform admin user overview
 - Run wizard and Run Center
 - Docker Compose local infrastructure and dev/demo scripts
@@ -120,9 +120,10 @@ The implemented dev/demo MVP is a customer-scoped automation control plane. It c
 
 These product areas exist in the current MVP, but their scope is intentionally limited:
 
-- Templates are managed text resources. They are not rendered, uploaded, or wired into Worker execution.
+- Templates are managed text resources. Actions may map selected templates to relative files under the run playbook
+  workspace, where the Worker materializes them before Ansible starts.
 - Secrets store protected values and expose safe metadata/reference behavior. Secret values are never returned by the
-  API, and runtime secret injection is Post-MVP.
+  API; `secret://...` references are resolved only by the Worker during workspace preparation.
 - Platform admin user overview is a review and administration aid for existing users, not user registration,
   invitation, password management, or identity-provider administration.
 - The local showcase/bootstrap flow demonstrates real API and Worker paths, but it is not production packaging.
@@ -135,7 +136,7 @@ Current implementation boundaries are intentionally explicit:
 - The API queues work and enforces authorization; it never executes Ansible, SSH, TCP checks, shell commands, or process starts.
 - The Worker executes queued Runs, polls schedules, processes Hostzustand checks, creates workspaces, and captures logs.
 - Git-backed playbooks, imports, Ansible Collections management, cloud-provider inventory,
-  notifications, approval workflow, advanced secret runtime integration, and production deployment packaging remain Post-MVP.
+  notifications, approval workflow, external secret providers, and production deployment packaging remain Post-MVP.
 - `deploy/` is local dev/demo guidance only at this point.
 
 For the explicit implemented/supporting/deferred split, see `docs/MVP_BOUNDARY.md`.

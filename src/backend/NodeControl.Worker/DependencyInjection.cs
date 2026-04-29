@@ -4,6 +4,7 @@ using NodeControl.Application.Abstractions.HostConnectivity;
 using NodeControl.Application.HostConnectionChecks;
 using NodeControl.Application.JobRuns;
 using NodeControl.Application.Schedules;
+using NodeControl.Application.Secrets;
 using NodeControl.Infrastructure;
 using NodeControl.Infrastructure.Execution;
 using NodeControl.Worker.HostConnectionChecks;
@@ -21,6 +22,7 @@ public static class DependencyInjection
         services.AddNodeControlInfrastructure(configuration);
         services.AddScoped<IAnsiblePlaybookRunner, AnsiblePlaybookRunner>();
         services.AddScoped<IHostConnectivityChecker, TcpHostConnectivityChecker>();
+        services.AddSingleton<SecretReferenceParser>();
         services.AddScoped<IJobRunWorkspaceBuilder>(serviceProvider =>
         {
             var options = serviceProvider.GetRequiredService<IOptions<ExecutionOptions>>().Value;

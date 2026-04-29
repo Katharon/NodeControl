@@ -40,8 +40,8 @@ The explicit current/supporting/Post-MVP boundary is maintained in `docs/MVP_BOU
 - Inventory groups and inventory preview
 - Inline YAML and managed artifact-directory playbooks
 - Variable sets with YAML/JSON validation
-- Template management as plain text resources
-- Secret metadata management, rotation, and safe `secret://...` reference validation
+- Template management as plain text resources with Action-linked workspace materialization
+- Secret metadata management, rotation, safe `secret://...` reference validation, and Worker-side execution resolution
 
 ### Runs, Scheduling, and Operations
 
@@ -70,7 +70,7 @@ The explicit current/supporting/Post-MVP boundary is maintained in `docs/MVP_BOU
 - Explicit permission checks for sensitive operations
 - Customer-scoped lookup patterns for list/detail/action flows
 - Secret metadata responses without raw secret values
-- Lightweight response-time redaction for obvious sensitive log/error patterns
+- Lightweight redaction for obvious sensitive log/error patterns and Worker-resolved secret values
 - Confirmation guardrails for cancel, retry, archive, pause/resume, and secret archive flows
 - Clearer forbidden/not-found messaging in core user-facing areas
 
@@ -80,8 +80,8 @@ The explicit current/supporting/Post-MVP boundary is maintained in `docs/MVP_BOU
 - The Worker is the only process that runs `ansible-playbook` or performs Hostzustand TCP checks.
 - Manual and scheduled Runs use the same queued JobRun execution path.
 - Schedules use a database-backed Worker poller. Quartz.NET is not part of the current implementation.
-- Templates are not rendered or connected to Worker execution yet.
-- Secret values are not returned through the API and are not decrypted into execution yet.
+- Templates can be materialized as configured Worker run workspace files.
+- Secret values are not returned through the API and are decrypted only in the Worker execution path.
 - Git-backed playbooks remain Post-MVP.
 
 ## Near-Term Expansion Paths
