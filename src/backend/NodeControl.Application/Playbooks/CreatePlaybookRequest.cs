@@ -8,4 +8,5 @@ public sealed record CreatePlaybookRequest(
     string? Description,
     PlaybookSourceType SourceType,
     string? InlineContent,
-    string? EntryFilePath);
+    string? EntryFilePath,
+    IReadOnlyList<PlaybookArtifactFileDto>? ArtifactFiles = null);

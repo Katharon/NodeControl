@@ -81,6 +81,7 @@ public sealed class JobRunExecutionService(
             var runResult = await ansibleRunner.RunAsync(
                 new AnsiblePlaybookRunRequest(
                     workspace.WorkspacePath,
+                    workspace.PlaybookFileName,
                     workspace.VariableFileName,
                     workspace.StdoutLogPath,
                     workspace.StderrLogPath,

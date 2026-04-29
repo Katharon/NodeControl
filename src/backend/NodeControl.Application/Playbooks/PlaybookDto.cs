@@ -14,4 +14,5 @@ public sealed record PlaybookDto(
     string? EntryFilePath,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt,
-    DateTimeOffset? ArchivedAt);
+    DateTimeOffset? ArchivedAt,
+    IReadOnlyList<PlaybookArtifactFileDto> ArtifactFiles);

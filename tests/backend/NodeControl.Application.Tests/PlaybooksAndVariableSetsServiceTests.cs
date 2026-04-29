@@ -44,8 +44,38 @@ public sealed class PlaybooksAndVariableSetsServiceTests
         Assert.Empty(fixture.Db.Playbooks);
     }
 
+    [Fact]
+    public async Task PlaybookService_creates_artifact_directory_when_entry_file_exists()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+
+        var result = await fixture.CreatePlaybookService().CreateAsync(
+            fixture.CurrentUser,
+            fixture.Customer.Id,
+            ValidArtifactPlaybookRequest("deploy-app"));
+
+        Assert.Null(result.Error);
+        Assert.Single(fixture.Db.Playbooks);
+        Assert.Equal(PlaybookSourceType.ArtifactDirectory, result.Value!.SourceType);
+        Assert.Null(result.Value.InlineContent);
+        Assert.Equal("site.yml", result.Value.EntryFilePath);
+        Assert.Equal(2, result.Value.ArtifactFiles.Count);
+    }
+
+    [Fact]
+    public async Task PlaybookService_rejects_artifact_directory_without_entry_file()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+
+        var result = await fixture.CreatePlaybookService().CreateAsync(
+            fixture.CurrentUser,
+            fixture.Customer.Id,
+            ValidArtifactPlaybookRequest("deploy-app") with { EntryFilePath = "missing.yml" });
+
+        Assert.Equal(CustomerServiceError.BadRequest, result.Error);
+    }
+
     [Theory]
-    [InlineData(PlaybookSourceType.ArtifactDirectory)]
     [InlineData(PlaybookSourceType.GitRepository)]
     public async Task PlaybookService_rejects_reserved_source_types(PlaybookSourceType sourceType)
     {
@@ -216,6 +246,21 @@ public sealed class PlaybooksAndVariableSetsServiceTests
             PlaybookSourceType.InlineYaml,
             "- hosts: all\n  tasks:\n    - debug:\n        msg: hello\n",
             null);
+    }
+
+    private static CreatePlaybookRequest ValidArtifactPlaybookRequest(string slug)
+    {
+        return new CreatePlaybookRequest(
+            "Deploy App",
+            slug,
+            null,
+            PlaybookSourceType.ArtifactDirectory,
+            null,
+            "site.yml",
+            [
+                new PlaybookArtifactFileDto("site.yml", "- hosts: all\n  roles:\n    - app\n"),
+                new PlaybookArtifactFileDto("roles/app/tasks/main.yml", "- debug:\n    msg: hello\n")
+            ]);
     }
 
     private static CreateVariableSetRequest ValidVariableSetRequest(string slug, VariableSetFormat format)

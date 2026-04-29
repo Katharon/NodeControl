@@ -188,15 +188,16 @@ Reason:
 - Professional portfolio value
 - Works well for dashboard-style applications
 
-## DEC-016: Store playbook metadata in DB and artifacts on filesystem
+## DEC-016: Store playbook metadata in DB and materialize artifacts in run workspaces
 
 Status: Accepted
 
 Reason:
 
 - Real Ansible playbooks may contain multiple files, roles, templates, and assets.
-- The database should store metadata and references.
-- The filesystem can store playbook artifacts and run workspaces in MVP.
+- The current MVP stores inline YAML or a small managed set of artifact-directory files with the Playbook record.
+- The Worker materializes playbook files into the filesystem-backed JobRun workspace before execution.
+- A later durable artifact store may move larger playbook assets out of the database without changing the API/Worker boundary.
 
 ## DEC-017: Git-backed playbooks are post-MVP
 

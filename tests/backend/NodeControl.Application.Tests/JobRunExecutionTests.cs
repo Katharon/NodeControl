@@ -125,6 +125,29 @@ public sealed class JobRunExecutionTests
             fixture.VariableSet);
 
         Assert.Equal(fixture.Playbook.InlineContent, await File.ReadAllTextAsync(result.Workspace!.PlaybookPath));
+        Assert.Equal("playbook/site.yml", result.Workspace.PlaybookFileName);
+    }
+
+    [Fact]
+    public async Task JobRunWorkspaceBuilder_materializes_artifact_directory_playbook()
+    {
+        using var fixture = ExecutionFixture.Create(artifactPlaybook: true);
+
+        var result = await fixture.CreateWorkspaceBuilder().BuildAsync(
+            fixture.JobRun,
+            fixture.Job,
+            fixture.ControlNode,
+            fixture.InventoryGroup,
+            [fixture.ManagedNode],
+            fixture.Playbook,
+            fixture.VariableSet);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("playbook/site.yml", result.Workspace!.PlaybookFileName);
+        Assert.Equal(
+            "- hosts: all\n  roles:\n    - app\n",
+            await File.ReadAllTextAsync(result.Workspace.PlaybookPath));
+        Assert.True(File.Exists(Path.Combine(result.Workspace.WorkspacePath, "playbook", "roles", "app", "tasks", "main.yml")));
     }
 
     [Fact]
@@ -450,7 +473,8 @@ public sealed class JobRunExecutionTests
             bool includeVariableSet = true,
             VariableSetFormat variableFormat = VariableSetFormat.Yaml,
             string variableContent = "app_name: nodecontrol\n",
-            bool addJobRun = true)
+            bool addJobRun = true,
+            bool artifactPlaybook = false)
         {
             var workspaceRoot = Path.Combine(Path.GetTempPath(), "nodecontrol-tests", Guid.NewGuid().ToString("N"));
             var db = new NodeControlTestDbContext();
@@ -459,15 +483,26 @@ public sealed class JobRunExecutionTests
             var controlNode = ControlNode.Create(customer.Id, "control", "control.local", 22, null, TestTime);
             var inventoryGroup = InventoryGroup.Create(customer.Id, "web", null, TestTime);
             var managedNode = ManagedNode.Create(customer.Id, "web-01", "10.0.0.10", 22, "Linux", "prod", null, TestTime);
-            var playbook = Playbook.Create(
-                customer.Id,
-                "Deploy",
-                "deploy",
-                null,
-                PlaybookSourceType.InlineYaml,
-                "- hosts: all\n  tasks:\n    - debug:\n        msg: hello\n",
-                null,
-                TestTime);
+            var playbook = artifactPlaybook
+                ? Playbook.Create(
+                    customer.Id,
+                    "Deploy",
+                    "deploy",
+                    null,
+                    PlaybookSourceType.ArtifactDirectory,
+                    null,
+                    "site.yml",
+                    TestTime,
+                    "[{\"path\":\"site.yml\",\"content\":\"- hosts: all\\n  roles:\\n    - app\\n\"},{\"path\":\"roles/app/tasks/main.yml\",\"content\":\"- debug:\\n    msg: hello\\n\"}]")
+                : Playbook.Create(
+                    customer.Id,
+                    "Deploy",
+                    "deploy",
+                    null,
+                    PlaybookSourceType.InlineYaml,
+                    "- hosts: all\n  tasks:\n    - debug:\n        msg: hello\n",
+                    null,
+                    TestTime);
             var variableSet = includeVariableSet
                 ? VariableSet.Create(customer.Id, "Defaults", "defaults", null, variableFormat, variableContent, false, TestTime)
                 : null;

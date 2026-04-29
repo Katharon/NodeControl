@@ -1,7 +1,7 @@
 "use client";
 
 import CheckIcon from "@mui/icons-material/Check";
-import { Alert, Button, CircularProgress, Paper, Stack, Typography } from "@mui/material";
+import { Alert, Button, Chip, CircularProgress, Paper, Stack, Typography } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { PlaybookForm } from "@/components/playbooks/PlaybookForm";
@@ -50,6 +50,13 @@ export function PlaybookDetailsCard({ customerId, playbookId, canManagePlaybooks
           <Stack>
             <Typography component="h1" variant="h4">{playbookQuery.data.name}</Typography>
             <Typography color="text.secondary">{playbookQuery.data.slug}</Typography>
+            <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1, mt: 1 }}>
+              <Chip label={playbookQuery.data.sourceType === "ArtifactDirectory" ? "Artifact directory" : "Inline YAML"} size="small" variant="outlined" />
+              <Chip label={`Entry: ${playbookQuery.data.entryFilePath ?? "site.yml"}`} size="small" variant="outlined" />
+              {playbookQuery.data.sourceType === "ArtifactDirectory" ? (
+                <Chip label={`${playbookQuery.data.artifactFiles.length} files`} size="small" variant="outlined" />
+              ) : null}
+            </Stack>
           </Stack>
           <Button disabled={validateMutation.isPending} onClick={() => validateMutation.mutate()} startIcon={<CheckIcon />} variant="outlined">
             Validate

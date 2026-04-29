@@ -10,7 +10,7 @@ operational loop end to end:
 
 - Customers, users, customer memberships, static roles, and permissions
 - Control Hosts, Hosts, inventory groups, and inventory preview
-- Inline playbooks and variable sets
+- Inline YAML playbooks, managed artifact-directory playbooks, and variable sets
 - Actions as reusable execution definitions
 - Manual Runs, Run Center, persisted logs, cancellation, and retry
 - Database-polled schedules that create scheduled Runs through the same execution path
@@ -34,7 +34,7 @@ These areas are implemented, but their current scope is deliberately narrow:
 These areas may be visible as placeholder routes or documented future directions, but they are not part of the
 current MVP:
 
-- Git-backed playbooks and artifact-directory playbooks
+- Git-backed playbooks and richer playbook asset lifecycle
 - Ansible Collections dependency management
 - Import workflows for existing inventories or automation definitions
 - Cloud-provider integrations as inventory sources

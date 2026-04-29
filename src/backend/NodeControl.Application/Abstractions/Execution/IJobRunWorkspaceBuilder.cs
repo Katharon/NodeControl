@@ -25,6 +25,7 @@ public sealed record JobRunWorkspace(
     string VariablePath,
     string VariableFileName,
     string PlaybookPath,
+    string PlaybookFileName,
     string StdoutLogPath,
     string StderrLogPath);
 

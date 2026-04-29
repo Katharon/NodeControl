@@ -7,6 +7,7 @@ import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import {
   Alert,
   Button,
+  Chip,
   CircularProgress,
   Dialog,
   DialogContent,
@@ -74,7 +75,11 @@ export function PlaybookList({ customerId, canManagePlaybooks }: PlaybookListPro
                   <BookIcon color="primary" />
                   <Stack>
                     <Typography sx={{ fontWeight: 700 }}>{playbook.name}</Typography>
-                    <Typography color="text.secondary" variant="body2">{playbook.slug}</Typography>
+                    <Stack direction="row" sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+                      <Typography color="text.secondary" variant="body2">{playbook.slug}</Typography>
+                      <Chip label={playbookTypeLabel(playbook.sourceType)} size="small" variant="outlined" />
+                      <Chip label={playbook.entryFilePath ?? "site.yml"} size="small" variant="outlined" />
+                    </Stack>
                   </Stack>
                 </Stack>
                 <Stack direction="row" sx={{ gap: 1 }}>
@@ -99,4 +104,8 @@ export function PlaybookList({ customerId, canManagePlaybooks }: PlaybookListPro
       </Dialog>
     </Stack>
   );
+}
+
+function playbookTypeLabel(sourceType: string) {
+  return sourceType === "ArtifactDirectory" ? "Artifact directory" : "Inline YAML";
 }

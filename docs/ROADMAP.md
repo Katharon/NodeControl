@@ -38,7 +38,7 @@ The explicit current/supporting/Post-MVP boundary is maintained in `docs/MVP_BOU
 - Control Hosts
 - Hosts
 - Inventory groups and inventory preview
-- Inline playbooks
+- Inline YAML and managed artifact-directory playbooks
 - Variable sets with YAML/JSON validation
 - Template management as plain text resources
 - Secret metadata management, rotation, and safe `secret://...` reference validation
@@ -82,7 +82,7 @@ The explicit current/supporting/Post-MVP boundary is maintained in `docs/MVP_BOU
 - Schedules use a database-backed Worker poller. Quartz.NET is not part of the current implementation.
 - Templates are not rendered or connected to Worker execution yet.
 - Secret values are not returned through the API and are not decrypted into execution yet.
-- Git-backed and artifact-directory playbooks remain Post-MVP.
+- Git-backed playbooks remain Post-MVP.
 
 ## Near-Term Expansion Paths
 
@@ -94,7 +94,7 @@ Good next slices should stay small, visible, and aligned with the control-plane 
 - Basic operational health endpoint and version display
 - More Worker test coverage for edge cases around cancellation, timeouts, and host checks
 - Secret runtime integration design before any execution-time decryption work
-- Artifact-directory playbook design for multi-file playbook assets before adding repository-backed execution
+- Hardening the managed playbook asset lifecycle before adding repository-backed execution
 
 These are likely next steps, not commitments. Each should be delivered as a vertical slice with authorization,
 customer scoping, tests, and documentation.
@@ -105,7 +105,7 @@ These areas are intentionally outside the current MVP and should not be treated 
 because some placeholder routes or docs mention them:
 
 - Git-backed playbooks
-- Artifact-directory playbooks
+- Richer playbook asset upload/import lifecycle
 - Ansible Collections dependency management
 - Import workflows
 - Cloud-provider inventory integrations

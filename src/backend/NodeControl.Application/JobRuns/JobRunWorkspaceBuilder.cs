@@ -1,5 +1,7 @@
+using System.Text.Json;
 using YamlDotNet.Serialization;
 using NodeControl.Application.Abstractions.Execution;
+using NodeControl.Application.Playbooks;
 using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
@@ -10,6 +12,7 @@ namespace NodeControl.Application.JobRuns;
 
 public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWorkspaceBuilder
 {
+    private static readonly JsonSerializerOptions ArtifactJsonOptions = new(JsonSerializerDefaults.Web);
     private readonly ISerializer yamlSerializer = new SerializerBuilder().Build();
     private readonly string runWorkspaceRoot = string.IsNullOrWhiteSpace(runWorkspaceRoot)
         ? "/var/lib/nodecontrol/runs"
@@ -44,14 +47,21 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
             return JobRunWorkspaceBuildResult.Failed("Inventory group has no active managed nodes.");
         }
 
-        if (playbook.SourceType != PlaybookSourceType.InlineYaml)
-        {
-            return JobRunWorkspaceBuildResult.Failed("Only inline YAML playbooks are supported for execution.");
-        }
-
-        if (string.IsNullOrWhiteSpace(playbook.InlineContent))
+        if (playbook.SourceType == PlaybookSourceType.InlineYaml
+            && string.IsNullOrWhiteSpace(playbook.InlineContent))
         {
             return JobRunWorkspaceBuildResult.Failed("Inline playbook content is required for execution.");
+        }
+
+        if (playbook.SourceType == PlaybookSourceType.ArtifactDirectory
+            && string.IsNullOrWhiteSpace(playbook.ArtifactFilesJson))
+        {
+            return JobRunWorkspaceBuildResult.Failed("Artifact-directory playbook files are required for execution.");
+        }
+
+        if (playbook.SourceType is not (PlaybookSourceType.InlineYaml or PlaybookSourceType.ArtifactDirectory))
+        {
+            return JobRunWorkspaceBuildResult.Failed("Playbook source type is not supported for execution.");
         }
 
         var rootPath = Path.GetFullPath(runWorkspaceRoot);
@@ -65,6 +75,7 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
         var inventoryPath = Path.Combine(workspacePath, "inventory.yml");
         var variableFileName = variableSet?.Format == VariableSetFormat.Json ? "vars.json" : "vars.yml";
         var variablePath = Path.Combine(workspacePath, variableFileName);
+        var playbookFileName = "playbook/site.yml";
         var playbookPath = Path.Combine(playbookDirectory, "site.yml");
         var stdoutLogPath = Path.Combine(workspacePath, "stdout.log");
         var stderrLogPath = Path.Combine(workspacePath, "stderr.log");
@@ -73,7 +84,23 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
 
         await File.WriteAllTextAsync(inventoryPath, BuildInventoryYaml(inventoryGroup, managedNodes), cancellationToken);
         await File.WriteAllTextAsync(variablePath, variableSet is null ? "{}" : variableSet.Content, cancellationToken);
-        await File.WriteAllTextAsync(playbookPath, playbook.InlineContent, cancellationToken);
+
+        if (playbook.SourceType == PlaybookSourceType.InlineYaml)
+        {
+            await File.WriteAllTextAsync(playbookPath, playbook.InlineContent, cancellationToken);
+        }
+        else
+        {
+            var artifactResult = await WriteArtifactFilesAsync(playbook, playbookDirectory, cancellationToken);
+            if (!artifactResult.Succeeded)
+            {
+                return JobRunWorkspaceBuildResult.Failed(artifactResult.ErrorMessage ?? "Artifact-directory playbook files could not be materialized.");
+            }
+
+            playbookPath = artifactResult.PlaybookPath!;
+            playbookFileName = artifactResult.PlaybookFileName!;
+        }
+
         await File.WriteAllTextAsync(stdoutLogPath, string.Empty, cancellationToken);
         await File.WriteAllTextAsync(stderrLogPath, string.Empty, cancellationToken);
 
@@ -83,8 +110,94 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
             variablePath,
             variableFileName,
             playbookPath,
+            playbookFileName,
             stdoutLogPath,
             stderrLogPath));
+    }
+
+    private async Task<ArtifactPlaybookWriteResult> WriteArtifactFilesAsync(
+        Playbook playbook,
+        string playbookDirectory,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<PlaybookArtifactFileDto> artifactFiles;
+        string entryFilePath;
+        try
+        {
+            artifactFiles = DeserializeArtifactFiles(playbook.ArtifactFilesJson);
+            entryFilePath = NormalizeArtifactPath(playbook.EntryFilePath);
+        }
+        catch (ArgumentException exception)
+        {
+            return ArtifactPlaybookWriteResult.Failed(exception.Message);
+        }
+
+        if (artifactFiles.Count == 0)
+        {
+            return ArtifactPlaybookWriteResult.Failed("Artifact-directory playbook files are required for execution.");
+        }
+
+        var playbookRoot = Path.GetFullPath(playbookDirectory);
+        string? entryAbsolutePath = null;
+        foreach (var artifactFile in artifactFiles)
+        {
+            var relativePath = NormalizeArtifactPath(artifactFile.Path);
+            if (artifactFile.Content is null)
+            {
+                return ArtifactPlaybookWriteResult.Failed("Artifact file content is required.");
+            }
+
+            var absolutePath = Path.GetFullPath(Path.Combine(playbookRoot, relativePath));
+            if (!absolutePath.StartsWith(playbookRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            {
+                return ArtifactPlaybookWriteResult.Failed("Artifact file path is invalid.");
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(absolutePath)!);
+            await File.WriteAllTextAsync(absolutePath, artifactFile.Content, cancellationToken);
+
+            if (relativePath == entryFilePath)
+            {
+                entryAbsolutePath = absolutePath;
+            }
+        }
+
+        if (entryAbsolutePath is null)
+        {
+            return ArtifactPlaybookWriteResult.Failed("Artifact entry file is missing.");
+        }
+
+        return ArtifactPlaybookWriteResult.Ok(entryAbsolutePath, $"playbook/{entryFilePath}");
+    }
+
+    private static IReadOnlyList<PlaybookArtifactFileDto> DeserializeArtifactFiles(string? artifactFilesJson)
+    {
+        if (string.IsNullOrWhiteSpace(artifactFilesJson))
+        {
+            return [];
+        }
+
+        return JsonSerializer.Deserialize<IReadOnlyList<PlaybookArtifactFileDto>>(artifactFilesJson, ArtifactJsonOptions) ?? [];
+    }
+
+    private static string NormalizeArtifactPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            throw new ArgumentException("Artifact file path is required.", nameof(path));
+        }
+
+        var normalized = path.Trim().Replace('\\', '/');
+        if (normalized.Length > 500
+            || normalized.StartsWith("/", StringComparison.Ordinal)
+            || normalized.EndsWith("/", StringComparison.Ordinal)
+            || Path.IsPathRooted(normalized)
+            || normalized.Split('/').Any(part => string.IsNullOrWhiteSpace(part) || part == "." || part == ".."))
+        {
+            throw new ArgumentException("Artifact file path is invalid.", nameof(path));
+        }
+
+        return normalized;
     }
 
     private string BuildInventoryYaml(InventoryGroup inventoryGroup, IReadOnlyList<ManagedNode> managedNodes)
@@ -115,5 +228,22 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
         };
 
         return yamlSerializer.Serialize(inventory);
+    }
+
+    private sealed record ArtifactPlaybookWriteResult(
+        bool Succeeded,
+        string? PlaybookPath,
+        string? PlaybookFileName,
+        string? ErrorMessage)
+    {
+        public static ArtifactPlaybookWriteResult Ok(string playbookPath, string playbookFileName)
+        {
+            return new ArtifactPlaybookWriteResult(true, playbookPath, playbookFileName, null);
+        }
+
+        public static ArtifactPlaybookWriteResult Failed(string errorMessage)
+        {
+            return new ArtifactPlaybookWriteResult(false, null, null, errorMessage);
+        }
     }
 }

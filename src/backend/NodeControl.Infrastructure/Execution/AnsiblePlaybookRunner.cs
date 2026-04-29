@@ -7,7 +7,6 @@ namespace NodeControl.Infrastructure.Execution;
 public sealed class AnsiblePlaybookRunner(IOptions<ExecutionOptions> options) : IAnsiblePlaybookRunner
 {
     private const string InventoryFileName = "inventory.yml";
-    private const string PlaybookFileName = "playbook/site.yml";
 
     public async Task<AnsiblePlaybookRunResult> RunAsync(
         AnsiblePlaybookRunRequest request,
@@ -34,7 +33,7 @@ public sealed class AnsiblePlaybookRunner(IOptions<ExecutionOptions> options) : 
 
         startInfo.ArgumentList.Add("-i");
         startInfo.ArgumentList.Add(InventoryFileName);
-        startInfo.ArgumentList.Add(PlaybookFileName);
+        startInfo.ArgumentList.Add(request.PlaybookFileName);
         startInfo.ArgumentList.Add("-e");
         startInfo.ArgumentList.Add($"@{request.VariableFileName}");
 

@@ -15,6 +15,7 @@ public sealed class Playbook
         PlaybookSourceType sourceType,
         string? inlineContent,
         string? entryFilePath,
+        string? artifactFilesJson,
         DateTimeOffset createdAt)
     {
         Id = id;
@@ -24,8 +25,9 @@ public sealed class Playbook
         Description = DefinitionValidation.NormalizeOptional(description, 1000, nameof(description));
         SourceType = sourceType;
         Status = PlaybookStatus.Active;
-        InlineContent = inlineContent;
+        InlineContent = NormalizeInlineContent(sourceType, inlineContent);
         EntryFilePath = DefinitionValidation.ValidateEntryFilePath(entryFilePath);
+        ArtifactFilesJson = NormalizeArtifactFilesJson(sourceType, artifactFilesJson);
         CreatedAt = createdAt;
     }
 
@@ -47,6 +49,8 @@ public sealed class Playbook
 
     public string? EntryFilePath { get; private set; }
 
+    public string? ArtifactFilesJson { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset? UpdatedAt { get; private set; }
@@ -61,10 +65,21 @@ public sealed class Playbook
         PlaybookSourceType sourceType,
         string? inlineContent,
         string? entryFilePath,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        string? artifactFilesJson = null)
     {
-        Validate(name, slug, sourceType, inlineContent);
-        return new Playbook(Guid.NewGuid(), customerId, name, slug, description, sourceType, inlineContent, entryFilePath, createdAt);
+        Validate(name, slug, sourceType, inlineContent, artifactFilesJson);
+        return new Playbook(
+            Guid.NewGuid(),
+            customerId,
+            name,
+            slug,
+            description,
+            sourceType,
+            inlineContent,
+            entryFilePath,
+            artifactFilesJson,
+            createdAt);
     }
 
     public void Update(
@@ -74,15 +89,17 @@ public sealed class Playbook
         PlaybookSourceType sourceType,
         string? inlineContent,
         string? entryFilePath,
-        DateTimeOffset updatedAt)
+        DateTimeOffset updatedAt,
+        string? artifactFilesJson = null)
     {
-        Validate(name, slug, sourceType, inlineContent);
+        Validate(name, slug, sourceType, inlineContent, artifactFilesJson);
         Name = name.Trim();
         Slug = slug.Trim();
         Description = DefinitionValidation.NormalizeOptional(description, 1000, nameof(description));
         SourceType = sourceType;
-        InlineContent = inlineContent;
+        InlineContent = NormalizeInlineContent(sourceType, inlineContent);
         EntryFilePath = DefinitionValidation.ValidateEntryFilePath(entryFilePath);
+        ArtifactFilesJson = NormalizeArtifactFilesJson(sourceType, artifactFilesJson);
         UpdatedAt = updatedAt;
     }
 
@@ -102,13 +119,40 @@ public sealed class Playbook
         string name,
         string slug,
         PlaybookSourceType sourceType,
-        string? inlineContent)
+        string? inlineContent,
+        string? artifactFilesJson)
     {
         DefinitionValidation.ValidateName(name);
         DefinitionValidation.ValidateSlug(slug);
         if (sourceType == PlaybookSourceType.InlineYaml)
         {
             DefinitionValidation.ValidateContent(inlineContent ?? string.Empty, 200000, nameof(inlineContent));
+            if (!string.IsNullOrWhiteSpace(artifactFilesJson))
+            {
+                throw new ArgumentException("Inline playbooks cannot contain artifact files.", nameof(artifactFilesJson));
+            }
         }
+        else if (sourceType == PlaybookSourceType.ArtifactDirectory)
+        {
+            DefinitionValidation.ValidateContent(artifactFilesJson ?? string.Empty, 1000000, nameof(artifactFilesJson));
+            if (!string.IsNullOrWhiteSpace(inlineContent))
+            {
+                throw new ArgumentException("Artifact-directory playbooks cannot contain inline YAML.", nameof(inlineContent));
+            }
+        }
+        else
+        {
+            throw new ArgumentException("Playbook source type is not supported.", nameof(sourceType));
+        }
+    }
+
+    private static string? NormalizeInlineContent(PlaybookSourceType sourceType, string? inlineContent)
+    {
+        return sourceType == PlaybookSourceType.InlineYaml ? inlineContent : null;
+    }
+
+    private static string? NormalizeArtifactFilesJson(PlaybookSourceType sourceType, string? artifactFilesJson)
+    {
+        return sourceType == PlaybookSourceType.ArtifactDirectory ? artifactFilesJson : null;
     }
 }

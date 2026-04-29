@@ -102,7 +102,7 @@ The implemented dev/demo MVP is a customer-scoped automation control plane. It c
 - Control nodes
 - Managed nodes
 - Inventory groups
-- Inline playbooks
+- Inline YAML and managed artifact-directory playbooks
 - Variable sets
 - Manual jobs
 - Scheduled jobs
@@ -134,7 +134,7 @@ Current implementation boundaries are intentionally explicit:
 - NodeControl is still a control plane around Ansible, not an AWX clone.
 - The API queues work and enforces authorization; it never executes Ansible, SSH, TCP checks, shell commands, or process starts.
 - The Worker executes queued Runs, polls schedules, processes Hostzustand checks, creates workspaces, and captures logs.
-- Git-backed playbooks, artifact-directory playbooks, imports, Ansible Collections management, cloud-provider inventory,
+- Git-backed playbooks, imports, Ansible Collections management, cloud-provider inventory,
   notifications, approval workflow, advanced secret runtime integration, and production deployment packaging remain Post-MVP.
 - `deploy/` is local dev/demo guidance only at this point.
 
@@ -148,7 +148,7 @@ Post-MVP work is directional, not a hidden product promise. Likely expansion pat
 - Basic operational health/version visibility
 - Stronger Worker edge-case coverage and operational recovery behavior
 - Secret runtime integration and key lifecycle work
-- Git-backed playbooks and artifact-directory playbooks
+- Git-backed playbooks and richer playbook asset lifecycle
 - Import workflows for existing inventories or automation definitions
 - Ansible Collections dependency tracking
 - Notification integrations

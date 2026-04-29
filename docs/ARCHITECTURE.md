@@ -218,7 +218,9 @@ A group of ManagedNodes used to generate Ansible inventory.
 
 ### Playbook
 
-A reusable automation definition.
+A reusable automation definition. The current implementation supports inline YAML playbooks and managed
+artifact-directory playbooks with relative file paths plus an entry file such as `site.yml`. The Worker materializes
+either source type into the per-Run workspace before invoking Ansible.
 
 ### VariableSet
 

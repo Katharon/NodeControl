@@ -44,10 +44,17 @@ One concrete execution.
 
 ## Current Playbook Storage
 
-The current implementation stores inline playbook definitions through the application/database model and writes
-the selected playbook into each JobRun workspace when a Run is processed.
+The current implementation supports two playbook source types:
 
-Artifact-directory playbooks remain a later feature. A production-style artifact path could be:
+- Inline YAML playbooks, where the playbook content is stored directly on the Playbook record.
+- Managed artifact-directory playbooks, where NodeControl stores a small set of relative playbook files and an
+  entry file path such as `site.yml`.
+
+When a Run is processed, the Worker materializes the selected playbook into that JobRun workspace. The API stores
+metadata/content and validates obvious invalid combinations, but it never creates execution workspaces or runs
+Ansible.
+
+A later production-style artifact path outside individual run workspaces could be:
 
 ```text
 /var/lib/nodecontrol/playbooks/{customerId}/{playbookId}/
@@ -59,7 +66,7 @@ For inline YAML playbooks, a future artifact-backed layout could write:
 /var/lib/nodecontrol/playbooks/{customerId}/{playbookId}/site.yml
 ```
 
-Later artifact-directory playbooks may include:
+Managed artifact-directory playbooks may include:
 
 ```text
 site.yml
@@ -85,6 +92,10 @@ Suggested path:
 ├── stdout.log
 └── stderr.log
 ```
+
+For inline YAML playbooks, the Worker writes the content to `playbook/site.yml`. For artifact-directory playbooks,
+the Worker writes the complete managed file tree under `playbook/` and invokes `ansible-playbook` with the configured
+entry file path.
 
 The Worker implements local execution for queued JobRuns. The workspace root is configured with
 `NodeControl:Execution:RunWorkspaceRoot`; development uses `.nodecontrol/runs`, while production-style
@@ -279,7 +290,7 @@ If exceeded:
 Potential later improvements:
 
 - Git-backed playbooks
-- Artifact-directory upload
+- Richer artifact upload/import lifecycle
 - Ansible roles support in UI
 - Vault integration
 - Secret masking

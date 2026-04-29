@@ -3,6 +3,11 @@ import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api/apiClient";
 export type PlaybookSourceType = "InlineYaml" | "ArtifactDirectory" | "GitRepository";
 export type PlaybookStatus = "Active" | "Archived";
 
+export type PlaybookArtifactFile = {
+  path: string;
+  content: string;
+};
+
 export type Playbook = {
   id: string;
   customerId: string;
@@ -13,6 +18,7 @@ export type Playbook = {
   status: PlaybookStatus;
   inlineContent: string | null;
   entryFilePath: string | null;
+  artifactFiles: PlaybookArtifactFile[];
   createdAt: string;
   updatedAt: string | null;
   archivedAt: string | null;
@@ -25,6 +31,7 @@ export type PlaybookInput = {
   sourceType: PlaybookSourceType;
   inlineContent?: string | null;
   entryFilePath?: string | null;
+  artifactFiles?: PlaybookArtifactFile[] | null;
 };
 
 export type PlaybookValidationResult = {

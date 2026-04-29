@@ -55,6 +55,10 @@ public sealed class PlaybookConfiguration : IEntityTypeConfiguration<Playbook>
             .HasColumnName("entry_file_path")
             .HasMaxLength(500);
 
+        builder.Property(playbook => playbook.ArtifactFilesJson)
+            .HasColumnName("artifact_files_json")
+            .HasMaxLength(1000000);
+
         builder.Property(playbook => playbook.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

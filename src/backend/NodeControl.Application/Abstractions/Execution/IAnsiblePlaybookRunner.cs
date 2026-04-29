@@ -9,6 +9,7 @@ public interface IAnsiblePlaybookRunner
 
 public sealed record AnsiblePlaybookRunRequest(
     string WorkspacePath,
+    string PlaybookFileName,
     string VariableFileName,
     string StdoutLogPath,
     string StderrLogPath,
