@@ -86,7 +86,7 @@ Examples:
 - AuditLog
 - Secret
 
-The Domain project must not depend on ASP.NET Core, EF Core, Quartz, or Ansible execution code.
+The Domain project must not depend on ASP.NET Core, EF Core, scheduler infrastructure, or Ansible execution code.
 
 ### NodeControl.Application
 

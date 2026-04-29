@@ -94,7 +94,7 @@ Good next slices should stay small, visible, and aligned with the control-plane 
 - Basic operational health endpoint and version display
 - More Worker test coverage for edge cases around cancellation, timeouts, and host checks
 - Secret runtime integration design before any execution-time decryption work
-- Git/artifact playbook design before adding repository-backed execution
+- Artifact-directory playbook design for multi-file playbook assets before adding repository-backed execution
 
 These are likely next steps, not commitments. Each should be delivered as a vertical slice with authorization,
 customer scoping, tests, and documentation.

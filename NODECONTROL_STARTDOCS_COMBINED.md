@@ -1,3 +1,17 @@
+# Legacy / Archival Planning Document
+
+This combined start document is retained for historical context only. It is not an active source of truth for
+current architecture, scheduling, product scope, or implementation status.
+
+Active truth now lives in `README.md`, `AGENTS.md`, and the focused files under `docs/`, especially
+`docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, `docs/SCHEDULING.md`, and
+`docs/ANSIBLE_EXECUTION.md`.
+
+Some sections below describe early planning assumptions that have since changed, including older Quartz.NET
+scheduling notes. The current implementation uses database-backed schedule polling in `NodeControl.Worker`.
+
+---
+
 # File: README.md
 
 # NodeControl
@@ -2485,4 +2499,3 @@ A task is done when:
 
 
 ---
-

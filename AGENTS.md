@@ -66,7 +66,7 @@ Forbidden:
 
 - ASP.NET Core dependencies
 - EF Core dependencies
-- Quartz dependencies
+- Scheduling infrastructure dependencies
 - Ansible process execution
 - HTTP concerns
 
@@ -97,7 +97,7 @@ Allowed:
 
 - EF Core DbContext
 - PostgreSQL persistence
-- Quartz integration
+- Database-backed schedule polling integration
 - File storage
 - Ansible process runner
 - Logging implementation
@@ -199,13 +199,14 @@ Rules:
 
 ## Scheduling Rules
 
-1. Use Quartz.NET for scheduling.
-2. Keep NodeControl's domain model independent from Quartz internals.
+1. Use database-backed Worker polling for the current scheduling implementation.
+2. Keep NodeControl's domain model independent from scheduler infrastructure internals.
 3. `Schedule` is a NodeControl concept.
-4. Quartz is an implementation detail.
+4. Scheduler infrastructure is an implementation detail.
 5. Cron expressions must be validated.
 6. Schedules must be enableable and disableable.
 7. Scheduled runs must write `JobRun.TriggerType = Scheduled`.
+8. The API manages schedule definitions only; it must not create due scheduled runs or execute jobs directly.
 
 ## Ansible Rules
 
