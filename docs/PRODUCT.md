@@ -180,12 +180,12 @@ NodeControl should position itself as:
 A strong demo should show:
 
 1. Start the local stack with the scripts in `scripts/`.
-2. Login through Fake Auth as Dev Admin for the local demo.
-3. Select a customer.
-4. View hosts and inventory.
-5. Open a playbook/action.
-6. Run an action manually through the run wizard.
-7. Inspect run status and logs in the Run Center.
-8. Create or inspect a schedule.
-9. Show audit logs.
+2. Seed the optional showcase story with `./scripts/dev-seed-demo.sh`.
+3. Login through Fake Auth as Dev Admin for the local demo.
+4. Select the `Acme Managed Services` customer.
+5. View hosts and inventory.
+6. Open the demo playbook, variable set, and action.
+7. Run the action manually through the run wizard or Action page.
+8. Inspect run status and logs in the Run Center.
+9. Inspect the paused schedule, Hostzustand, and audit logs.
 10. Explain customer separation, internal permissions, and the API/Worker execution boundary.

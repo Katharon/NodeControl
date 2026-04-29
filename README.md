@@ -164,10 +164,16 @@ Apply the existing EF Core migrations to the local PostgreSQL database:
 ./scripts/dev-migrate.sh
 ```
 
-Run the application in three separate terminals:
+Start the API in one terminal and load the optional showcase data from another terminal:
 
 ```bash
 ./scripts/dev-run-api.sh
+./scripts/dev-seed-demo.sh
+```
+
+With the API still running, start the Worker and frontend in separate terminals:
+
+```bash
 ./scripts/dev-run-worker.sh
 ./scripts/dev-run-frontend.sh
 ```
@@ -207,6 +213,7 @@ The `scripts/` directory contains small shell scripts for repeatable local workf
 - `dev-run-api.sh` starts the API in Development mode on `http://localhost:5257`.
 - `dev-run-worker.sh` starts the Worker in Development mode.
 - `dev-run-frontend.sh` starts the Next.js dev server and points it at the local API.
+- `dev-seed-demo.sh` creates or updates the Acme showcase data through the running API.
 - `dev-smoke.sh` runs backend restore/build/test, frontend lint/build, the API execution-boundary grep, and optional HTTP checks when local services are running.
 
 The scripts use these defaults and can be overridden through environment variables:
@@ -225,11 +232,15 @@ A compact reviewer/demo path is:
 
 1. Start local infrastructure with `./scripts/dev-up.sh`.
 2. Apply migrations with `./scripts/dev-migrate.sh`.
-3. Run API, Worker, and frontend with the three `dev-run-*` scripts.
-4. Open `http://localhost:3000` and sign in through Fake Auth as Dev Admin.
-5. Open Dashboard, Customers, Hosts, Actions, Schedules, Runs, Hostzustand, Users, and Audit.
-6. Use the Run wizard to queue a Run, then inspect the Run Center and logs.
-7. Point out customer scoping, internal roles, audit history, and the API/Worker execution boundary.
+3. Start the API with `./scripts/dev-run-api.sh`.
+4. Load the showcase data with `./scripts/dev-seed-demo.sh`.
+5. Run the Worker and frontend with `./scripts/dev-run-worker.sh` and `./scripts/dev-run-frontend.sh`.
+6. Open `http://localhost:3000` and sign in through Fake Auth as Dev Admin.
+7. Open the `Acme Managed Services` customer and inspect Hosts, Inventar, Playbooks, Variables, Actions, Schedules, Runs, Hostzustand, Users, and Audit.
+8. Start the `Demo - Inventory Echo` Action through the UI or queue it with `./scripts/dev-seed-demo.sh --queue-run`, then inspect the Run Center and logs.
+9. Point out customer scoping, internal roles, audit history, and the API/Worker execution boundary.
+
+The seeded showcase is intentionally honest: the demo Action uses a safe inline Ansible debug playbook through the real Worker execution path. It does not fake successful SSH access to demo hosts. See `docs/SHOWCASE.md` for the full walkthrough.
 
 ## Development Strategy
 

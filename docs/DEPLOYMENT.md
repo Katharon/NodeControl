@@ -26,10 +26,16 @@ dotnet tool restore
 ./scripts/dev-migrate.sh
 ```
 
-Run the app in three terminals:
+Optional showcase data, after starting the API in one terminal:
 
 ```bash
 ./scripts/dev-run-api.sh
+./scripts/dev-seed-demo.sh
+```
+
+With the API still running, start the Worker and frontend in separate terminals:
+
+```bash
 ./scripts/dev-run-worker.sh
 ./scripts/dev-run-frontend.sh
 ```
@@ -52,6 +58,7 @@ OIDC development, but it is not required for the default demo path.
 - `scripts/dev-run-api.sh`: starts `NodeControl.Api` in Development mode.
 - `scripts/dev-run-worker.sh`: starts `NodeControl.Worker` in Development mode.
 - `scripts/dev-run-frontend.sh`: starts the Next.js dev server.
+- `scripts/dev-seed-demo.sh`: seeds or updates the Acme showcase story through the running Development API.
 - `scripts/dev-smoke.sh`: runs restore/build/test/lint/build, the API execution-boundary grep, and optional local HTTP checks.
 
 ## Runtime Responsibilities

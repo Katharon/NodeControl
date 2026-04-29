@@ -58,6 +58,7 @@ package yet.
 - Planned placeholder pages for post-MVP surfaces
 - Frontend shell stabilization
 - Local scripts for infrastructure, migrations, API, Worker, frontend, and smoke checks
+- API-driven Acme showcase seed flow for hosts, inventory, playbook, variables, action, paused schedule, and optional queued Run
 - Minimal `deploy/` notes that clearly avoid claiming production readiness
 
 ## Current Architecture Boundaries
@@ -74,7 +75,6 @@ package yet.
 
 Good next slices should stay small and visible:
 
-- Demo seed data and a scripted demo reset path
 - Screenshots or a short demo guide for reviewers
 - More focused frontend tests around shell, run wizard, and critical empty states
 - Production configuration documentation and deployment hardening

@@ -10,14 +10,20 @@ For a local demo, use the root development compose file through the scripts:
 ./scripts/dev-migrate.sh
 ```
 
-Then run the API, Worker, and frontend in separate terminals:
+Then start the API in one terminal and seed the optional showcase story from another terminal:
 
 ```bash
 ./scripts/dev-run-api.sh
+./scripts/dev-seed-demo.sh
+```
+
+Run the Worker and frontend in separate terminals:
+
+```bash
 ./scripts/dev-run-worker.sh
 ./scripts/dev-run-frontend.sh
 ```
 
-Open `http://localhost:3000` and sign in through Fake Auth. Production deployment hardening, packaging, TLS, and identity-provider configuration are intentionally outside this slice.
+Open `http://localhost:3000` and sign in through Fake Auth. The seeded `Acme Managed Services` story can be used to show hosts, inventory, playbooks, variables, actions, schedules, runs, logs, host health, and audit. Production deployment hardening, packaging, TLS, and identity-provider configuration are intentionally outside this slice.
 
-For fuller setup notes, see `docs/DEPLOYMENT.md` and the root `README.md`.
+For fuller setup notes, see `docs/DEPLOYMENT.md`, `docs/SHOWCASE.md`, and the root `README.md`.
