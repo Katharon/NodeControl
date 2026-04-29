@@ -57,6 +57,6 @@ public sealed class JobRunLogService(
             entry.TimestampUtc,
             entry.Stream.ToString(),
             entry.Level.ToString(),
-            entry.Message);
+            JobRunLogRedactor.Redact(entry.Message) ?? string.Empty);
     }
 }

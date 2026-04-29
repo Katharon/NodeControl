@@ -511,6 +511,108 @@ public sealed class JobsAndJobRunsServiceTests
         Assert.Equal(CustomerServiceError.NotFound, result.Error);
     }
 
+    [Fact]
+    public async Task JobRunService_redacts_sensitive_error_and_cancellation_values()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+        var failedRun = fixture.AddQueuedJobRun();
+        failedRun.MarkRunning(TestTime);
+        failedRun.MarkFailed(1, "Authorization: Bearer abcdefghijklmnop token=super-secret", TestTime);
+        var cancellingRun = fixture.AddQueuedJobRun();
+        cancellingRun.MarkRunning(TestTime);
+        cancellingRun.RequestCancellation(fixture.CurrentUser.Id, "password=do-not-show", TestTime);
+
+        var failedResult = await fixture.CreateJobRunService().GetAsync(
+            fixture.CurrentUser,
+            fixture.Customer.Id,
+            failedRun.Id);
+        var cancellingResult = await fixture.CreateJobRunService().GetAsync(
+            fixture.CurrentUser,
+            fixture.Customer.Id,
+            cancellingRun.Id);
+
+        Assert.Null(failedResult.Error);
+        Assert.Null(cancellingResult.Error);
+        Assert.Equal("Authorization: Bearer [REDACTED] token=[REDACTED]", failedResult.Value!.ErrorMessage);
+        Assert.Equal("password=[REDACTED]", cancellingResult.Value!.CancellationReason);
+    }
+
+    [Fact]
+    public async Task JobRunLogService_redacts_obvious_sensitive_log_values()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+        var jobRun = fixture.AddQueuedJobRun();
+        fixture.Db.AddJobRunLogEntry(JobRunLogEntry.Create(
+            jobRun,
+            1,
+            TestTime,
+            JobRunLogStream.StdOut,
+            JobRunLogLevel.Info,
+            "ok password=hunter2 Authorization: Bearer abcdefghijklmnop ref secret://api-token=resolved"));
+
+        var result = await fixture.CreateJobRunLogService().ListAsync(
+            fixture.CurrentUser,
+            fixture.Customer.Id,
+            jobRun.Id,
+            null,
+            null);
+
+        Assert.Null(result.Error);
+        Assert.Equal(
+            "ok password=[REDACTED] Authorization: Bearer [REDACTED] ref secret://api-token=[REDACTED]",
+            Assert.Single(result.Value!.Items).Message);
+    }
+
+    [Fact]
+    public async Task JobRunLogService_keeps_secret_references_without_resolved_values()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+        var jobRun = fixture.AddQueuedJobRun();
+        fixture.Db.AddJobRunLogEntry(JobRunLogEntry.Create(
+            jobRun,
+            1,
+            TestTime,
+            JobRunLogStream.StdOut,
+            JobRunLogLevel.Info,
+            "using secret://api-token"));
+
+        var result = await fixture.CreateJobRunLogService().ListAsync(
+            fixture.CurrentUser,
+            fixture.Customer.Id,
+            jobRun.Id,
+            null,
+            null);
+
+        Assert.Null(result.Error);
+        Assert.Equal("using secret://api-token", Assert.Single(result.Value!.Items).Message);
+    }
+
+    [Fact]
+    public async Task JobRunLogService_rejects_cross_tenant_log_lookup_as_not_found()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+        var other = fixture.AddOtherCustomer();
+        var otherJob = fixture.AddValidJob(other.Customer.Id, other.Resources);
+        var otherRun = JobRun.CreateManual(otherJob, other.CurrentUser.Id, TestTime);
+        fixture.Db.AddJobRun(otherRun);
+        fixture.Db.AddJobRunLogEntry(JobRunLogEntry.Create(
+            otherRun,
+            1,
+            TestTime,
+            JobRunLogStream.StdOut,
+            JobRunLogLevel.Info,
+            "other customer output"));
+
+        var result = await fixture.CreateJobRunLogService().ListAsync(
+            fixture.CurrentUser,
+            fixture.Customer.Id,
+            otherRun.Id,
+            null,
+            null);
+
+        Assert.Equal(CustomerServiceError.NotFound, result.Error);
+    }
+
     private static DateTimeOffset TestTime => new(2026, 4, 27, 10, 0, 0, TimeSpan.Zero);
 
     private static CurrentUserDto CurrentUser(User user)
@@ -676,6 +778,11 @@ public sealed class JobsAndJobRunsServiceTests
         public JobRunService CreateJobRunService()
         {
             return new JobRunService(Db, new CustomerAuthorizationService(Db), clock, CreateAuditWriter());
+        }
+
+        public JobRunLogService CreateJobRunLogService()
+        {
+            return new JobRunLogService(Db, new CustomerAuthorizationService(Db));
         }
 
         private AuditLogWriter CreateAuditWriter()

@@ -5,6 +5,7 @@ import PauseIcon from "@mui/icons-material/Pause";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import { Alert, Button, CircularProgress, Divider, Paper, Stack, Typography } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ConfirmActionButton } from "@/components/guardrails/ConfirmActionButton";
 import { JobScheduleForm } from "@/components/schedules/JobScheduleForm";
 import { JobScheduleStatusChip } from "@/components/schedules/JobScheduleStatusChip";
 import { getCustomer } from "@/lib/api/customers";
@@ -75,18 +76,41 @@ export function JobScheduleDetailsCard({ customerId, scheduleId }: JobScheduleDe
           {canManageSchedules ? (
             <Stack direction="row" sx={{ alignSelf: { sm: "flex-start" }, gap: 1 }}>
               {schedule.status === "Active" ? (
-                <Button disabled={pauseMutation.isPending} onClick={() => pauseMutation.mutate()} startIcon={<PauseIcon />} variant="outlined">
+                <ConfirmActionButton
+                  actionLabel="Pause Schedule"
+                  color="primary"
+                  message="This pauses future scheduled Runs until the Schedule is resumed."
+                  onConfirm={() => pauseMutation.mutateAsync()}
+                  pending={pauseMutation.isPending}
+                  startIcon={<PauseIcon />}
+                  title="Pause this Schedule?"
+                >
                   Pause
-                </Button>
+                </ConfirmActionButton>
               ) : null}
               {schedule.status === "Paused" ? (
-                <Button disabled={resumeMutation.isPending} onClick={() => resumeMutation.mutate()} startIcon={<PlayArrowIcon />} variant="outlined">
+                <ConfirmActionButton
+                  actionLabel="Resume Schedule"
+                  color="primary"
+                  message="This enables the Schedule again. Future Runs will be queued from its cron expression."
+                  onConfirm={() => resumeMutation.mutateAsync()}
+                  pending={resumeMutation.isPending}
+                  startIcon={<PlayArrowIcon />}
+                  title="Resume this Schedule?"
+                >
                   Resume
-                </Button>
+                </ConfirmActionButton>
               ) : null}
-              <Button color="warning" disabled={archiveMutation.isPending} onClick={() => archiveMutation.mutate()} startIcon={<ArchiveIcon />} variant="outlined">
+              <ConfirmActionButton
+                actionLabel="Archive Schedule"
+                message="Archived Schedules will no longer create scheduled Runs."
+                onConfirm={() => archiveMutation.mutateAsync()}
+                pending={archiveMutation.isPending}
+                startIcon={<ArchiveIcon />}
+                title="Archive this Schedule?"
+              >
                 Archive
-              </Button>
+              </ConfirmActionButton>
             </Stack>
           ) : null}
         </Stack>

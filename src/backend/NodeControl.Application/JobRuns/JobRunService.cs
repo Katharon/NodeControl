@@ -319,13 +319,13 @@ public sealed class JobRunService(
             jobRun.StartedAt,
             jobRun.FinishedAt,
             jobRun.ExitCode,
-            jobRun.ErrorMessage,
+            JobRunLogRedactor.Redact(jobRun.ErrorMessage),
             jobRun.WorkspacePath,
             jobRun.StdoutLogPath,
             jobRun.StderrLogPath,
             jobRun.CancellationRequestedAtUtc,
             jobRun.CancellationRequestedByUserId,
-            jobRun.CancellationReason,
+            JobRunLogRedactor.Redact(jobRun.CancellationReason),
             jobRun.CreatedAt);
     }
 }

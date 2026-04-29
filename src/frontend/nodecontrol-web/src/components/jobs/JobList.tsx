@@ -18,6 +18,7 @@ import {
 } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { ConfirmActionButton } from "@/components/guardrails/ConfirmActionButton";
 import { JobForm } from "@/components/jobs/JobForm";
 import { RunJobButton } from "@/components/jobs/RunJobButton";
 import { getCustomer } from "@/lib/api/customers";
@@ -101,9 +102,16 @@ export function JobList({ customerId }: JobListProps) {
                   <Button endIcon={<OpenInNewIcon />} href={`/customers/${customerId}/actions/${job.id}`} variant="outlined">Öffnen</Button>
                   {canRunJobs ? <RunJobButton customerId={customerId} jobId={job.id} /> : null}
                   {canManageJobs ? (
-                    <Button color="warning" disabled={archiveMutation.isPending} onClick={() => archiveMutation.mutate(job.id)} startIcon={<ArchiveIcon />} variant="outlined">
+                    <ConfirmActionButton
+                      actionLabel="Archive Action"
+                      message="Archived Actions disappear from normal selection and cannot be queued for new Runs."
+                      onConfirm={() => archiveMutation.mutateAsync(job.id)}
+                      pending={archiveMutation.isPending}
+                      startIcon={<ArchiveIcon />}
+                      title="Archive this Action?"
+                    >
                       Archive
-                    </Button>
+                    </ConfirmActionButton>
                   ) : null}
                 </Stack>
               </Stack>

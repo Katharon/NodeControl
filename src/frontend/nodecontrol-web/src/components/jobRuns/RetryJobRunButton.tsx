@@ -1,9 +1,9 @@
 "use client";
 
 import ReplayIcon from "@mui/icons-material/Replay";
-import { Button } from "@mui/material";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { ConfirmActionButton } from "@/components/guardrails/ConfirmActionButton";
 import { retryJobRun } from "@/lib/api/jobRuns";
 
 type RetryJobRunButtonProps = {
@@ -23,8 +23,17 @@ export function RetryJobRunButton({ customerId, jobRunId }: RetryJobRunButtonPro
   });
 
   return (
-    <Button disabled={mutation.isPending} onClick={() => mutation.mutate()} startIcon={<ReplayIcon />} variant="contained">
+    <ConfirmActionButton
+      actionLabel="Retry run"
+      color="primary"
+      message="This creates a new queued run using the same Action definition and execution path."
+      onConfirm={() => mutation.mutateAsync()}
+      pending={mutation.isPending}
+      startIcon={<ReplayIcon />}
+      title="Retry this run?"
+      variant="contained"
+    >
       Retry run
-    </Button>
+    </ConfirmActionButton>
   );
 }

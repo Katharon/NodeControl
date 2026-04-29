@@ -6,6 +6,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { Alert, Box, Button, CircularProgress, Divider, Paper, Stack, TextField, Typography } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { ConfirmActionButton } from "@/components/guardrails/ConfirmActionButton";
 import { RotateSecretDialog } from "@/components/secrets/RotateSecretDialog";
 import { SecretForm } from "@/components/secrets/SecretForm";
 import { SecretKindChip } from "@/components/secrets/SecretKindChip";
@@ -81,9 +82,17 @@ export function SecretDetailsCard({ customerId, secretId, canManageSecrets }: Se
               <Button onClick={() => setRotateOpen(true)} startIcon={<AutorenewIcon />} variant="outlined">
                 Rotate
               </Button>
-              <Button color="warning" disabled={archiveMutation.isPending} onClick={() => archiveMutation.mutate()} startIcon={<ArchiveIcon />} variant="outlined">
+              <ConfirmActionButton
+                actionLabel="Archive secret"
+                message="Archived secrets stop validating as active secret references for this customer."
+                onConfirm={() => archiveMutation.mutateAsync()}
+                pending={archiveMutation.isPending}
+                startIcon={<ArchiveIcon />}
+                title="Archive this secret?"
+                warning="Existing playbooks or variables that still reference this secret may need to be updated."
+              >
                 Archive
-              </Button>
+              </ConfirmActionButton>
             </Stack>
           ) : null}
         </Stack>
@@ -114,6 +123,7 @@ export function SecretDetailsCard({ customerId, secretId, canManageSecrets }: Se
           <Stack direction={{ xs: "column", sm: "row" }} sx={{ gap: 1 }}>
             <TextField
               fullWidth
+              helperText="Reference only. The stored value is not returned by the API."
               slotProps={{ input: { readOnly: true, sx: { fontFamily: "monospace" } } }}
               value={reference}
             />

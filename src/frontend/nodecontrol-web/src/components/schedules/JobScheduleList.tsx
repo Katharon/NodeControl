@@ -18,6 +18,7 @@ import {
 } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { ConfirmActionButton } from "@/components/guardrails/ConfirmActionButton";
 import { JobScheduleForm } from "@/components/schedules/JobScheduleForm";
 import { JobScheduleStatusChip } from "@/components/schedules/JobScheduleStatusChip";
 import { getCustomer } from "@/lib/api/customers";
@@ -102,9 +103,16 @@ export function JobScheduleList({ customerId }: JobScheduleListProps) {
                 <Stack direction="row" sx={{ gap: 1 }}>
                   <Button endIcon={<OpenInNewIcon />} href={`/customers/${customerId}/schedules/${schedule.id}`} variant="outlined">Öffnen</Button>
                   {canManageSchedules ? (
-                    <Button color="warning" disabled={archiveMutation.isPending} onClick={() => archiveMutation.mutate(schedule.id)} startIcon={<ArchiveIcon />} variant="outlined">
+                    <ConfirmActionButton
+                      actionLabel="Archive Schedule"
+                      message="Archived Schedules will no longer create scheduled Runs."
+                      onConfirm={() => archiveMutation.mutateAsync(schedule.id)}
+                      pending={archiveMutation.isPending}
+                      startIcon={<ArchiveIcon />}
+                      title="Archive this Schedule?"
+                    >
                       Archive
-                    </Button>
+                    </ConfirmActionButton>
                   ) : null}
                 </Stack>
               </Stack>
