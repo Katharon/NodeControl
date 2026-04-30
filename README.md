@@ -37,6 +37,7 @@ customer-scoped automation control plane with a complete local demo loop. Curren
 - Managed nodes
 - Inventory groups
 - Inline YAML and managed artifact-directory playbooks
+- Customer-scoped Git repository sources for one-time artifact import into managed playbooks/templates
 - Variable sets
 - Actions and manual Runs
 - Scheduled Runs / cron jobs through Worker polling
@@ -63,7 +64,7 @@ Important current boundaries:
 - The API never executes Ansible, shell commands, SSH checks, or TCP checks.
 - `NodeControl.Worker` is responsible for queued Run execution, schedule polling, host connection checks, workspaces, logs, and Ansible process execution.
 - `deploy/` is dev/demo guidance only; production packaging is not complete.
-- Git-backed playbooks, imports, cloud integrations, notifications, advanced secret
+- Continuous Git-backed playbooks/sync, cloud integrations, notifications, advanced secret
   runtime integration, and broader system/security administration are Post-MVP directions.
 
 See `docs/MVP_BOUNDARY.md` for the explicit current-vs-Post-MVP boundary.

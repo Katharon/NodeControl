@@ -2,6 +2,7 @@ using NodeControl.Application.Audit;
 using NodeControl.Application.Abstractions.Persistence;
 using NodeControl.Domain.Audit;
 using NodeControl.Domain.Customers;
+using NodeControl.Domain.GitRepositories;
 using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
@@ -34,6 +35,8 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     public List<InventoryGroupNode> InventoryGroupNodes { get; } = [];
 
     public List<Playbook> Playbooks { get; } = [];
+
+    public List<GitRepository> GitRepositories { get; } = [];
 
     public List<VariableSet> VariableSets { get; } = [];
 
@@ -315,6 +318,20 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     {
         return Task.FromResult(Playbooks.FirstOrDefault(playbook =>
             playbook.CustomerId == customerId && playbook.Slug == slug));
+    }
+
+    public Task<IReadOnlyList<GitRepository>> ListActiveGitRepositoriesAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult<IReadOnlyList<GitRepository>>(
+            GitRepositories
+                .Where(repository => repository.CustomerId == customerId && repository.Status == GitRepositoryStatus.Active)
+                .ToArray());
+    }
+
+    public Task<GitRepository?> FindGitRepositoryAsync(Guid customerId, Guid gitRepositoryId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(GitRepositories.FirstOrDefault(repository =>
+            repository.CustomerId == customerId && repository.Id == gitRepositoryId));
     }
 
     public Task<IReadOnlyList<VariableSet>> ListActiveVariableSetsAsync(Guid customerId, CancellationToken cancellationToken)
@@ -620,6 +637,11 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
     public void AddPlaybook(Playbook playbook)
     {
         Playbooks.Add(playbook);
+    }
+
+    public void AddGitRepository(GitRepository gitRepository)
+    {
+        GitRepositories.Add(gitRepository);
     }
 
     public void AddVariableSet(VariableSet variableSet)

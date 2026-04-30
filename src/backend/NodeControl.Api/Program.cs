@@ -27,6 +27,7 @@ app.MapControlNodesEndpoints();
 app.MapManagedNodesEndpoints();
 app.MapInventoryGroupsEndpoints();
 app.MapPlaybooksEndpoints();
+app.MapGitRepositoriesEndpoints();
 app.MapVariableSetsEndpoints();
 app.MapTemplatesEndpoints();
 app.MapSecretsEndpoints();

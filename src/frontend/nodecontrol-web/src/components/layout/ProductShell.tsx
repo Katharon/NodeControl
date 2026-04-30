@@ -90,9 +90,9 @@ const navigationGroups: NavigationGroup[] = [
   {
     label: "Onboarding & Quellen",
     items: [
-      { label: "Git-Repos", href: "/git-repos", icon: GitHubIcon, planned: true },
+      { label: "Git-Repos", href: "/git-repos", icon: GitHubIcon, scopedSegment: "git-repos" },
       { label: "Collections", href: "/collections", icon: ExtensionIcon, planned: true },
-      { label: "Import", href: "/import", icon: UploadFileIcon, planned: true },
+      { label: "Import", href: "/import", icon: UploadFileIcon, scopedSegment: "import" },
     ],
   },
   {
@@ -119,6 +119,8 @@ const scopedPathBySegment: Record<string, string> = {
   audit: "audit",
   "host-health": "host-health",
   hosts: "hosts",
+  "git-repos": "git-repos",
+  import: "import",
   inventories: "inventories",
   playbooks: "playbooks",
   "run-wizard": "run-wizard",

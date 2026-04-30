@@ -103,6 +103,7 @@ The implemented dev/demo MVP is a customer-scoped automation control plane. It c
 - Managed nodes
 - Inventory groups
 - Inline YAML and managed artifact-directory playbooks with product-side file import/editing
+- Customer-scoped Git repository sources for one-time artifact imports
 - Variable sets
 - Manual jobs
 - Scheduled jobs
@@ -122,6 +123,9 @@ These product areas exist in the current MVP, but their scope is intentionally l
 
 - Templates are managed text resources with file import/editing in the UI. Actions may map selected templates to
   relative files under the run playbook workspace, where the Worker materializes them before Ansible starts.
+- Git repository sources store repository metadata such as URL, branch/revision, and subpath. The MVP import flow is
+  intentionally one-time: operators copy selected public GitHub files into managed Playbook or Template content, and
+  future Runs use that managed content rather than syncing from Git.
 - Secrets store protected values and expose safe metadata/reference behavior. Secret values are never returned by the
   API; `secret://...` references are resolved only by the Worker during workspace preparation.
 - Platform admin user overview is a review and administration aid for existing users, not user registration,
@@ -135,7 +139,7 @@ Current implementation boundaries are intentionally explicit:
 - NodeControl is still a control plane around Ansible, not an AWX clone.
 - The API queues work and enforces authorization; it never executes Ansible, SSH, TCP checks, shell commands, or process starts.
 - The Worker executes queued Runs, polls schedules, processes Hostzustand checks, creates workspaces, and captures logs.
-- Git-backed playbooks, imports, Ansible Collections management, cloud-provider inventory,
+- Continuous Git-backed playbook execution, Git sync, Ansible Collections management, cloud-provider inventory,
   notifications, approval workflow, external secret providers, and production deployment packaging remain Post-MVP.
 - `deploy/` is local dev/demo guidance only at this point.
 
@@ -149,7 +153,7 @@ Post-MVP work is directional, not a hidden product promise. Likely expansion pat
 - Basic operational health/version visibility
 - Stronger Worker edge-case coverage and operational recovery behavior
 - Secret runtime integration and key lifecycle work
-- Git-backed playbooks and richer playbook asset lifecycle
+- Continuous Git-backed playbooks and richer playbook asset lifecycle
 - Import workflows for existing inventories or automation definitions
 - Ansible Collections dependency tracking
 - Notification integrations

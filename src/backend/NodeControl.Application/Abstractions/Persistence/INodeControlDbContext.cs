@@ -2,6 +2,7 @@ using NodeControl.Application.Audit;
 using NodeControl.Domain.Audit;
 using NodeControl.Domain.Users;
 using NodeControl.Domain.Customers;
+using NodeControl.Domain.GitRepositories;
 using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
@@ -178,6 +179,16 @@ public interface INodeControlDbContext
     }
 
     Task<Playbook?> FindPlaybookBySlugAsync(Guid customerId, string slug, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<IReadOnlyList<GitRepository>> ListActiveGitRepositoriesAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task<GitRepository?> FindGitRepositoryAsync(Guid customerId, Guid gitRepositoryId, CancellationToken cancellationToken)
     {
         throw new NotSupportedException();
     }
@@ -360,6 +371,11 @@ public interface INodeControlDbContext
     }
 
     void AddPlaybook(Playbook playbook)
+    {
+        throw new NotSupportedException();
+    }
+
+    void AddGitRepository(GitRepository gitRepository)
     {
         throw new NotSupportedException();
     }

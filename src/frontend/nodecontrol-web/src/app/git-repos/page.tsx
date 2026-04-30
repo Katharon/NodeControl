@@ -1,11 +1,12 @@
 import { AppPage } from "@/components/layout/AppPage";
-import { PlaceholderProductPage } from "@/components/layout/PlaceholderProductPage";
+import { ProductRoutePicker } from "@/components/layout/ProductRoutePicker";
 
 export default function GitReposPage() {
   return (
     <AppPage>
-      <PlaceholderProductPage
-        description="Git-Repos gehören zu späteren playbook- und artifact-basierten Workflows. Der MVP verwendet bewusst Inline-Playbooks."
+      <ProductRoutePicker
+        customerPath="git-repos"
+        description="Manage customer-scoped Git repository sources for one-time artifact imports."
         title="Git-Repos"
       />
     </AppPage>

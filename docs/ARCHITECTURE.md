@@ -20,7 +20,8 @@ development infrastructure, dev/demo scripts, and a demo-ready product surface.
 Implemented product areas include customer and membership management, static roles/permissions, Control Hosts,
 Hosts, inventory groups, playbooks, variable sets, actions, runs, schedules, persisted run logs, audit logs,
 templates, secrets metadata and Worker-side reference resolution, user overview, Hostzustand checks, a run wizard, and a
-Run Center.
+Run Center. Git repository sources are managed as customer-scoped metadata and can be used by the frontend for one-time
+imports into the existing managed artifact models.
 
 The production deployment story is not complete. `deploy/` contains dev/demo notes only, while local bootstrap
 is handled by scripts in `scripts/`.
@@ -221,6 +222,12 @@ A group of ManagedNodes used to generate Ansible inventory.
 A reusable automation definition. The current implementation supports inline YAML playbooks and managed
 artifact-directory playbooks with relative file paths plus an entry file such as `site.yml`. The Worker materializes
 either source type into the per-Run workspace before invoking Ansible.
+
+### GitRepository
+
+A customer-scoped repository source definition containing repository URL, optional branch, optional revision, and
+optional subpath. In the MVP, Git repositories are used for one-time browser-side imports into managed Playbook or
+Template content. They are not cloned or synchronized by the API, and Runs do not depend on Git availability.
 
 ### VariableSet
 

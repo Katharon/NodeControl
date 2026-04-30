@@ -81,6 +81,11 @@ The product UI lets operators import local text files, edit file paths/content a
 entry file plus stored artifact file list. The API still stores and validates metadata/content only; it does not create
 execution workspaces or run Ansible.
 
+Git repository sources are a one-time import aid in the MVP. NodeControl stores customer-scoped repository metadata
+such as URL, branch/revision, and subpath. The import UI can fetch selected public GitHub files in the browser and then
+save the resulting content into the existing managed Playbook or Template records. The Worker still materializes only
+managed NodeControl content during Runs; it does not clone Git repositories during execution.
+
 ## JobRun Workspace
 
 Each JobRun gets its own workspace.
@@ -217,6 +222,7 @@ This is intentionally narrow:
 - The Worker writes execution-ready files into the run workspace.
 - NodeControl does not run a separate Jinja/Python template engine in this slice.
 - Template artifact paths must be relative and must not overwrite existing playbook files.
+- Git imports copy content into managed artifacts and do not create a continuous sync relationship.
 
 ## Secrets
 

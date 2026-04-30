@@ -3,6 +3,7 @@ using NodeControl.Application.Audit;
 using NodeControl.Application.Abstractions.Persistence;
 using NodeControl.Domain.Audit;
 using NodeControl.Domain.Customers;
+using NodeControl.Domain.GitRepositories;
 using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
@@ -36,6 +37,8 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
     public DbSet<InventoryGroupNode> InventoryGroupNodes => Set<InventoryGroupNode>();
 
     public DbSet<Playbook> Playbooks => Set<Playbook>();
+
+    public DbSet<GitRepository> GitRepositories => Set<GitRepository>();
 
     public DbSet<VariableSet> VariableSets => Set<VariableSet>();
 
@@ -464,6 +467,26 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<GitRepository>> ListActiveGitRepositoriesAsync(
+        Guid customerId,
+        CancellationToken cancellationToken)
+    {
+        return await GitRepositories
+            .Where(repository => repository.CustomerId == customerId && repository.Status == GitRepositoryStatus.Active)
+            .OrderBy(repository => repository.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<GitRepository?> FindGitRepositoryAsync(
+        Guid customerId,
+        Guid gitRepositoryId,
+        CancellationToken cancellationToken)
+    {
+        return await GitRepositories.FirstOrDefaultAsync(
+            repository => repository.CustomerId == customerId && repository.Id == gitRepositoryId,
+            cancellationToken);
+    }
+
     public async Task<IReadOnlyList<VariableSet>> ListActiveVariableSetsAsync(
         Guid customerId,
         CancellationToken cancellationToken)
@@ -820,6 +843,11 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
     public void AddPlaybook(Playbook playbook)
     {
         Playbooks.Add(playbook);
+    }
+
+    public void AddGitRepository(GitRepository gitRepository)
+    {
+        GitRepositories.Add(gitRepository);
     }
 
     public void AddVariableSet(VariableSet variableSet)

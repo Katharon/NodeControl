@@ -39,6 +39,7 @@ The explicit current/supporting/Post-MVP boundary is maintained in `docs/MVP_BOU
 - Hosts
 - Inventory groups and inventory preview
 - Inline YAML and managed artifact-directory playbooks
+- Customer-scoped Git repository sources for one-time artifact imports
 - Variable sets with YAML/JSON validation
 - Template management as plain text resources with Action-linked workspace materialization
 - Secret metadata management, rotation, safe `secret://...` reference validation, and Worker-side execution resolution
@@ -82,7 +83,8 @@ The explicit current/supporting/Post-MVP boundary is maintained in `docs/MVP_BOU
 - Schedules use a database-backed Worker poller. Quartz.NET is not part of the current implementation.
 - Templates can be materialized as configured Worker run workspace files.
 - Secret values are not returned through the API and are decrypted only in the Worker execution path.
-- Git-backed playbooks remain Post-MVP.
+- Continuous Git-backed playbook execution and Git sync remain Post-MVP. The current Git surface is a one-time import
+  aid into managed artifacts.
 
 ## Near-Term Expansion Paths
 
@@ -94,7 +96,7 @@ Good next slices should stay small, visible, and aligned with the control-plane 
 - Basic operational health endpoint and version display
 - More Worker test coverage for edge cases around cancellation, timeouts, and host checks
 - Secret runtime integration design before any execution-time decryption work
-- Hardening the managed playbook asset lifecycle before adding repository-backed execution
+- Hardening one-time Git import flows before adding repository-backed execution
 
 These are likely next steps, not commitments. Each should be delivered as a vertical slice with authorization,
 customer scoping, tests, and documentation.
@@ -104,7 +106,7 @@ customer scoping, tests, and documentation.
 These areas are intentionally outside the current MVP and should not be treated as partially implemented just
 because some placeholder routes or docs mention them:
 
-- Git-backed playbooks
+- Continuous Git-backed playbooks
 - Richer playbook asset upload/import lifecycle
 - Ansible Collections dependency management
 - Import workflows

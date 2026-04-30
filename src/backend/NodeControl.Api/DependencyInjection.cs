@@ -11,6 +11,7 @@ using NodeControl.Application.Authorization;
 using NodeControl.Application.Auth;
 using NodeControl.Application.ControlNodes;
 using NodeControl.Application.Customers;
+using NodeControl.Application.GitRepositories;
 using NodeControl.Application.HostConnectionChecks;
 using NodeControl.Application.InventoryGroups;
 using NodeControl.Application.JobRuns;
@@ -60,6 +61,7 @@ public static class DependencyInjection
         services.AddScoped<InventoryPreviewService>();
         services.AddScoped<YamlJsonValidationService>();
         services.AddScoped<PlaybookService>();
+        services.AddScoped<GitRepositoryService>();
         services.AddScoped<VariableSetService>();
         services.AddScoped<TemplateValidationService>();
         services.AddSingleton<SecretReferenceParser>();

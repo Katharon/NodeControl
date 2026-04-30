@@ -1,11 +1,12 @@
 import { AppPage } from "@/components/layout/AppPage";
-import { PlaceholderProductPage } from "@/components/layout/PlaceholderProductPage";
+import { ProductRoutePicker } from "@/components/layout/ProductRoutePicker";
 
 export default function ImportPage() {
   return (
     <AppPage>
-      <PlaceholderProductPage
-        description="Import bleibt Post-MVP. Der MVP hält die Datenanlage bewusst explizit, kundenbezogen und auditierbar."
+      <ProductRoutePicker
+        customerPath="import"
+        description="Import public GitHub files once into managed Playbook and Template artifacts."
         title="Import"
       />
     </AppPage>
