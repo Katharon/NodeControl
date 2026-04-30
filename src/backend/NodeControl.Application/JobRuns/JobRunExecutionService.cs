@@ -16,7 +16,7 @@ namespace NodeControl.Application.JobRuns;
 public sealed class JobRunExecutionService(
     INodeControlDbContext dbContext,
     IJobRunWorkspaceBuilder workspaceBuilder,
-    IAnsiblePlaybookRunner ansibleRunner,
+    IControlNodeDispatcher controlNodeDispatcher,
     SecretReferenceParser secretReferenceParser,
     ISecretProtector secretProtector,
     IClock clock)
@@ -86,14 +86,17 @@ public sealed class JobRunExecutionService(
             await dbContext.SaveChangesAsync(cancellationToken);
             await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Info, "Execution workspace created.", cancellationToken);
 
-            await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Info, "Starting ansible-playbook.", cancellationToken);
-            var runResult = await ansibleRunner.RunAsync(
-                new AnsiblePlaybookRunRequest(
-                    workspace.WorkspacePath,
-                    workspace.PlaybookFileName,
-                    workspace.VariableFileName,
-                    workspace.StdoutLogPath,
-                    workspace.StderrLogPath,
+            await AppendLogAsync(
+                jobRun,
+                JobRunLogStream.System,
+                JobRunLogLevel.Info,
+                $"Dispatching run to control node '{executionContext.ControlNode!.Name}'.",
+                cancellationToken);
+            var runResult = await controlNodeDispatcher.DispatchAsync(
+                new ControlNodeDispatchRequest(
+                    jobRun,
+                    executionContext.ControlNode!,
+                    workspace,
                     TimeSpan.FromSeconds(executionContext.Job!.DefaultTimeoutSeconds),
                     (line, token) => AppendLogAsync(jobRun, JobRunLogStream.StdOut, JobRunLogLevel.Info, line, token, executionContext.SecretValuesBySlug!.Values),
                     (line, token) => AppendLogAsync(jobRun, JobRunLogStream.StdErr, JobRunLogLevel.Error, line, token, executionContext.SecretValuesBySlug!.Values),
@@ -104,25 +107,25 @@ public sealed class JobRunExecutionService(
             {
                 var errorMessage = runResult.ErrorMessage ?? "JobRun was cancelled.";
                 await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Warning, "Cancellation observed by worker.", cancellationToken);
-                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Warning, "ansible-playbook terminated because cancellation was requested.", cancellationToken);
+                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Warning, "Control-node execution terminated because cancellation was requested.", cancellationToken);
                 jobRun.MarkCancelled(runResult.ExitCode, RedactForStorage(errorMessage, executionContext.SecretValuesBySlug!.Values), clock.UtcNow);
                 await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Warning, "JobRun cancelled.", cancellationToken);
             }
             else if (runResult.TimedOut)
             {
-                var errorMessage = runResult.ErrorMessage ?? "ansible-playbook execution timed out.";
+                var errorMessage = runResult.ErrorMessage ?? "Control-node execution timed out.";
                 await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken, executionContext.SecretValuesBySlug!.Values);
                 jobRun.MarkTimedOut(runResult.ExitCode, RedactForStorage(errorMessage, executionContext.SecretValuesBySlug!.Values), clock.UtcNow);
             }
             else if (runResult.ExitCode == 0)
             {
-                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Info, "ansible-playbook exited with code 0.", cancellationToken);
+                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Info, "Control-node execution exited with code 0.", cancellationToken);
                 jobRun.MarkSucceeded(runResult.ExitCode.Value, clock.UtcNow);
             }
             else
             {
                 var errorMessage = runResult.ErrorMessage
-                    ?? $"ansible-playbook exited with code {runResult.ExitCode?.ToString() ?? "unknown"}.";
+                    ?? $"Control-node execution exited with code {runResult.ExitCode?.ToString() ?? "unknown"}.";
                 await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken, executionContext.SecretValuesBySlug!.Values);
                 jobRun.MarkFailed(runResult.ExitCode, RedactForStorage(errorMessage, executionContext.SecretValuesBySlug!.Values), clock.UtcNow);
             }
@@ -188,7 +191,7 @@ public sealed class JobRunExecutionService(
             return JobRunExecutionContext.Failed("JobRun and Job customer ids do not match.");
         }
 
-        var controlNode = await dbContext.FindControlNodeAsync(jobRun.CustomerId, job.ControlNodeId, cancellationToken);
+        var controlNode = await dbContext.FindControlNodeAsync(jobRun.CustomerId, jobRun.ControlNodeId, cancellationToken);
         if (controlNode?.Status != ControlNodeStatus.Active || controlNode.CustomerId != jobRun.CustomerId)
         {
             return JobRunExecutionContext.Failed("JobRun references an unavailable control node.");

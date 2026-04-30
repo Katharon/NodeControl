@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using NodeControl.Application.Abstractions.Execution;
 using NodeControl.Application.Abstractions.Persistence;
 using NodeControl.Application.Abstractions.Security;
@@ -15,6 +16,7 @@ using NodeControl.Domain.Secrets;
 using NodeControl.Domain.Templates;
 using NodeControl.Domain.Users;
 using NodeControl.Domain.VariableSets;
+using NodeControl.Infrastructure.Execution;
 using NodeControl.Worker.JobRuns;
 
 namespace NodeControl.Application.Tests;
@@ -42,6 +44,7 @@ public sealed class JobRunExecutionTests
         Assert.True(result.Succeeded);
         Assert.True(Directory.Exists(result.Workspace!.WorkspacePath));
         Assert.Equal(fixture.JobRun.Id.ToString("D"), Path.GetFileName(result.Workspace.WorkspacePath));
+        Assert.Contains(fixture.ControlNode.Id.ToString("D"), result.Workspace.WorkspacePath);
     }
 
     [Fact]
@@ -145,6 +148,29 @@ public sealed class JobRunExecutionTests
 
         Assert.Equal(fixture.Playbook.InlineContent, await File.ReadAllTextAsync(result.Workspace!.PlaybookPath));
         Assert.Equal("playbook/site.yml", result.Workspace.PlaybookFileName);
+    }
+
+    [Fact]
+    public async Task JobRunWorkspaceBuilder_writes_control_node_dispatch_manifest()
+    {
+        using var fixture = ExecutionFixture.Create();
+
+        var result = await fixture.CreateWorkspaceBuilder().BuildAsync(
+            fixture.JobRun,
+            fixture.Job,
+            fixture.ControlNode,
+            fixture.InventoryGroup,
+            [fixture.ManagedNode],
+            fixture.Playbook,
+            fixture.VariableSet,
+            [],
+            EmptySecrets);
+
+        Assert.True(result.Succeeded);
+        var manifest = await File.ReadAllTextAsync(result.Workspace!.DispatchManifestPath);
+        Assert.Contains(fixture.JobRun.Id.ToString("D"), manifest);
+        Assert.Contains(fixture.ControlNode.Id.ToString("D"), manifest);
+        Assert.Contains(fixture.ControlNode.Hostname, manifest);
     }
 
     [Fact]
@@ -266,6 +292,34 @@ public sealed class JobRunExecutionTests
         Assert.Equal(0, fixture.JobRun.ExitCode);
         Assert.Equal(JobRunStatus.Running, fixture.Db.SavedJobRunStatuses[0][0]);
         Assert.Equal(JobRunStatus.Succeeded, fixture.Db.SavedJobRunStatuses[^1][0]);
+    }
+
+    [Fact]
+    public async Task JobRunExecutionService_dispatches_to_run_bound_control_node_snapshot()
+    {
+        using var fixture = ExecutionFixture.Create();
+        var secondControlNode = ControlNode.Create(fixture.Customer.Id, "control-2", "localhost", 22, null, TestTime);
+        fixture.Db.AddControlNode(secondControlNode);
+        fixture.Job.Update(
+            fixture.Job.Name,
+            fixture.Job.Slug,
+            fixture.Job.Description,
+            secondControlNode.Id,
+            fixture.Job.InventoryGroupId,
+            fixture.Job.PlaybookId,
+            fixture.Job.VariableSetId,
+            fixture.Job.DefaultTimeoutSeconds,
+            TestTime.AddMinutes(1),
+            fixture.Job.TemplateArtifactsJson);
+        var dispatcher = new CapturingControlNodeDispatcher(new ControlNodeDispatchResult(0, false, false, null));
+        var service = fixture.CreateExecutionService(dispatcher);
+
+        await service.ExecuteAsync(fixture.JobRun);
+
+        Assert.Equal(JobRunStatus.Succeeded, fixture.JobRun.Status);
+        Assert.Equal(fixture.ControlNode.Id, dispatcher.Requests.Single().ControlNode.Id);
+        Assert.Equal(fixture.ControlNode.Id, fixture.JobRun.ControlNodeId);
+        Assert.NotEqual(fixture.Job.ControlNodeId, fixture.JobRun.ControlNodeId);
     }
 
     [Fact]
@@ -394,6 +448,44 @@ public sealed class JobRunExecutionTests
     }
 
     [Fact]
+    public async Task ControlNodeDispatcher_runs_local_control_node_through_ansible_runner()
+    {
+        using var fixture = ExecutionFixture.Create(controlNodeHostname: "localhost");
+        var workspace = await BuildWorkspaceAsync(fixture);
+        var runner = new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null));
+        var dispatcher = new ControlNodeDispatcher(runner, Options.Create(new ExecutionOptions()));
+
+        var result = await dispatcher.DispatchAsync(new ControlNodeDispatchRequest(
+            fixture.JobRun,
+            fixture.ControlNode,
+            workspace,
+            TimeSpan.FromSeconds(30)));
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Single(runner.Requests);
+        Assert.Equal(workspace.WorkspacePath, runner.Requests.Single().WorkspacePath);
+    }
+
+    [Fact]
+    public async Task ControlNodeDispatcher_rejects_non_local_control_node_without_remote_transport()
+    {
+        using var fixture = ExecutionFixture.Create(controlNodeHostname: "control.example.test");
+        var workspace = await BuildWorkspaceAsync(fixture);
+        var runner = new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null));
+        var dispatcher = new ControlNodeDispatcher(runner, Options.Create(new ExecutionOptions()));
+
+        var result = await dispatcher.DispatchAsync(new ControlNodeDispatchRequest(
+            fixture.JobRun,
+            fixture.ControlNode,
+            workspace,
+            TimeSpan.FromSeconds(30)));
+
+        Assert.Null(result.ExitCode);
+        Assert.Contains("requires remote dispatch", result.ErrorMessage);
+        Assert.Empty(runner.Requests);
+    }
+
+    [Fact]
     public async Task QueuedJobRunWorker_ignores_when_no_queued_job_runs_exist()
     {
         using var fixture = ExecutionFixture.Create(addJobRun: false);
@@ -430,6 +522,23 @@ public sealed class JobRunExecutionTests
     }
 
     private static DateTimeOffset TestTime => new(2026, 4, 27, 10, 0, 0, TimeSpan.Zero);
+
+    private static async Task<JobRunWorkspace> BuildWorkspaceAsync(ExecutionFixture fixture)
+    {
+        var result = await fixture.CreateWorkspaceBuilder().BuildAsync(
+            fixture.JobRun,
+            fixture.Job,
+            fixture.ControlNode,
+            fixture.InventoryGroup,
+            [fixture.ManagedNode],
+            fixture.Playbook,
+            fixture.VariableSet,
+            [],
+            EmptySecrets);
+
+        Assert.True(result.Succeeded);
+        return result.Workspace!;
+    }
 
     private sealed class FakeAnsibleRunner(
         Func<AnsiblePlaybookRunRequest, AnsiblePlaybookRunResult> handler,
@@ -481,6 +590,42 @@ public sealed class JobRunExecutionTests
                 false,
                 ObservedCancellation,
                 ObservedCancellation ? "ansible-playbook was cancelled." : "cancellation was not observed.");
+        }
+    }
+
+    private sealed class PassthroughControlNodeDispatcher(IAnsiblePlaybookRunner runner) : IControlNodeDispatcher
+    {
+        public async Task<ControlNodeDispatchResult> DispatchAsync(
+            ControlNodeDispatchRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            var result = await runner.RunAsync(
+                new AnsiblePlaybookRunRequest(
+                    request.Workspace.WorkspacePath,
+                    request.Workspace.PlaybookFileName,
+                    request.Workspace.VariableFileName,
+                    request.Workspace.StdoutLogPath,
+                    request.Workspace.StderrLogPath,
+                    request.Timeout,
+                    request.OnStdoutLine,
+                    request.OnStderrLine,
+                    request.IsCancellationRequested),
+                cancellationToken);
+
+            return new ControlNodeDispatchResult(result.ExitCode, result.TimedOut, result.Cancelled, result.ErrorMessage);
+        }
+    }
+
+    private sealed class CapturingControlNodeDispatcher(ControlNodeDispatchResult result) : IControlNodeDispatcher
+    {
+        public List<ControlNodeDispatchRequest> Requests { get; } = [];
+
+        public Task<ControlNodeDispatchResult> DispatchAsync(
+            ControlNodeDispatchRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            Requests.Add(request);
+            return Task.FromResult(result);
         }
     }
 
@@ -588,13 +733,14 @@ public sealed class JobRunExecutionTests
             bool artifactPlaybook = false,
             string? templateArtifactPath = null,
             string? templateContent = null,
-            string? protectedSecretValue = null)
+            string? protectedSecretValue = null,
+            string controlNodeHostname = "control.local")
         {
             var workspaceRoot = Path.Combine(Path.GetTempPath(), "nodecontrol-tests", Guid.NewGuid().ToString("N"));
             var db = new NodeControlTestDbContext();
             var user = User.Create("Operator", "operator@nodecontrol.local", false, TestTime);
             var customer = Customer.Create("Customer A", "customer-a", null, TestTime);
-            var controlNode = ControlNode.Create(customer.Id, "control", "control.local", 22, null, TestTime);
+            var controlNode = ControlNode.Create(customer.Id, "control", controlNodeHostname, 22, null, TestTime);
             var inventoryGroup = InventoryGroup.Create(customer.Id, "web", null, TestTime);
             var managedNode = ManagedNode.Create(customer.Id, "web-01", "10.0.0.10", 22, "Linux", "prod", null, TestTime);
             var playbook = artifactPlaybook
@@ -716,10 +862,17 @@ public sealed class JobRunExecutionTests
             IAnsiblePlaybookRunner runner,
             IJobRunWorkspaceBuilder? workspaceBuilder = null)
         {
+            return CreateExecutionService(new PassthroughControlNodeDispatcher(runner), workspaceBuilder);
+        }
+
+        public JobRunExecutionService CreateExecutionService(
+            IControlNodeDispatcher dispatcher,
+            IJobRunWorkspaceBuilder? workspaceBuilder = null)
+        {
             return new JobRunExecutionService(
                 Db,
                 workspaceBuilder ?? CreateWorkspaceBuilder(),
-                runner,
+                dispatcher,
                 new SecretReferenceParser(),
                 new FakeSecretProtector(),
                 new TestClock());
@@ -734,6 +887,7 @@ public sealed class JobRunExecutionTests
             services.AddSingleton(new SecretReferenceParser());
             services.AddSingleton<ISecretProtector>(new FakeSecretProtector());
             services.AddSingleton(runner);
+            services.AddSingleton<IControlNodeDispatcher>(new PassthroughControlNodeDispatcher(runner));
             services.AddScoped<JobRunExecutionService>();
             return services.BuildServiceProvider();
         }

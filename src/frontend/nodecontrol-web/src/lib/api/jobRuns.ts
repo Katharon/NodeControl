@@ -9,6 +9,7 @@ export type JobRun = {
   id: string;
   customerId: string;
   jobId: string;
+  controlNodeId: string;
   triggerType: JobRunTriggerType;
   triggeredByUserId: string | null;
   scheduleId: string | null;

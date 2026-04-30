@@ -6,6 +6,7 @@ public sealed record JobRunDto(
     Guid Id,
     Guid CustomerId,
     Guid JobId,
+    Guid ControlNodeId,
     JobRunTriggerType TriggerType,
     Guid? TriggeredByUserId,
     Guid? ScheduleId,

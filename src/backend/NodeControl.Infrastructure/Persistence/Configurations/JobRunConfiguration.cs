@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using NodeControl.Domain.Customers;
 using NodeControl.Domain.Jobs;
+using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Users;
 
 namespace NodeControl.Infrastructure.Persistence.Configurations;
@@ -24,6 +25,10 @@ public sealed class JobRunConfiguration : IEntityTypeConfiguration<JobRun>
 
         builder.Property(jobRun => jobRun.JobId)
             .HasColumnName("job_id")
+            .IsRequired();
+
+        builder.Property(jobRun => jobRun.ControlNodeId)
+            .HasColumnName("control_node_id")
             .IsRequired();
 
         builder.Property(jobRun => jobRun.TriggerType)
@@ -106,6 +111,12 @@ public sealed class JobRunConfiguration : IEntityTypeConfiguration<JobRun>
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired();
 
+        builder.HasOne<ControlNode>()
+            .WithMany()
+            .HasForeignKey(jobRun => jobRun.ControlNodeId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired();
+
         builder.HasOne<User>()
             .WithMany()
             .HasForeignKey(jobRun => jobRun.TriggeredByUserId)
@@ -126,5 +137,8 @@ public sealed class JobRunConfiguration : IEntityTypeConfiguration<JobRun>
 
         builder.HasIndex(jobRun => new { jobRun.Status, jobRun.QueuedAt })
             .HasDatabaseName("ix_job_runs_status_queued_at");
+
+        builder.HasIndex(jobRun => new { jobRun.CustomerId, jobRun.ControlNodeId, jobRun.CreatedAt })
+            .HasDatabaseName("ix_job_runs_customer_id_control_node_id_created_at");
     }
 }

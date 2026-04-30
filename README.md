@@ -43,6 +43,7 @@ customer-scoped automation control plane with a complete local demo loop. Curren
 - Scheduled Runs / cron jobs through Worker polling
 - Job run history
 - Job logs
+- Run-bound Control Hosts with Worker-side dispatch preparation and local/dev execution fallback
 - Audit logs
 - Hostzustand / TCP reachability checks processed by the Worker
 - Templates as managed text resources that can be materialized into Worker run workspaces through Actions
@@ -63,6 +64,7 @@ Important current boundaries:
 
 - The API never executes Ansible, shell commands, SSH checks, or TCP checks.
 - `NodeControl.Worker` is responsible for queued Run execution, schedule polling, host connection checks, workspaces, logs, and Ansible process execution.
+- Runs snapshot the selected Control Host at queue time; the Worker prepares control-host-scoped workspaces and dispatch manifests before local/dev Ansible execution.
 - `deploy/` is dev/demo guidance only; production packaging is not complete.
 - Continuous Git-backed playbooks/sync, cloud integrations, notifications, advanced secret
   runtime integration, and broader system/security administration are Post-MVP directions.

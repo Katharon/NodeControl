@@ -68,23 +68,37 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
             return JobRunWorkspaceBuildResult.Failed("Playbook source type is not supported for execution.");
         }
 
+        if (jobRun.ControlNodeId != controlNode.Id)
+        {
+            return JobRunWorkspaceBuildResult.Failed("JobRun control node binding does not match the selected control node.");
+        }
+
         var rootPath = Path.GetFullPath(runWorkspaceRoot);
-        var workspacePath = Path.GetFullPath(Path.Combine(rootPath, jobRun.Id.ToString("D")));
-        if (!workspacePath.StartsWith(rootPath, StringComparison.Ordinal))
+        var workspacePath = Path.GetFullPath(Path.Combine(
+            rootPath,
+            jobRun.CustomerId.ToString("D"),
+            "control-nodes",
+            controlNode.Id.ToString("D"),
+            "runs",
+            jobRun.Id.ToString("D")));
+        if (!IsWithinDirectory(rootPath, workspacePath))
         {
             return JobRunWorkspaceBuildResult.Failed("Execution workspace path is invalid.");
         }
 
         var playbookDirectory = Path.Combine(workspacePath, "playbook");
+        var dispatchDirectory = Path.Combine(workspacePath, ".nodecontrol");
         var inventoryPath = Path.Combine(workspacePath, "inventory.yml");
         var variableFileName = variableSet?.Format == VariableSetFormat.Json ? "vars.json" : "vars.yml";
         var variablePath = Path.Combine(workspacePath, variableFileName);
         var playbookFileName = "playbook/site.yml";
         var playbookPath = Path.Combine(playbookDirectory, "site.yml");
+        var dispatchManifestPath = Path.Combine(dispatchDirectory, "control-node-dispatch.json");
         var stdoutLogPath = Path.Combine(workspacePath, "stdout.log");
         var stderrLogPath = Path.Combine(workspacePath, "stderr.log");
 
         Directory.CreateDirectory(playbookDirectory);
+        Directory.CreateDirectory(dispatchDirectory);
 
         await File.WriteAllTextAsync(inventoryPath, BuildInventoryYaml(inventoryGroup, managedNodes), cancellationToken);
         await File.WriteAllTextAsync(
@@ -116,6 +130,10 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
 
         await File.WriteAllTextAsync(stdoutLogPath, string.Empty, cancellationToken);
         await File.WriteAllTextAsync(stderrLogPath, string.Empty, cancellationToken);
+        await File.WriteAllTextAsync(
+            dispatchManifestPath,
+            BuildDispatchManifest(jobRun, job, controlNode, inventoryPath, variablePath, playbookPath),
+            cancellationToken);
 
         return JobRunWorkspaceBuildResult.Ok(new JobRunWorkspace(
             workspacePath,
@@ -124,6 +142,7 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
             variableFileName,
             playbookPath,
             playbookFileName,
+            dispatchManifestPath,
             stdoutLogPath,
             stderrLogPath));
     }
@@ -310,6 +329,49 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
         };
 
         return yamlSerializer.Serialize(inventory);
+    }
+
+    private static string BuildDispatchManifest(
+        JobRun jobRun,
+        Job job,
+        ControlNode controlNode,
+        string inventoryPath,
+        string variablePath,
+        string playbookPath)
+    {
+        return JsonSerializer.Serialize(
+            new
+            {
+                jobRunId = jobRun.Id,
+                customerId = jobRun.CustomerId,
+                jobId = job.Id,
+                controlNode = new
+                {
+                    id = controlNode.Id,
+                    name = controlNode.Name,
+                    hostname = controlNode.Hostname,
+                    sshPort = controlNode.SshPort
+                },
+                artifacts = new
+                {
+                    inventoryPath,
+                    variablePath,
+                    playbookPath
+                }
+            },
+            ArtifactJsonOptions);
+    }
+
+    private static bool IsWithinDirectory(string rootPath, string path)
+    {
+        var normalizedRoot = Path.GetFullPath(rootPath);
+        if (!normalizedRoot.EndsWith(Path.DirectorySeparatorChar))
+        {
+            normalizedRoot += Path.DirectorySeparatorChar;
+        }
+
+        var normalizedPath = Path.GetFullPath(path);
+        return normalizedPath.StartsWith(normalizedRoot, StringComparison.Ordinal);
     }
 
     private sealed record ArtifactPlaybookWriteResult(

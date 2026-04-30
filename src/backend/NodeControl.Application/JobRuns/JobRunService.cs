@@ -295,6 +295,7 @@ public sealed class JobRunService(
             {
                 jobRunId = jobRun.Id,
                 jobId = jobRun.JobId,
+                controlNodeId = jobRun.ControlNodeId,
                 jobName,
                 status = jobRun.Status.ToString(),
                 triggerType = jobRun.TriggerType.ToString(),
@@ -309,6 +310,7 @@ public sealed class JobRunService(
             jobRun.Id,
             jobRun.CustomerId,
             jobRun.JobId,
+            jobRun.ControlNodeId,
             jobRun.TriggerType,
             jobRun.TriggeredByUserId,
             jobRun.ScheduleId,

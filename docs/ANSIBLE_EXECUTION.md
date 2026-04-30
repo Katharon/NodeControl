@@ -93,11 +93,13 @@ Each JobRun gets its own workspace.
 Suggested path:
 
 ```text
-/var/lib/nodecontrol/runs/{jobRunId}/
+/var/lib/nodecontrol/runs/{customerId}/control-nodes/{controlNodeId}/runs/{jobRunId}/
 ├── inventory.yml
 ├── vars.yml
 ├── playbook/
 │   └── site.yml
+├── .nodecontrol/
+│   └── control-node-dispatch.json
 ├── stdout.log
 └── stderr.log
 ```
@@ -109,6 +111,18 @@ entry file path.
 The Worker implements local execution for queued JobRuns. The workspace root is configured with
 `NodeControl:Execution:RunWorkspaceRoot`; development uses `.nodecontrol/runs`, while production-style
 configuration uses `/var/lib/nodecontrol/runs`.
+
+Each JobRun snapshots the selected Control Node when it is queued. Worker execution loads that Control Node through the
+JobRun binding, scopes the workspace path under that Control Node, and writes a small dispatch manifest into the
+workspace. Later changes to the Action's Control Node do not change already queued Runs.
+
+The current remote-dispatch MVP has an explicit Worker-side dispatch boundary:
+
+- The API still queues Runs and reads state only.
+- The Worker prepares execution artifacts and a control-node dispatch manifest.
+- Local/dev execution is allowed only for configured local Control Node hostnames such as `localhost`, `127.0.0.1`, and `::1`.
+- Non-local Control Nodes fail honestly with a remote-dispatch-not-configured error until a future authenticated remote
+  transport is implemented.
 
 ## Execution Command
 

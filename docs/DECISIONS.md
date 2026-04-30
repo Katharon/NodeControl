@@ -230,3 +230,18 @@ Reason:
 - Secret references stay as references at rest in normal definitions.
 - The Worker already owns run workspace materialization and is the right boundary for producing execution-ready files.
 - Persisted run logs and API-facing models must not expose resolved secret values.
+
+## DEC-020: Snapshot Control Node binding on JobRuns and dispatch only from Worker
+
+Status: Accepted
+
+JobRuns store the selected ControlNodeId when they are queued. The Worker loads that run-bound Control Node, prepares a
+control-node-scoped workspace, writes a dispatch manifest, and then dispatches through a Worker-side abstraction.
+
+Reason:
+
+- A Run should remain tied to the Control Node selected at queue time.
+- Editing an Action after queueing must not silently retarget already queued Runs.
+- The API remains non-operational and never performs Ansible, SSH, shell, TCP, or process execution.
+- The MVP can keep local/dev execution for configured local Control Nodes while failing honestly for non-local remote
+  Control Nodes until a future authenticated transport exists.

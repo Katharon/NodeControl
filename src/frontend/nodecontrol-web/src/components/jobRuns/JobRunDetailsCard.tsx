@@ -80,7 +80,7 @@ export function JobRunDetailsCard({ customerId, jobRunId }: JobRunDetailsCardPro
   const controlNodesQuery = useQuery({
     queryKey: ["control-nodes", customerId],
     queryFn: () => getControlNodes(customerId),
-    enabled: Boolean(job && canViewNodes),
+    enabled: Boolean(jobRun?.controlNodeId && canViewNodes),
   });
   const inventoryGroupsQuery = useQuery({
     queryKey: ["inventory-groups", customerId],
@@ -122,7 +122,7 @@ export function JobRunDetailsCard({ customerId, jobRunId }: JobRunDetailsCardPro
     return <Alert severity="error">Dieser Run konnte nicht geladen werden.</Alert>;
   }
 
-  const controlNode = controlNodesQuery.data?.find((item) => item.id === job?.controlNodeId) ?? null;
+  const controlNode = controlNodesQuery.data?.find((item) => item.id === jobRun.controlNodeId) ?? null;
   const inventoryGroup = inventoryGroupsQuery.data?.find((item) => item.id === job?.inventoryGroupId) ?? null;
   const playbook = playbooksQuery.data?.find((item) => item.id === job?.playbookId) ?? null;
   const variableSet = variableSetsQuery.data?.find((item) => item.id === job?.variableSetId) ?? null;
@@ -231,7 +231,7 @@ export function JobRunDetailsCard({ customerId, jobRunId }: JobRunDetailsCardPro
                     ["Action", job.name],
                     ["Slug", job.slug],
                     ["Timeout", `${job.defaultTimeoutSeconds}s`],
-                    ["Control Host", contextValue(controlNodesQuery.isPending, controlNodesQuery.isError, controlNode?.name)],
+                    ["Run Control Host", contextValue(controlNodesQuery.isPending, controlNodesQuery.isError, controlNode?.name)],
                     ["Inventar", contextValue(inventoryGroupsQuery.isPending, inventoryGroupsQuery.isError, inventoryGroup?.name)],
                     ["Playbook", contextValue(playbooksQuery.isPending, playbooksQuery.isError, playbook?.name)],
                     ["Variablen", job.variableSetId ? contextValue(variableSetsQuery.isPending, variableSetsQuery.isError, variableSet?.name) : "Keine"],
@@ -278,7 +278,7 @@ export function JobRunDetailsCard({ customerId, jobRunId }: JobRunDetailsCardPro
             {canViewAuditLogs ? (
               <RelatedLink href={`/customers/${customerId}/audit`} icon={HistoryIcon} label="Audit" />
             ) : null}
-            {job?.controlNodeId ? (
+            {jobRun.controlNodeId ? (
               <RelatedLink href={`/customers/${customerId}/hosts`} icon={HubIcon} label="Hosts" />
             ) : null}
             {job?.inventoryGroupId ? (
@@ -301,6 +301,7 @@ export function JobRunDetailsCard({ customerId, jobRunId }: JobRunDetailsCardPro
             items={[
               ["Run ID", jobRun.id],
               ["Action ID", jobRun.jobId],
+              ["Control Host ID", jobRun.controlNodeId],
               ["Triggered by", jobRun.triggeredByUserId ?? "n/a"],
               ["Schedule", jobRun.scheduleId ?? "n/a"],
               ["Retried from", jobRun.retriedFromJobRunId ?? "n/a"],

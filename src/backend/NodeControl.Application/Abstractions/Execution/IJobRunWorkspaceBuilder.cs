@@ -33,6 +33,7 @@ public sealed record JobRunWorkspace(
     string VariableFileName,
     string PlaybookPath,
     string PlaybookFileName,
+    string DispatchManifestPath,
     string StdoutLogPath,
     string StderrLogPath);
 

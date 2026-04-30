@@ -61,6 +61,7 @@ public sealed class ScheduledJobRunService(
                 {
                     jobRunId = jobRun.Id,
                     jobId = job.Id,
+                    controlNodeId = jobRun.ControlNodeId,
                     jobName = job.Name,
                     scheduleId = schedule.Id,
                     scheduleSlug = schedule.Slug,

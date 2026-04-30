@@ -10,6 +10,7 @@ public sealed class JobRun
         Guid id,
         Guid customerId,
         Guid jobId,
+        Guid controlNodeId,
         JobRunTriggerType triggerType,
         Guid? triggeredByUserId,
         Guid? scheduleId,
@@ -22,6 +23,7 @@ public sealed class JobRun
         Id = id;
         CustomerId = customerId;
         JobId = jobId;
+        ControlNodeId = controlNodeId;
         TriggerType = triggerType;
         TriggeredByUserId = triggeredByUserId;
         ScheduleId = scheduleId;
@@ -37,6 +39,8 @@ public sealed class JobRun
     public Guid CustomerId { get; private set; }
 
     public Guid JobId { get; private set; }
+
+    public Guid ControlNodeId { get; private set; }
 
     public JobRunTriggerType TriggerType { get; private set; }
 
@@ -90,6 +94,7 @@ public sealed class JobRun
             Guid.NewGuid(),
             job.CustomerId,
             job.Id,
+            job.ControlNodeId,
             JobRunTriggerType.Manual,
             triggeredByUserId,
             null,
@@ -118,6 +123,7 @@ public sealed class JobRun
             Guid.NewGuid(),
             job.CustomerId,
             job.Id,
+            job.ControlNodeId,
             JobRunTriggerType.Scheduled,
             null,
             schedule.Id,
@@ -156,6 +162,7 @@ public sealed class JobRun
             Guid.NewGuid(),
             job.CustomerId,
             job.Id,
+            job.ControlNodeId,
             JobRunTriggerType.Retry,
             triggeredByUserId,
             null,

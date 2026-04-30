@@ -20,7 +20,8 @@ development infrastructure, dev/demo scripts, and a demo-ready product surface.
 Implemented product areas include customer and membership management, static roles/permissions, Control Hosts,
 Hosts, inventory groups, playbooks, variable sets, actions, runs, schedules, persisted run logs, audit logs,
 templates, secrets metadata and Worker-side reference resolution, user overview, Hostzustand checks, a run wizard, and a
-Run Center. Git repository sources are managed as customer-scoped metadata and can be used by the frontend for one-time
+Run Center. Runs snapshot the selected Control Host and the Worker prepares control-host-scoped workspaces with a
+dispatch manifest before invoking the local Ansible adapter for configured local/dev Control Hosts. Git repository sources are managed as customer-scoped metadata and can be used by the frontend for one-time
 imports into the existing managed artifact models.
 
 The production deployment story is not complete. `deploy/` contains dev/demo notes only, while local bootstrap
@@ -259,6 +260,9 @@ Reusable execution template.
 
 One concrete execution of a Job.
 
+A JobRun stores the ControlNodeId selected at queue time. Worker execution uses this run-bound ControlNodeId for
+workspace preparation and dispatch, so already queued Runs are not silently retargeted if an Action is later edited.
+
 ### Schedule
 
 Recurring trigger rule for creating JobRuns.
@@ -278,9 +282,11 @@ API creates JobRun with Status = Queued
   |
 Worker picks queued JobRun
   |
-Worker builds workspace
+Worker builds control-host-scoped workspace
   |
-Worker runs ansible-playbook
+Worker dispatches through Control Host boundary
+  |
+Local/dev adapter runs ansible-playbook for configured local Control Hosts
   |
 Worker captures stdout/stderr/exit code
   |
@@ -291,7 +297,9 @@ AuditLog records execution
 
 The MVP Worker polls queued JobRuns from the database and processes the oldest queued run first. It also
 polls active schedules and creates queued scheduled JobRuns when they are due. Actual Ansible execution
-remains local to the Worker process until remote control-node dispatch is introduced in a later slice.
+uses a Worker-only dispatch abstraction. The current MVP supports local/dev Control Hosts through the local
+Ansible adapter and reports non-local Control Hosts as remote-dispatch-not-configured until an authenticated
+transport is added later.
 
 JobRun logs are persisted by the Worker as ordered entries. The API provides read-only access to those logs
 through customer-scoped authorization, applies lightweight response-time redaction for obvious token/password
