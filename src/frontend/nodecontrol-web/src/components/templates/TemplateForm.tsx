@@ -2,8 +2,11 @@
 
 import CheckIcon from "@mui/icons-material/Check";
 import SaveIcon from "@mui/icons-material/Save";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button, MenuItem, Stack, TextField } from "@mui/material";
+import { Button, MenuItem, Stack, TextField, Typography } from "@mui/material";
+import type { ChangeEvent } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import type { Template, TemplateInput, TemplateValidationResult } from "@/lib/api/templates";
@@ -30,11 +33,13 @@ type TemplateFormProps = {
 };
 
 export function TemplateForm({ template, submitLabel, onSubmit, onValidate, onValidationResult }: TemplateFormProps) {
+  const [importedFileName, setImportedFileName] = useState<string | null>(null);
   const {
     formState: { errors, isSubmitting },
     getValues,
     handleSubmit,
     register,
+    setValue,
   } = useForm<TemplateFormValues>({
     resolver: zodResolver(templateSchema),
     defaultValues: {
@@ -59,6 +64,35 @@ export function TemplateForm({ template, submitLabel, onSubmit, onValidate, onVa
       language: values.language || null,
     });
     onValidationResult?.(result);
+  }
+
+  async function importTemplateFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    const content = await file.text();
+    const values = getValues();
+    setValue("content", content, { shouldDirty: true, shouldValidate: true });
+    setImportedFileName(file.name);
+
+    if (!values.name.trim()) {
+      setValue("name", titleFromFileName(file.name), { shouldDirty: true, shouldValidate: true });
+    }
+
+    if (!values.slug.trim()) {
+      setValue("slug", slugFromFileName(file.name), { shouldDirty: true, shouldValidate: true });
+    }
+
+    if (!values.language?.trim()) {
+      setValue("language", inferLanguage(file.name), { shouldDirty: true, shouldValidate: true });
+    }
+
+    if (!template) {
+      setValue("templateType", inferTemplateType(file.name), { shouldDirty: true, shouldValidate: true });
+    }
   }
 
   return (
@@ -87,6 +121,13 @@ export function TemplateForm({ template, submitLabel, onSubmit, onValidate, onVa
         <MenuItem value="ConfigFile">Config File</MenuItem>
       </TextField>
       <TextField error={Boolean(errors.language)} helperText={errors.language?.message} label="Language" {...register("language")} />
+      <Stack direction={{ xs: "column", sm: "row" }} sx={{ alignItems: { sm: "center" }, gap: 1 }}>
+        <Button component="label" startIcon={<UploadFileIcon />} variant="outlined">
+          Import file
+          <input hidden onChange={importTemplateFile} type="file" />
+        </Button>
+        {importedFileName ? <Typography color="text.secondary" variant="body2">Imported {importedFileName}</Typography> : null}
+      </Stack>
       <TextField
         error={Boolean(errors.content)}
         helperText={errors.content?.message ?? "Use secret://my-secret to reference a stored secret."}
@@ -108,4 +149,69 @@ export function TemplateForm({ template, submitLabel, onSubmit, onValidate, onVa
       </Stack>
     </Stack>
   );
+}
+
+function titleFromFileName(fileName: string) {
+  return withoutExtension(fileName)
+    .replaceAll(/[-_]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function slugFromFileName(fileName: string) {
+  const slug = withoutExtension(fileName)
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, "-")
+    .replaceAll(/^-|-$/g, "");
+  return slug.length >= 2 ? slug.slice(0, 100) : "template";
+}
+
+function withoutExtension(fileName: string) {
+  const name = fileName.split(/[\\/]/).pop() ?? fileName;
+  const lastDot = name.lastIndexOf(".");
+  return lastDot > 0 ? name.slice(0, lastDot) : name;
+}
+
+function inferLanguage(fileName: string) {
+  const extension = fileName.split(".").pop()?.toLowerCase();
+  switch (extension) {
+    case "j2":
+    case "jinja":
+    case "jinja2":
+      return "jinja2";
+    case "yml":
+    case "yaml":
+      return "yaml";
+    case "json":
+      return "json";
+    case "sh":
+      return "shell";
+    case "ps1":
+      return "powershell";
+    case "conf":
+    case "cfg":
+      return "config";
+    default:
+      return extension ?? "";
+  }
+}
+
+function inferTemplateType(fileName: string): TemplateFormValues["templateType"] {
+  const extension = fileName.split(".").pop()?.toLowerCase();
+  if (extension === "j2" || extension === "jinja" || extension === "jinja2") {
+    return "Jinja2";
+  }
+
+  if (extension === "yml" || extension === "yaml") {
+    return "AnsibleVars";
+  }
+
+  if (extension === "sh" || extension === "ps1") {
+    return "ShellScript";
+  }
+
+  if (extension === "conf" || extension === "cfg") {
+    return "ConfigFile";
+  }
+
+  return "GenericText";
 }

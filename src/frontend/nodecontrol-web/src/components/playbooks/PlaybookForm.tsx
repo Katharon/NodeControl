@@ -1,21 +1,26 @@
 "use client";
 
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
 import SaveIcon from "@mui/icons-material/Save";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button, MenuItem, Stack, TextField } from "@mui/material";
-import { useForm, useWatch } from "react-hook-form";
+import { Alert, Box, Button, Divider, IconButton, MenuItem, Stack, TextField, Typography } from "@mui/material";
+import type { ChangeEvent } from "react";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import type { Playbook, PlaybookArtifactFile, PlaybookInput } from "@/lib/api/playbooks";
 
 const slugPattern = /^[a-z0-9][a-z0-9-]{1,99}$/;
-const artifactFilesExample = JSON.stringify(
-  [
-    { path: "site.yml", content: "- hosts: all\n  roles:\n    - app\n" },
-    { path: "roles/app/tasks/main.yml", content: "- debug:\n    msg: hello\n" },
-  ],
-  null,
-  2,
-);
+const defaultArtifactFiles: PlaybookArtifactFile[] = [
+  { path: "site.yml", content: "- hosts: all\n  roles:\n    - app\n" },
+  { path: "roles/app/tasks/main.yml", content: "- debug:\n    msg: hello\n" },
+];
+
+const artifactFileSchema = z.object({
+  path: z.string().trim().min(1, "Path is required").max(500),
+  content: z.string().max(200000),
+});
 
 const playbookSchema = z
   .object({
@@ -25,7 +30,7 @@ const playbookSchema = z
     sourceType: z.enum(["InlineYaml", "ArtifactDirectory"]),
     inlineContent: z.string().max(200000).optional(),
     entryFilePath: z.string().trim().max(500).optional(),
-    artifactFilesText: z.string().max(1000000).optional(),
+    artifactFiles: z.array(artifactFileSchema).max(100, "At most 100 artifact files are supported").optional(),
   })
   .superRefine((values, context) => {
     if (values.sourceType === "InlineYaml") {
@@ -44,13 +49,40 @@ const playbookSchema = z
       context.addIssue({ code: "custom", message: "Inline YAML must be empty for artifact-directory playbooks", path: ["inlineContent"] });
     }
 
-    const parsed = parseArtifactFiles(values.artifactFilesText);
-    if (!parsed.ok) {
-      context.addIssue({ code: "custom", message: parsed.message, path: ["artifactFilesText"] });
+    const files = values.artifactFiles ?? [];
+    if (files.length === 0) {
+      context.addIssue({ code: "custom", message: "Artifact files are required", path: ["artifactFiles"] });
       return;
     }
 
-    if (!parsed.files.some((file) => file.path === values.entryFilePath?.trim())) {
+    const normalizedEntry = normalizeArtifactPath(values.entryFilePath);
+    if (!normalizedEntry.ok) {
+      context.addIssue({ code: "custom", message: normalizedEntry.message, path: ["entryFilePath"] });
+      return;
+    }
+
+    const seenPaths = new Set<string>();
+    let totalLength = 0;
+    for (const [index, file] of files.entries()) {
+      const normalizedPath = normalizeArtifactPath(file.path);
+      if (!normalizedPath.ok) {
+        context.addIssue({ code: "custom", message: normalizedPath.message, path: ["artifactFiles", index, "path"] });
+        continue;
+      }
+
+      if (seenPaths.has(normalizedPath.path)) {
+        context.addIssue({ code: "custom", message: "Artifact file paths must be unique", path: ["artifactFiles", index, "path"] });
+      }
+
+      seenPaths.add(normalizedPath.path);
+      totalLength += file.content.length;
+    }
+
+    if (totalLength > 1000000) {
+      context.addIssue({ code: "custom", message: "Artifact file content is too large", path: ["artifactFiles"] });
+    }
+
+    if (!seenPaths.has(normalizedEntry.path)) {
       context.addIssue({ code: "custom", message: "Artifact files must include the configured entry file", path: ["entryFilePath"] });
     }
   });
@@ -69,6 +101,8 @@ export function PlaybookForm({ playbook, submitLabel, onSubmit }: PlaybookFormPr
     handleSubmit,
     register,
     control,
+    getValues,
+    setValue,
   } = useForm<PlaybookFormValues>({
     resolver: zodResolver(playbookSchema),
     defaultValues: {
@@ -78,10 +112,32 @@ export function PlaybookForm({ playbook, submitLabel, onSubmit }: PlaybookFormPr
       sourceType: playbook?.sourceType === "ArtifactDirectory" ? "ArtifactDirectory" : "InlineYaml",
       inlineContent: playbook?.inlineContent ?? (playbook?.sourceType === "ArtifactDirectory" ? "" : "- hosts: all\n  tasks:\n    - debug:\n        msg: hello\n"),
       entryFilePath: playbook?.entryFilePath ?? "site.yml",
-      artifactFilesText: playbook?.artifactFiles?.length ? JSON.stringify(playbook.artifactFiles, null, 2) : artifactFilesExample,
+      artifactFiles: playbook?.artifactFiles?.length ? playbook.artifactFiles : defaultArtifactFiles,
     },
   });
+  const { append, fields, remove } = useFieldArray({ control, name: "artifactFiles" });
   const sourceType = useWatch({ control, name: "sourceType" });
+
+  async function importArtifactFiles(event: ChangeEvent<HTMLInputElement>) {
+    const selectedFiles = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (selectedFiles.length === 0) {
+      return;
+    }
+
+    const existingFiles = getValues("artifactFiles") ?? [];
+    const importedFiles = await Promise.all(
+      selectedFiles.map(async (file) => ({
+        path: getBrowserFilePath(file),
+        content: await file.text(),
+      })),
+    );
+
+    append(importedFiles);
+    if (existingFiles.length === 0 && importedFiles[0]) {
+      setValue("entryFilePath", importedFiles[0].path, { shouldDirty: true, shouldValidate: true });
+    }
+  }
 
   return (
     <Stack
@@ -94,7 +150,15 @@ export function PlaybookForm({ playbook, submitLabel, onSubmit }: PlaybookFormPr
           sourceType: values.sourceType,
           inlineContent: values.sourceType === "InlineYaml" ? values.inlineContent : null,
           entryFilePath: values.entryFilePath || null,
-          artifactFiles: values.sourceType === "ArtifactDirectory" ? parseArtifactFiles(values.artifactFilesText).files : null,
+          artifactFiles: values.sourceType === "ArtifactDirectory"
+            ? (values.artifactFiles ?? []).map((file) => {
+                const normalizedPath = normalizeArtifactPath(file.path);
+                return {
+                  path: normalizedPath.ok ? normalizedPath.path : file.path.trim(),
+                  content: file.content,
+                };
+              })
+            : null,
         }),
       )}
       sx={{ gap: 2 }}
@@ -128,14 +192,59 @@ export function PlaybookForm({ playbook, submitLabel, onSubmit }: PlaybookFormPr
           {...register("inlineContent")}
         />
       ) : (
-        <TextField
-          error={Boolean(errors.artifactFilesText)}
-          helperText={errors.artifactFilesText?.message ?? "JSON array of files with path and content. Paths are relative to the playbook directory."}
-          label="Artifact files"
-          minRows={16}
-          multiline
-          {...register("artifactFilesText")}
-        />
+        <Stack sx={{ gap: 2 }}>
+          <Alert severity={errors.artifactFiles ? "error" : "info"}>
+            {errors.artifactFiles?.message ?? "Artifact files are stored as relative paths under the Worker playbook workspace."}
+          </Alert>
+          <Stack direction={{ xs: "column", sm: "row" }} sx={{ gap: 1 }}>
+            <Button component="label" startIcon={<UploadFileIcon />} variant="outlined">
+              Import files
+              <input hidden multiple onChange={importArtifactFiles} type="file" />
+            </Button>
+            <Button
+              onClick={() => append({ path: fields.length === 0 ? "site.yml" : "", content: "" })}
+              startIcon={<AddIcon />}
+              type="button"
+              variant="outlined"
+            >
+              Add file
+            </Button>
+          </Stack>
+          <Stack divider={<Divider />} sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}>
+            {fields.map((field, index) => (
+              <Box key={field.id} sx={{ p: 2 }}>
+                <Stack sx={{ gap: 1.5 }}>
+                  <Stack direction={{ xs: "column", sm: "row" }} sx={{ alignItems: { sm: "flex-start" }, gap: 1 }}>
+                    <TextField
+                      error={Boolean(errors.artifactFiles?.[index]?.path)}
+                      helperText={errors.artifactFiles?.[index]?.path?.message ?? "Relative path, for example roles/app/tasks/main.yml"}
+                      label="Artifact path"
+                      sx={{ flex: 1 }}
+                      {...register(`artifactFiles.${index}.path`)}
+                    />
+                    <IconButton aria-label="Remove artifact file" color="warning" onClick={() => remove(index)} sx={{ mt: { sm: 1 } }}>
+                      <DeleteIcon />
+                    </IconButton>
+                  </Stack>
+                  <TextField
+                    error={Boolean(errors.artifactFiles?.[index]?.content)}
+                    helperText={errors.artifactFiles?.[index]?.content?.message}
+                    label="File content"
+                    minRows={8}
+                    multiline
+                    slotProps={{ input: { sx: { fontFamily: "monospace", fontSize: 14 } } }}
+                    {...register(`artifactFiles.${index}.content`)}
+                  />
+                </Stack>
+              </Box>
+            ))}
+            {fields.length === 0 ? (
+              <Box sx={{ p: 2 }}>
+                <Typography color="text.secondary">No artifact files added yet.</Typography>
+              </Box>
+            ) : null}
+          </Stack>
+        </Stack>
       )}
       <Button disabled={isSubmitting} startIcon={<SaveIcon />} sx={{ alignSelf: "flex-start" }} type="submit" variant="contained">
         {submitLabel}
@@ -144,39 +253,26 @@ export function PlaybookForm({ playbook, submitLabel, onSubmit }: PlaybookFormPr
   );
 }
 
-function parseArtifactFiles(value: string | undefined): { ok: true; files: PlaybookArtifactFile[]; message?: never } | { ok: false; files: PlaybookArtifactFile[]; message: string } {
-  if (!value?.trim()) {
-    return { ok: false, files: [], message: "Artifact files are required" };
+function normalizeArtifactPath(value: string | undefined): { ok: true; path: string } | { ok: false; message: string } {
+  const normalized = value?.trim().replaceAll("\\", "/") ?? "";
+  if (!normalized) {
+    return { ok: false, message: "Artifact file path is required" };
   }
 
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      return { ok: false, files: [], message: "Artifact files must be a non-empty JSON array" };
-    }
-
-    const files = parsed.map((item) => {
-      if (!isArtifactFile(item)) {
-        throw new Error("Each artifact file needs path and content strings");
-      }
-
-      return { path: item.path.trim(), content: item.content };
-    });
-
-    return { ok: true, files };
-  } catch (error) {
-    return { ok: false, files: [], message: error instanceof Error ? error.message : "Artifact files JSON is invalid" };
+  if (
+    normalized.length > 500
+    || normalized.startsWith("/")
+    || normalized.endsWith("/")
+    || /^[A-Za-z]:/.test(normalized)
+    || normalized.split("/").some((part) => !part.trim() || part === "." || part === "..")
+  ) {
+    return { ok: false, message: "Artifact file path is invalid" };
   }
+
+  return { ok: true, path: normalized };
 }
 
-function isArtifactFile(value: unknown): value is PlaybookArtifactFile {
-  return Boolean(
-    value
-      && typeof value === "object"
-      && "path" in value
-      && "content" in value
-      && typeof value.path === "string"
-      && value.path.trim().length > 0
-      && typeof value.content === "string",
-  );
+function getBrowserFilePath(file: File) {
+  const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath;
+  return (relativePath || file.name).replaceAll("\\", "/");
 }

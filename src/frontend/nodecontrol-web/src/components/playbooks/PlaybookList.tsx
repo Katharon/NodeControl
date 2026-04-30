@@ -78,7 +78,10 @@ export function PlaybookList({ customerId, canManagePlaybooks }: PlaybookListPro
                     <Stack direction="row" sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                       <Typography color="text.secondary" variant="body2">{playbook.slug}</Typography>
                       <Chip label={playbookTypeLabel(playbook.sourceType)} size="small" variant="outlined" />
-                      <Chip label={playbook.entryFilePath ?? "site.yml"} size="small" variant="outlined" />
+                      <Chip label={`Entry: ${playbook.entryFilePath ?? "site.yml"}`} size="small" variant="outlined" />
+                      {playbook.sourceType === "ArtifactDirectory" ? (
+                        <Chip label={`${playbook.artifactFiles.length} files`} size="small" variant="outlined" />
+                      ) : null}
                     </Stack>
                   </Stack>
                 </Stack>

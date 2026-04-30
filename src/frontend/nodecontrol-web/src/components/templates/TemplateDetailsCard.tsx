@@ -2,7 +2,7 @@
 
 import ArchiveIcon from "@mui/icons-material/Archive";
 import CheckIcon from "@mui/icons-material/Check";
-import { Alert, Box, Button, CircularProgress, Divider, Paper, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, CircularProgress, Divider, Paper, Stack, Typography } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { TemplateForm } from "@/components/templates/TemplateForm";
@@ -67,6 +67,7 @@ export function TemplateDetailsCard({ customerId, templateId, canManageTemplates
             <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
               <TemplateTypeChip templateType={template.templateType} />
               <TemplateStatusChip status={template.status} />
+              <Chip label={`${template.content.length.toLocaleString()} chars`} size="small" variant="outlined" />
               {template.language ? <Typography color="text.secondary" variant="body2">{template.language}</Typography> : null}
             </Stack>
           </Stack>

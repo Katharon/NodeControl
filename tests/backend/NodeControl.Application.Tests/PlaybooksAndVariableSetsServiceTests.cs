@@ -75,6 +75,49 @@ public sealed class PlaybooksAndVariableSetsServiceTests
         Assert.Equal(CustomerServiceError.BadRequest, result.Error);
     }
 
+    [Fact]
+    public async Task PlaybookService_rejects_artifact_directory_with_unsafe_paths()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+
+        var result = await fixture.CreatePlaybookService().CreateAsync(
+            fixture.CurrentUser,
+            fixture.Customer.Id,
+            ValidArtifactPlaybookRequest("deploy-app") with
+            {
+                ArtifactFiles =
+                [
+                    new PlaybookArtifactFileDto("site.yml", "- hosts: all\n"),
+                    new PlaybookArtifactFileDto("../roles/app/tasks/main.yml", "- debug:\n    msg: hello\n")
+                ]
+            });
+
+        Assert.Equal(CustomerServiceError.BadRequest, result.Error);
+        Assert.Empty(fixture.Db.Playbooks);
+    }
+
+    [Fact]
+    public async Task PlaybookService_rejects_artifact_directory_with_duplicate_normalized_paths()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+
+        var result = await fixture.CreatePlaybookService().CreateAsync(
+            fixture.CurrentUser,
+            fixture.Customer.Id,
+            ValidArtifactPlaybookRequest("deploy-app") with
+            {
+                ArtifactFiles =
+                [
+                    new PlaybookArtifactFileDto("site.yml", "- hosts: all\n"),
+                    new PlaybookArtifactFileDto("roles/app/tasks/main.yml", "- debug:\n    msg: hello\n"),
+                    new PlaybookArtifactFileDto("roles\\app\\tasks\\main.yml", "- debug:\n    msg: duplicate\n")
+                ]
+            });
+
+        Assert.Equal(CustomerServiceError.BadRequest, result.Error);
+        Assert.Empty(fixture.Db.Playbooks);
+    }
+
     [Theory]
     [InlineData(PlaybookSourceType.GitRepository)]
     public async Task PlaybookService_rejects_reserved_source_types(PlaybookSourceType sourceType)

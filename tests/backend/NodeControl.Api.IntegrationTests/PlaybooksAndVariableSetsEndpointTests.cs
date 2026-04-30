@@ -135,6 +135,35 @@ public sealed class PlaybooksAndVariableSetsEndpointTests
     }
 
     [Fact]
+    public async Task Post_playbook_rejects_invalid_artifact_entry_and_duplicate_paths()
+    {
+        await using var factory = DefinitionApiFactory.Create(CustomerRole.Owner);
+        var seeded = factory.SeedCurrentUserAndCustomer();
+        using var client = factory.CreateClient();
+
+        using var missingEntryResponse = await client.PostAsJsonAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/playbooks",
+            ValidArtifactPlaybookRequest("missing-entry") with { EntryFilePath = "missing.yml" },
+            JsonOptions);
+        using var duplicatePathResponse = await client.PostAsJsonAsync(
+            $"/api/v1/customers/{seeded.Customer.Id}/playbooks",
+            ValidArtifactPlaybookRequest("duplicate-path") with
+            {
+                ArtifactFiles =
+                [
+                    new PlaybookArtifactFileDto("site.yml", "- hosts: all\n"),
+                    new PlaybookArtifactFileDto("roles/app/tasks/main.yml", "- debug:\n    msg: hello\n"),
+                    new PlaybookArtifactFileDto("roles\\app\\tasks\\main.yml", "- debug:\n    msg: duplicate\n")
+                ]
+            },
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.BadRequest, missingEntryResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, duplicatePathResponse.StatusCode);
+        Assert.Empty(factory.Db.Playbooks);
+    }
+
+    [Fact]
     public async Task Platform_admin_can_manage_all_customer_definitions()
     {
         await using var factory = DefinitionApiFactory.CreatePlatformAdmin();
@@ -158,6 +187,21 @@ public sealed class PlaybooksAndVariableSetsEndpointTests
     private static CreatePlaybookRequest ValidPlaybookRequest(string slug)
     {
         return new CreatePlaybookRequest("Deploy App", slug, null, PlaybookSourceType.InlineYaml, ValidYaml, null);
+    }
+
+    private static CreatePlaybookRequest ValidArtifactPlaybookRequest(string slug)
+    {
+        return new CreatePlaybookRequest(
+            "Deploy App",
+            slug,
+            null,
+            PlaybookSourceType.ArtifactDirectory,
+            null,
+            "site.yml",
+            [
+                new PlaybookArtifactFileDto("site.yml", "- hosts: all\n  roles:\n    - app\n"),
+                new PlaybookArtifactFileDto("roles/app/tasks/main.yml", "- debug:\n    msg: hello\n")
+            ]);
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)

@@ -77,6 +77,10 @@ group_vars/
 host_vars/
 ```
 
+The product UI lets operators import local text files, edit file paths/content as explicit rows, and see the configured
+entry file plus stored artifact file list. The API still stores and validates metadata/content only; it does not create
+execution workspaces or run Ansible.
+
 ## JobRun Workspace
 
 Each JobRun gets its own workspace.
@@ -202,6 +206,10 @@ Rules:
 Templates are reusable customer-scoped text/Jinja2/config/script resources. Actions may map managed templates to
 relative file paths under `playbook/` in the per-Run workspace. During workspace preparation, the Worker materializes
 those files and resolves any `secret://...` references in the template content.
+
+The UI can import a local text file into a Template and can configure multiple Action template artifact mappings with
+explicit relative workspace paths. These paths are validated as relative artifact paths and are still materialized only
+by the Worker during run preparation.
 
 This is intentionally narrow:
 

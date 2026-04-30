@@ -83,6 +83,7 @@ export function TemplateList({ customerId, canManageTemplates }: TemplateListPro
                 <TableCell>Slug</TableCell>
                 <TableCell>Type</TableCell>
                 <TableCell>Language</TableCell>
+                <TableCell>Size</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Updated</TableCell>
                 <TableCell align="right">Actions</TableCell>
@@ -95,6 +96,7 @@ export function TemplateList({ customerId, canManageTemplates }: TemplateListPro
                   <TableCell>{template.slug}</TableCell>
                   <TableCell><TemplateTypeChip templateType={template.templateType} /></TableCell>
                   <TableCell>{template.language || "n/a"}</TableCell>
+                  <TableCell>{template.content.length.toLocaleString()} chars</TableCell>
                   <TableCell><TemplateStatusChip status={template.status} /></TableCell>
                   <TableCell>{new Date(template.updatedAt ?? template.createdAt).toLocaleString()}</TableCell>
                   <TableCell align="right">

@@ -102,7 +102,7 @@ The implemented dev/demo MVP is a customer-scoped automation control plane. It c
 - Control nodes
 - Managed nodes
 - Inventory groups
-- Inline YAML and managed artifact-directory playbooks
+- Inline YAML and managed artifact-directory playbooks with product-side file import/editing
 - Variable sets
 - Manual jobs
 - Scheduled jobs
@@ -120,8 +120,8 @@ The implemented dev/demo MVP is a customer-scoped automation control plane. It c
 
 These product areas exist in the current MVP, but their scope is intentionally limited:
 
-- Templates are managed text resources. Actions may map selected templates to relative files under the run playbook
-  workspace, where the Worker materializes them before Ansible starts.
+- Templates are managed text resources with file import/editing in the UI. Actions may map selected templates to
+  relative files under the run playbook workspace, where the Worker materializes them before Ansible starts.
 - Secrets store protected values and expose safe metadata/reference behavior. Secret values are never returned by the
   API; `secret://...` references are resolved only by the Worker during workspace preparation.
 - Platform admin user overview is a review and administration aid for existing users, not user registration,

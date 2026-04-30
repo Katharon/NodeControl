@@ -1,10 +1,12 @@
 "use client";
 
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
 import SaveIcon from "@mui/icons-material/Save";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Alert, Button, CircularProgress, MenuItem, Stack, TextField } from "@mui/material";
+import { Alert, Box, Button, CircularProgress, Divider, IconButton, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import { getControlNodes } from "@/lib/api/controlNodes";
 import { getInventoryGroups } from "@/lib/api/inventoryGroups";
@@ -15,18 +17,43 @@ import { getVariableSets } from "@/lib/api/variableSets";
 
 const slugPattern = /^[a-z0-9][a-z0-9-]{1,99}$/;
 
-const jobSchema = z.object({
-  name: z.string().trim().min(1).max(200),
-  slug: z.string().trim().regex(slugPattern, "Use lowercase letters, numbers, and hyphens"),
-  description: z.string().trim().max(1000).optional(),
-  controlNodeId: z.string().uuid(),
-  inventoryGroupId: z.string().uuid(),
-  playbookId: z.string().uuid(),
-  variableSetId: z.string(),
-  templateArtifactTemplateId: z.string(),
-  templateArtifactPath: z.string().trim().max(500).optional(),
-  defaultTimeoutSeconds: z.number().int().min(30).max(86400),
+const templateArtifactSchema = z.object({
+  templateId: z.string(),
+  path: z.string().trim().max(500).optional(),
 });
+
+const jobSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200),
+    slug: z.string().trim().regex(slugPattern, "Use lowercase letters, numbers, and hyphens"),
+    description: z.string().trim().max(1000).optional(),
+    controlNodeId: z.string().uuid(),
+    inventoryGroupId: z.string().uuid(),
+    playbookId: z.string().uuid(),
+    variableSetId: z.string(),
+    templateArtifacts: z.array(templateArtifactSchema).max(20, "At most 20 template artifacts are supported"),
+    defaultTimeoutSeconds: z.number().int().min(30).max(86400),
+  })
+  .superRefine((values, context) => {
+    const seenPaths = new Set<string>();
+    for (const [index, artifact] of values.templateArtifacts.entries()) {
+      if (!artifact.templateId) {
+        context.addIssue({ code: "custom", message: "Template is required", path: ["templateArtifacts", index, "templateId"] });
+      }
+
+      const normalizedPath = normalizeArtifactPath(artifact.path);
+      if (!normalizedPath.ok) {
+        context.addIssue({ code: "custom", message: normalizedPath.message, path: ["templateArtifacts", index, "path"] });
+        continue;
+      }
+
+      if (seenPaths.has(normalizedPath.path)) {
+        context.addIssue({ code: "custom", message: "Template artifact paths must be unique", path: ["templateArtifacts", index, "path"] });
+      }
+
+      seenPaths.add(normalizedPath.path);
+    }
+  });
 
 type JobFormValues = z.infer<typeof jobSchema>;
 
@@ -45,6 +72,7 @@ export function JobForm({ customerId, job, submitLabel, onSubmit }: JobFormProps
   const templatesQuery = useQuery({ queryKey: ["templates", customerId], queryFn: () => getTemplates(customerId) });
   const {
     formState: { errors, isSubmitting },
+    control,
     handleSubmit,
     register,
   } = useForm<JobFormValues>({
@@ -57,11 +85,11 @@ export function JobForm({ customerId, job, submitLabel, onSubmit }: JobFormProps
       inventoryGroupId: job?.inventoryGroupId ?? "",
       playbookId: job?.playbookId ?? "",
       variableSetId: job?.variableSetId ?? "",
-      templateArtifactTemplateId: job?.templateArtifacts[0]?.templateId ?? "",
-      templateArtifactPath: job?.templateArtifacts[0]?.path ?? "",
+      templateArtifacts: job?.templateArtifacts ?? [],
       defaultTimeoutSeconds: job?.defaultTimeoutSeconds ?? 1800,
     },
   });
+  const { append, fields, remove } = useFieldArray({ control, name: "templateArtifacts" });
 
   if (controlNodesQuery.isPending || inventoryGroupsQuery.isPending || playbooksQuery.isPending || variableSetsQuery.isPending || templatesQuery.isPending) {
     return <CircularProgress size={22} />;
@@ -84,9 +112,13 @@ export function JobForm({ customerId, job, submitLabel, onSubmit }: JobFormProps
           playbookId: values.playbookId,
           variableSetId: values.variableSetId || null,
           defaultTimeoutSeconds: values.defaultTimeoutSeconds,
-          templateArtifacts: values.templateArtifactTemplateId && values.templateArtifactPath
-            ? [{ templateId: values.templateArtifactTemplateId, path: values.templateArtifactPath }]
-            : [],
+          templateArtifacts: values.templateArtifacts.map((artifact) => {
+            const normalizedPath = normalizeArtifactPath(artifact.path);
+            return {
+              templateId: artifact.templateId,
+              path: normalizedPath.ok ? normalizedPath.path : artifact.path?.trim() ?? "",
+            };
+          }),
         }),
       )}
       sx={{ gap: 2 }}
@@ -107,16 +139,55 @@ export function JobForm({ customerId, job, submitLabel, onSubmit }: JobFormProps
         <MenuItem value="">None</MenuItem>
         {variableSetsQuery.data.map((variableSet) => <MenuItem key={variableSet.id} value={variableSet.id}>{variableSet.name}</MenuItem>)}
       </TextField>
-      <TextField label="Template Artifact" select {...register("templateArtifactTemplateId")}>
-        <MenuItem value="">None</MenuItem>
-        {templatesQuery.data.map((template) => <MenuItem key={template.id} value={template.id}>{template.name}</MenuItem>)}
-      </TextField>
-      <TextField
-        error={Boolean(errors.templateArtifactPath)}
-        helperText={errors.templateArtifactPath?.message}
-        label="Template Artifact Path"
-        {...register("templateArtifactPath")}
-      />
+      <Box sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}>
+        <Stack divider={<Divider />}>
+          <Stack direction={{ xs: "column", sm: "row" }} sx={{ alignItems: { sm: "center" }, justifyContent: "space-between", gap: 1, p: 2 }}>
+            <Stack>
+              <Typography sx={{ fontWeight: 700 }}>Template artifacts</Typography>
+              <Typography color="text.secondary" variant="body2">Materialized by the Worker under the playbook workspace.</Typography>
+            </Stack>
+            <Button
+              onClick={() => append({ templateId: "", path: "" })}
+              startIcon={<AddIcon />}
+              type="button"
+              variant="outlined"
+            >
+              Add mapping
+            </Button>
+          </Stack>
+          {fields.length === 0 ? (
+            <Box sx={{ p: 2 }}>
+              <Typography color="text.secondary">No template artifacts mapped.</Typography>
+            </Box>
+          ) : (
+            fields.map((field, index) => (
+              <Stack direction={{ xs: "column", md: "row" }} key={field.id} sx={{ alignItems: { md: "flex-start" }, gap: 1, p: 2 }}>
+                <TextField
+                  error={Boolean(errors.templateArtifacts?.[index]?.templateId)}
+                  helperText={errors.templateArtifacts?.[index]?.templateId?.message}
+                  label="Template"
+                  select
+                  sx={{ flex: 1 }}
+                  {...register(`templateArtifacts.${index}.templateId`)}
+                >
+                  <MenuItem value="">Select template</MenuItem>
+                  {templatesQuery.data.map((template) => <MenuItem key={template.id} value={template.id}>{template.name}</MenuItem>)}
+                </TextField>
+                <TextField
+                  error={Boolean(errors.templateArtifacts?.[index]?.path)}
+                  helperText={errors.templateArtifacts?.[index]?.path?.message ?? "Relative path, for example templates/app.conf"}
+                  label="Workspace path"
+                  sx={{ flex: 1 }}
+                  {...register(`templateArtifacts.${index}.path`)}
+                />
+                <IconButton aria-label="Remove template artifact" color="warning" onClick={() => remove(index)} sx={{ mt: { md: 1 } }}>
+                  <DeleteIcon />
+                </IconButton>
+              </Stack>
+            ))
+          )}
+        </Stack>
+      </Box>
       <TextField
         error={Boolean(errors.defaultTimeoutSeconds)}
         helperText={errors.defaultTimeoutSeconds?.message}
@@ -129,4 +200,23 @@ export function JobForm({ customerId, job, submitLabel, onSubmit }: JobFormProps
       </Button>
     </Stack>
   );
+}
+
+function normalizeArtifactPath(value: string | undefined): { ok: true; path: string } | { ok: false; message: string } {
+  const normalized = value?.trim().replaceAll("\\", "/") ?? "";
+  if (!normalized) {
+    return { ok: false, message: "Template artifact path is required" };
+  }
+
+  if (
+    normalized.length > 500
+    || normalized.startsWith("/")
+    || normalized.endsWith("/")
+    || /^[A-Za-z]:/.test(normalized)
+    || normalized.split("/").some((part) => !part.trim() || part === "." || part === "..")
+  ) {
+    return { ok: false, message: "Template artifact path is invalid" };
+  }
+
+  return { ok: true, path: normalized };
 }
