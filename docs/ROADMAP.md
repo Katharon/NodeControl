@@ -49,6 +49,7 @@ The explicit current/supporting/Post-MVP boundary is maintained in `docs/MVP_BOU
 - Actions as reusable execution definitions
 - Manual queued Runs
 - Worker execution pipeline for inline playbooks
+- Worker-side SSH remote dispatch for minimally configured non-local Control Hosts
 - Generated run workspaces and inventories
 - Captured stdout/stderr/system log entries
 - Run status transitions, cancellation, retry, and Run Center views
@@ -78,7 +79,7 @@ The explicit current/supporting/Post-MVP boundary is maintained in `docs/MVP_BOU
 ## Current Architecture Boundaries
 
 - The API never executes Ansible, SSH, TCP checks, shell commands, or process starts.
-- The Worker is the only process that runs `ansible-playbook` or performs Hostzustand TCP checks.
+- The Worker is the only process that runs `ansible-playbook`, stages SSH remote dispatch, or performs Hostzustand TCP checks.
 - Manual and scheduled Runs use the same queued JobRun execution path.
 - Schedules use a database-backed Worker poller. Quartz.NET is not part of the current implementation.
 - Templates can be materialized as configured Worker run workspace files.
@@ -120,7 +121,7 @@ because some placeholder routes or docs mention them:
 - SAML
 - Dynamic role editor
 - Policy engine
-- Multi-control-node dispatching
+- Advanced multi-control-node dispatching
 - Production Docker Compose packaging
 - Kubernetes/Helm only if explicitly needed later
 - Billing/licensing

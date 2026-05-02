@@ -5,6 +5,7 @@ using NodeControl.Application.Auth;
 using NodeControl.Application.Customers;
 using NodeControl.Domain.Authorization;
 using NodeControl.Domain.Nodes;
+using NodeControl.Domain.Secrets;
 
 namespace NodeControl.Application.ControlNodes;
 
@@ -65,11 +66,19 @@ public sealed class ControlNodeService(
 
         try
         {
+            if (!await RemoteCredentialIsValidAsync(customerId, request.SshPrivateKeySecretId, cancellationToken))
+            {
+                return CustomerServiceResult<ControlNodeDto>.BadRequest();
+            }
+
             var controlNode = ControlNode.Create(
                 customerId,
                 request.Name,
                 request.Hostname,
                 request.SshPort,
+                request.SshUsername,
+                request.SshPrivateKeySecretId,
+                request.RemoteWorkspaceRoot,
                 request.Description,
                 clock.UtcNow);
 
@@ -111,7 +120,20 @@ public sealed class ControlNodeService(
 
         try
         {
-            controlNode.Update(request.Name, request.Hostname, request.SshPort, request.Description, clock.UtcNow);
+            if (!await RemoteCredentialIsValidAsync(customerId, request.SshPrivateKeySecretId, cancellationToken))
+            {
+                return CustomerServiceResult<ControlNodeDto>.BadRequest();
+            }
+
+            controlNode.Update(
+                request.Name,
+                request.Hostname,
+                request.SshPort,
+                request.SshUsername,
+                request.SshPrivateKeySecretId,
+                request.RemoteWorkspaceRoot,
+                request.Description,
+                clock.UtcNow);
             await dbContext.SaveChangesAsync(cancellationToken);
 
             return CustomerServiceResult<ControlNodeDto>.Ok(Map(controlNode));
@@ -163,10 +185,30 @@ public sealed class ControlNodeService(
             controlNode.Name,
             controlNode.Hostname,
             controlNode.SshPort,
+            controlNode.SshUsername,
+            controlNode.SshPrivateKeySecretId,
+            controlNode.RemoteWorkspaceRoot,
             controlNode.Description,
             controlNode.Status,
             controlNode.CreatedAt,
             controlNode.UpdatedAt,
             controlNode.ArchivedAt);
+    }
+
+    private async Task<bool> RemoteCredentialIsValidAsync(
+        Guid customerId,
+        Guid? sshPrivateKeySecretId,
+        CancellationToken cancellationToken)
+    {
+        if (sshPrivateKeySecretId is null)
+        {
+            return true;
+        }
+
+        var secret = await dbContext.FindSecretAsync(customerId, sshPrivateKeySecretId.Value, cancellationToken);
+        return secret is not null
+            && secret.CustomerId == customerId
+            && secret.Status == SecretStatus.Active
+            && secret.Kind == SecretKind.SshPrivateKey;
     }
 }

@@ -98,8 +98,10 @@ public sealed class JobRunExecutionService(
                     executionContext.ControlNode!,
                     workspace,
                     TimeSpan.FromSeconds(executionContext.Job!.DefaultTimeoutSeconds),
-                    (line, token) => AppendLogAsync(jobRun, JobRunLogStream.StdOut, JobRunLogLevel.Info, line, token, executionContext.SecretValuesBySlug!.Values),
-                    (line, token) => AppendLogAsync(jobRun, JobRunLogStream.StdErr, JobRunLogLevel.Error, line, token, executionContext.SecretValuesBySlug!.Values),
+                    new ControlNodeCredentialMaterial(executionContext.ControlNodeSshPrivateKey),
+                    (line, token) => AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Info, line, token, SensitiveValues(executionContext)),
+                    (line, token) => AppendLogAsync(jobRun, JobRunLogStream.StdOut, JobRunLogLevel.Info, line, token, SensitiveValues(executionContext)),
+                    (line, token) => AppendLogAsync(jobRun, JobRunLogStream.StdErr, JobRunLogLevel.Error, line, token, SensitiveValues(executionContext)),
                     token => dbContext.IsJobRunCancellationRequestedAsync(jobRun.Id, token)),
                 cancellationToken);
 
@@ -108,14 +110,14 @@ public sealed class JobRunExecutionService(
                 var errorMessage = runResult.ErrorMessage ?? "JobRun was cancelled.";
                 await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Warning, "Cancellation observed by worker.", cancellationToken);
                 await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Warning, "Control-node execution terminated because cancellation was requested.", cancellationToken);
-                jobRun.MarkCancelled(runResult.ExitCode, RedactForStorage(errorMessage, executionContext.SecretValuesBySlug!.Values), clock.UtcNow);
+                jobRun.MarkCancelled(runResult.ExitCode, RedactForStorage(errorMessage, SensitiveValues(executionContext)), clock.UtcNow);
                 await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Warning, "JobRun cancelled.", cancellationToken);
             }
             else if (runResult.TimedOut)
             {
                 var errorMessage = runResult.ErrorMessage ?? "Control-node execution timed out.";
-                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken, executionContext.SecretValuesBySlug!.Values);
-                jobRun.MarkTimedOut(runResult.ExitCode, RedactForStorage(errorMessage, executionContext.SecretValuesBySlug!.Values), clock.UtcNow);
+                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken, SensitiveValues(executionContext));
+                jobRun.MarkTimedOut(runResult.ExitCode, RedactForStorage(errorMessage, SensitiveValues(executionContext)), clock.UtcNow);
             }
             else if (runResult.ExitCode == 0)
             {
@@ -126,8 +128,8 @@ public sealed class JobRunExecutionService(
             {
                 var errorMessage = runResult.ErrorMessage
                     ?? $"Control-node execution exited with code {runResult.ExitCode?.ToString() ?? "unknown"}.";
-                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken, executionContext.SecretValuesBySlug!.Values);
-                jobRun.MarkFailed(runResult.ExitCode, RedactForStorage(errorMessage, executionContext.SecretValuesBySlug!.Values), clock.UtcNow);
+                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken, SensitiveValues(executionContext));
+                jobRun.MarkFailed(runResult.ExitCode, RedactForStorage(errorMessage, SensitiveValues(executionContext)), clock.UtcNow);
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -237,6 +239,12 @@ public sealed class JobRunExecutionService(
             return JobRunExecutionContext.Failed(secretValues.ErrorMessage!);
         }
 
+        var controlNodeCredential = await ResolveControlNodeCredentialAsync(jobRun.CustomerId, controlNode, cancellationToken);
+        if (!controlNodeCredential.Succeeded)
+        {
+            return JobRunExecutionContext.Failed(controlNodeCredential.ErrorMessage!);
+        }
+
         return JobRunExecutionContext.Ok(
             job,
             controlNode,
@@ -245,7 +253,34 @@ public sealed class JobRunExecutionService(
             playbook,
             variableSet,
             templateArtifacts.Artifacts!,
-            secretValues.SecretValuesBySlug!);
+            secretValues.SecretValuesBySlug!,
+            controlNodeCredential.SshPrivateKey);
+    }
+
+    private async Task<ControlNodeCredentialResolutionResult> ResolveControlNodeCredentialAsync(
+        Guid customerId,
+        ControlNode controlNode,
+        CancellationToken cancellationToken)
+    {
+        if (controlNode.SshPrivateKeySecretId is null)
+        {
+            return ControlNodeCredentialResolutionResult.Ok(null);
+        }
+
+        var secret = await dbContext.FindSecretAsync(customerId, controlNode.SshPrivateKeySecretId.Value, cancellationToken);
+        if (secret?.Status != SecretStatus.Active || secret.CustomerId != customerId || secret.Kind != SecretKind.SshPrivateKey)
+        {
+            return ControlNodeCredentialResolutionResult.Failed("Control node SSH private key secret is unavailable for execution.");
+        }
+
+        try
+        {
+            return ControlNodeCredentialResolutionResult.Ok(secretProtector.Unprotect(secret.ProtectedValue));
+        }
+        catch (Exception)
+        {
+            return ControlNodeCredentialResolutionResult.Failed("Control node SSH private key secret could not be resolved for execution.");
+        }
     }
 
     private async Task<TemplateArtifactLoadResult> LoadTemplateArtifactsAsync(
@@ -343,6 +378,22 @@ public sealed class JobRunExecutionService(
         return redacted;
     }
 
+    private static IEnumerable<string> SensitiveValues(JobRunExecutionContext executionContext)
+    {
+        if (executionContext.SecretValuesBySlug is not null)
+        {
+            foreach (var secretValue in executionContext.SecretValuesBySlug.Values)
+            {
+                yield return secretValue;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(executionContext.ControlNodeSshPrivateKey))
+        {
+            yield return executionContext.ControlNodeSshPrivateKey;
+        }
+    }
+
     private sealed record TemplateArtifactLoadResult(
         bool Succeeded,
         IReadOnlyList<JobRunTemplateArtifact>? Artifacts,
@@ -372,6 +423,22 @@ public sealed class JobRunExecutionService(
         public static SecretReferenceResolutionResult Failed(string errorMessage)
         {
             return new SecretReferenceResolutionResult(false, null, errorMessage);
+        }
+    }
+
+    private sealed record ControlNodeCredentialResolutionResult(
+        bool Succeeded,
+        string? SshPrivateKey,
+        string? ErrorMessage)
+    {
+        public static ControlNodeCredentialResolutionResult Ok(string? sshPrivateKey)
+        {
+            return new ControlNodeCredentialResolutionResult(true, sshPrivateKey, null);
+        }
+
+        public static ControlNodeCredentialResolutionResult Failed(string errorMessage)
+        {
+            return new ControlNodeCredentialResolutionResult(false, null, errorMessage);
         }
     }
 }

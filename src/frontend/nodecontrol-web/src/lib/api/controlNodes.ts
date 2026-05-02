@@ -8,6 +8,9 @@ export type ControlNode = {
   name: string;
   hostname: string;
   sshPort: number;
+  sshUsername: string | null;
+  sshPrivateKeySecretId: string | null;
+  remoteWorkspaceRoot: string | null;
   description: string | null;
   status: ControlNodeStatus;
   createdAt: string;
@@ -19,6 +22,9 @@ export type ControlNodeInput = {
   name: string;
   hostname: string;
   sshPort: number;
+  sshUsername?: string | null;
+  sshPrivateKeySecretId?: string | null;
+  remoteWorkspaceRoot?: string | null;
   description?: string | null;
 };
 

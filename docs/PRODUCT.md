@@ -109,7 +109,7 @@ The implemented dev/demo MVP is a customer-scoped automation control plane. It c
 - Scheduled jobs
 - Job run history
 - Job logs
-- Run-bound Control Hosts with Worker-side dispatch preparation and local/dev execution fallback
+- Run-bound Control Hosts with Worker-side dispatch preparation, local/dev execution fallback, and SSH remote dispatch
 - Audit logs
 - Hostzustand / TCP reachability checks processed by the Worker
 - Template management as plain text resources with Action-linked workspace materialization
@@ -141,7 +141,7 @@ Current implementation boundaries are intentionally explicit:
 - The API queues work and enforces authorization; it never executes Ansible, SSH, TCP checks, shell commands, or process starts.
 - The Worker executes queued Runs, polls schedules, processes Hostzustand checks, creates workspaces, and captures logs.
 - Runs are bound to the selected Control Host when queued; local/dev execution remains available for configured local
-  Control Hosts, while non-local remote dispatch fails honestly until a future authenticated transport exists.
+  Control Hosts, while non-local Control Hosts can use a minimal Worker-side SSH dispatch configuration.
 - Continuous Git-backed playbook execution, Git sync, Ansible Collections management, cloud-provider inventory,
   notifications, approval workflow, external secret providers, and production deployment packaging remain Post-MVP.
 - `deploy/` is local dev/demo guidance only at this point.

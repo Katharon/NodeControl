@@ -323,6 +323,43 @@ public sealed class JobRunExecutionTests
     }
 
     [Fact]
+    public async Task JobRunExecutionService_resolves_control_node_ssh_key_only_for_dispatch_and_redacts_it()
+    {
+        using var fixture = ExecutionFixture.Create(controlNodeHostname: "control.example.test");
+        var keySecret = Secret.Create(
+            fixture.Customer.Id,
+            "Control key",
+            "control-key",
+            null,
+            SecretKind.SshPrivateKey,
+            "protected:-----BEGIN PRIVATE KEY-----\nremote-key\n-----END PRIVATE KEY-----",
+            TestTime);
+        fixture.Db.AddSecret(keySecret);
+        fixture.ControlNode.Update(
+            fixture.ControlNode.Name,
+            fixture.ControlNode.Hostname,
+            fixture.ControlNode.SshPort,
+            "ansible",
+            keySecret.Id,
+            "/var/lib/nodecontrol/remote-runs",
+            fixture.ControlNode.Description,
+            TestTime.AddMinutes(1));
+        var dispatcher = new CapturingControlNodeDispatcher(new ControlNodeDispatchResult(
+            255,
+            false,
+            false,
+            "ssh failed with -----BEGIN PRIVATE KEY-----\nremote-key\n-----END PRIVATE KEY-----"));
+        var service = fixture.CreateExecutionService(dispatcher);
+
+        await service.ExecuteAsync(fixture.JobRun);
+
+        Assert.Equal(JobRunStatus.Failed, fixture.JobRun.Status);
+        Assert.Equal("-----BEGIN PRIVATE KEY-----\nremote-key\n-----END PRIVATE KEY-----", dispatcher.Requests.Single().CredentialMaterial!.SshPrivateKey);
+        Assert.DoesNotContain("remote-key", fixture.JobRun.ErrorMessage);
+        Assert.DoesNotContain(fixture.Db.JobRunLogEntries, entry => entry.Message.Contains("remote-key", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task JobRunExecutionService_sets_failed_when_runner_returns_non_zero_exit_code()
     {
         using var fixture = ExecutionFixture.Create();
@@ -467,7 +504,7 @@ public sealed class JobRunExecutionTests
     }
 
     [Fact]
-    public async Task ControlNodeDispatcher_rejects_non_local_control_node_without_remote_transport()
+    public async Task ControlNodeDispatcher_rejects_non_local_control_node_without_remote_settings()
     {
         using var fixture = ExecutionFixture.Create(controlNodeHostname: "control.example.test");
         var workspace = await BuildWorkspaceAsync(fixture);
@@ -481,7 +518,35 @@ public sealed class JobRunExecutionTests
             TimeSpan.FromSeconds(30)));
 
         Assert.Null(result.ExitCode);
-        Assert.Contains("requires remote dispatch", result.ErrorMessage);
+        Assert.Contains("requires SSH remote dispatch settings", result.ErrorMessage);
+        Assert.Empty(runner.Requests);
+    }
+
+    [Fact]
+    public async Task ControlNodeDispatcher_rejects_non_local_control_node_without_private_key_material()
+    {
+        using var fixture = ExecutionFixture.Create(controlNodeHostname: "control.example.test");
+        fixture.ControlNode.Update(
+            fixture.ControlNode.Name,
+            fixture.ControlNode.Hostname,
+            fixture.ControlNode.SshPort,
+            "ansible",
+            Guid.NewGuid(),
+            "/var/lib/nodecontrol/remote-runs",
+            fixture.ControlNode.Description,
+            TestTime.AddMinutes(1));
+        var workspace = await BuildWorkspaceAsync(fixture);
+        var runner = new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null));
+        var dispatcher = new ControlNodeDispatcher(runner, Options.Create(new ExecutionOptions()));
+
+        var result = await dispatcher.DispatchAsync(new ControlNodeDispatchRequest(
+            fixture.JobRun,
+            fixture.ControlNode,
+            workspace,
+            TimeSpan.FromSeconds(30)));
+
+        Assert.Null(result.ExitCode);
+        Assert.Contains("private key material is unavailable", result.ErrorMessage);
         Assert.Empty(runner.Requests);
     }
 

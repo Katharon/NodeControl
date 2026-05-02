@@ -17,6 +17,7 @@ internal sealed record JobRunExecutionContext(
     VariableSet? VariableSet,
     IReadOnlyList<JobRunTemplateArtifact>? TemplateArtifacts,
     IReadOnlyDictionary<string, string>? SecretValuesBySlug,
+    string? ControlNodeSshPrivateKey,
     string? ErrorMessage)
 {
     public static JobRunExecutionContext Ok(
@@ -27,13 +28,25 @@ internal sealed record JobRunExecutionContext(
         Playbook playbook,
         VariableSet? variableSet,
         IReadOnlyList<JobRunTemplateArtifact> templateArtifacts,
-        IReadOnlyDictionary<string, string> secretValuesBySlug)
+        IReadOnlyDictionary<string, string> secretValuesBySlug,
+        string? controlNodeSshPrivateKey)
     {
-        return new JobRunExecutionContext(true, job, controlNode, inventoryGroup, managedNodes, playbook, variableSet, templateArtifacts, secretValuesBySlug, null);
+        return new JobRunExecutionContext(
+            true,
+            job,
+            controlNode,
+            inventoryGroup,
+            managedNodes,
+            playbook,
+            variableSet,
+            templateArtifacts,
+            secretValuesBySlug,
+            controlNodeSshPrivateKey,
+            null);
     }
 
     public static JobRunExecutionContext Failed(string errorMessage)
     {
-        return new JobRunExecutionContext(false, null, null, null, null, null, null, null, null, errorMessage);
+        return new JobRunExecutionContext(false, null, null, null, null, null, null, null, null, null, errorMessage);
     }
 }

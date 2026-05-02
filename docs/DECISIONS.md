@@ -243,5 +243,19 @@ Reason:
 - A Run should remain tied to the Control Node selected at queue time.
 - Editing an Action after queueing must not silently retarget already queued Runs.
 - The API remains non-operational and never performs Ansible, SSH, shell, TCP, or process execution.
-- The MVP can keep local/dev execution for configured local Control Nodes while failing honestly for non-local remote
-  Control Nodes until a future authenticated transport exists.
+- The MVP keeps local/dev execution for configured local Control Nodes and uses a small Worker-side SSH transport for
+  configured non-local Control Nodes.
+
+## DEC-021: Use Worker-side OpenSSH CLI for the remote dispatch MVP
+
+Status: Accepted
+
+NodeControl stores minimal SSH dispatch configuration on Control Nodes: username, remote workspace root, and an SSH
+private key Secret reference. For non-local Control Nodes, the Worker materializes that key into a temporary file,
+uses `scp` to stage the already-prepared run workspace, and uses `ssh` to start `ansible-playbook` remotely.
+
+Reason:
+
+- It keeps API behavior non-operational.
+- It reuses existing Secret protection and Worker-side secret resolution.
+- It is credible for an MVP without introducing agents, message buses, or a broad orchestration framework.

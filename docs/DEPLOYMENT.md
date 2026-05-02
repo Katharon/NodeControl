@@ -66,8 +66,8 @@ OIDC development, but it is not required for the default demo path.
 - PostgreSQL stores product data, users, memberships, schedules, run metadata, run log entries, audit logs,
   templates, and secret metadata.
 - The API exposes HTTP endpoints, validates input, performs authorization, and queues work.
-- The Worker processes queued Runs, due schedules, Hostzustand checks, run workspaces, Ansible execution, logs,
-  and status transitions.
+- The Worker processes queued Runs, due schedules, Hostzustand checks, run workspaces, local/SSH remote Ansible
+  execution, logs, and status transitions.
 - The frontend provides the demo/product UI.
 
 The API must never execute Ansible, SSH, TCP checks, shell commands, or process starts as product behavior.
@@ -93,5 +93,5 @@ Potential later features:
 - Automated database backup guidance
 - Observability stack
 - External object/file storage
-- Multi-worker or remote control-node execution model
+- Multi-worker dispatch coordination and hardened remote control-node operations
 - Kubernetes/Helm only if explicitly requested later

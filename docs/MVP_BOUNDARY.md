@@ -13,6 +13,7 @@ operational loop end to end:
 - Inline YAML playbooks, managed artifact-directory playbooks, and variable sets
 - Actions as reusable execution definitions
 - Manual Runs, Run Center, persisted logs, cancellation, and retry
+- Worker-side local/dev and SSH remote dispatch for configured Control Hosts
 - Database-polled schedules that create scheduled Runs through the same execution path
 - Hostzustand checks queued by the API and processed by the Worker
 - Customer-scoped audit logs
@@ -50,7 +51,8 @@ current MVP:
 
 - The API remains the HTTP control plane. It never executes Ansible, SSH, TCP checks, shell commands, or process starts
   as product behavior.
-- The Worker remains responsible for queued Run execution, Hostzustand TCP checks, workspaces, and log capture.
+- The Worker remains responsible for queued Run execution, SSH remote dispatch, Hostzustand TCP checks, workspaces,
+  and log capture.
 - Future surfaces should become real only through small vertical slices with authorization, customer scoping, tests,
   documentation, and demo behavior.
 - Placeholder UI should describe future intent honestly and must not imply that deferred capabilities already work.

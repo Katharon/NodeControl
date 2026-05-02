@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using NodeControl.Domain.Customers;
 using NodeControl.Domain.Nodes;
+using NodeControl.Domain.Secrets;
 
 namespace NodeControl.Infrastructure.Persistence.Configurations;
 
@@ -35,6 +36,17 @@ public sealed class ControlNodeConfiguration : IEntityTypeConfiguration<ControlN
             .HasColumnName("ssh_port")
             .IsRequired();
 
+        builder.Property(controlNode => controlNode.SshUsername)
+            .HasColumnName("ssh_username")
+            .HasMaxLength(100);
+
+        builder.Property(controlNode => controlNode.SshPrivateKeySecretId)
+            .HasColumnName("ssh_private_key_secret_id");
+
+        builder.Property(controlNode => controlNode.RemoteWorkspaceRoot)
+            .HasColumnName("remote_workspace_root")
+            .HasMaxLength(500);
+
         builder.Property(controlNode => controlNode.Description)
             .HasColumnName("description")
             .HasMaxLength(1000);
@@ -61,8 +73,16 @@ public sealed class ControlNodeConfiguration : IEntityTypeConfiguration<ControlN
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired();
 
+        builder.HasOne<Secret>()
+            .WithMany()
+            .HasForeignKey(controlNode => controlNode.SshPrivateKeySecretId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(controlNode => new { controlNode.CustomerId, controlNode.Name })
             .IsUnique()
             .HasDatabaseName("ux_control_nodes_customer_id_name");
+
+        builder.HasIndex(controlNode => controlNode.SshPrivateKeySecretId)
+            .HasDatabaseName("ix_control_nodes_ssh_private_key_secret_id");
     }
 }

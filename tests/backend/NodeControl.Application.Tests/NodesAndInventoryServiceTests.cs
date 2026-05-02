@@ -8,6 +8,7 @@ using NodeControl.Application.Abstractions.Time;
 using NodeControl.Domain.Customers;
 using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Nodes;
+using NodeControl.Domain.Secrets;
 using NodeControl.Domain.Users;
 
 namespace NodeControl.Application.Tests;
@@ -40,6 +41,54 @@ public sealed class NodesAndInventoryServiceTests
             "control-01.local"));
 
         Assert.Equal(CustomerServiceError.Forbidden, result.Error);
+        Assert.Empty(fixture.Db.ControlNodes);
+    }
+
+    [Fact]
+    public async Task ControlNodeService_creates_control_node_with_ssh_private_key_secret_reference()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+        var secret = Secret.Create(fixture.Customer.Id, "Control key", "control-key", null, SecretKind.SshPrivateKey, "protected-key", TestTime);
+        fixture.Db.AddSecret(secret);
+
+        var result = await fixture.CreateControlNodeService().CreateAsync(
+            fixture.CurrentUser,
+            fixture.Customer.Id,
+            new CreateControlNodeRequest(
+                "Remote control",
+                "control-01.example.test",
+                22,
+                "ansible",
+                secret.Id,
+                "/var/lib/nodecontrol/remote-runs"));
+
+        Assert.Null(result.Error);
+        Assert.Equal("ansible", result.Value!.SshUsername);
+        Assert.Equal(secret.Id, result.Value.SshPrivateKeySecretId);
+        Assert.Equal("/var/lib/nodecontrol/remote-runs", result.Value.RemoteWorkspaceRoot);
+    }
+
+    [Fact]
+    public async Task ControlNodeService_rejects_remote_credential_secret_from_another_customer()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+        var otherCustomer = Customer.Create("Other Customer", "other-customer", null, TestTime);
+        var otherSecret = Secret.Create(otherCustomer.Id, "Control key", "control-key", null, SecretKind.SshPrivateKey, "protected-key", TestTime);
+        fixture.Db.AddCustomer(otherCustomer);
+        fixture.Db.AddSecret(otherSecret);
+
+        var result = await fixture.CreateControlNodeService().CreateAsync(
+            fixture.CurrentUser,
+            fixture.Customer.Id,
+            new CreateControlNodeRequest(
+                "Remote control",
+                "control-01.example.test",
+                22,
+                "ansible",
+                otherSecret.Id,
+                "/var/lib/nodecontrol/remote-runs"));
+
+        Assert.Equal(CustomerServiceError.BadRequest, result.Error);
         Assert.Empty(fixture.Db.ControlNodes);
     }
 

@@ -35,6 +35,7 @@ export function CustomerNodesSections({ customerId }: CustomerNodesSectionsProps
   const customer = customerQuery.data;
   const canViewNodes = hasPermission(customer.permissions, "ViewNodes");
   const canManageNodes = hasPermission(customer.permissions, "ManageNodes");
+  const canViewSecrets = hasPermission(customer.permissions, "ViewSecrets");
 
   if (!canViewNodes) {
     return <Alert severity="warning">You do not have permission to view nodes for this customer.</Alert>;
@@ -65,7 +66,14 @@ export function CustomerNodesSections({ customerId }: CustomerNodesSectionsProps
         <Tab label="Inventare" />
       </Tabs>
 
-      {tab === 0 ? <ControlNodeList canManageNodes={canManageNodes} customerId={customerId} showCreateButton={false} /> : null}
+      {tab === 0 ? (
+        <ControlNodeList
+          canManageNodes={canManageNodes}
+          canViewSecrets={canViewSecrets}
+          customerId={customerId}
+          showCreateButton={false}
+        />
+      ) : null}
       {tab === 1 ? <ManagedNodeList canManageNodes={canManageNodes} customerId={customerId} showCreateButton={false} /> : null}
       {tab === 2 ? <InventoryGroupList canManageNodes={canManageNodes} customerId={customerId} /> : null}
 

@@ -121,8 +121,11 @@ The current remote-dispatch MVP has an explicit Worker-side dispatch boundary:
 - The API still queues Runs and reads state only.
 - The Worker prepares execution artifacts and a control-node dispatch manifest.
 - Local/dev execution is allowed only for configured local Control Node hostnames such as `localhost`, `127.0.0.1`, and `::1`.
-- Non-local Control Nodes fail honestly with a remote-dispatch-not-configured error until a future authenticated remote
-  transport is implemented.
+- Non-local Control Nodes use Worker-side SSH dispatch when an SSH username, SSH private key Secret reference, and
+  remote workspace root are configured.
+- The Worker materializes the SSH private key into a temporary file, stages the prepared workspace to the remote
+  Control Node with `scp`, starts `ansible-playbook` there with `ssh`, captures stdout/stderr into the existing JobRun
+  log model, and removes the temporary key file after dispatch.
 
 ## Execution Command
 
@@ -248,6 +251,10 @@ same-customer active metadata without decrypting. During JobRun execution, only 
 secrets and substitutes them while materializing `vars.yml` / `vars.json` and configured template artifact files.
 Resolved values may exist in the local run workspace as execution-ready artifacts, but they are redacted from persisted
 run logs and are not returned in API-facing models.
+
+Control Host SSH private keys are also referenced through existing Secret records. Control Host API responses expose
+only the selected Secret id as configuration metadata; the key value is decrypted only by the Worker when a queued Run
+is dispatched to a non-local Control Host.
 
 ## Dangerous Execution Concerns
 

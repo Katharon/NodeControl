@@ -21,7 +21,8 @@ Implemented product areas include customer and membership management, static rol
 Hosts, inventory groups, playbooks, variable sets, actions, runs, schedules, persisted run logs, audit logs,
 templates, secrets metadata and Worker-side reference resolution, user overview, Hostzustand checks, a run wizard, and a
 Run Center. Runs snapshot the selected Control Host and the Worker prepares control-host-scoped workspaces with a
-dispatch manifest before invoking the local Ansible adapter for configured local/dev Control Hosts. Git repository sources are managed as customer-scoped metadata and can be used by the frontend for one-time
+dispatch manifest before invoking either the local Ansible adapter for configured local/dev Control Hosts or the
+Worker-side SSH remote dispatch path for configured non-local Control Hosts. Git repository sources are managed as customer-scoped metadata and can be used by the frontend for one-time
 imports into the existing managed artifact models.
 
 The production deployment story is not complete. `deploy/` contains dev/demo notes only, while local bootstrap
@@ -286,7 +287,7 @@ Worker builds control-host-scoped workspace
   |
 Worker dispatches through Control Host boundary
   |
-Local/dev adapter runs ansible-playbook for configured local Control Hosts
+Local/dev adapter runs ansible-playbook for configured local Control Hosts, or Worker SSH dispatch stages and starts it remotely
   |
 Worker captures stdout/stderr/exit code
   |
@@ -298,8 +299,8 @@ AuditLog records execution
 The MVP Worker polls queued JobRuns from the database and processes the oldest queued run first. It also
 polls active schedules and creates queued scheduled JobRuns when they are due. Actual Ansible execution
 uses a Worker-only dispatch abstraction. The current MVP supports local/dev Control Hosts through the local
-Ansible adapter and reports non-local Control Hosts as remote-dispatch-not-configured until an authenticated
-transport is added later.
+Ansible adapter and supports non-local Control Hosts through a small SSH transport that stages the run workspace
+with `scp` and starts `ansible-playbook` with `ssh`.
 
 JobRun logs are persisted by the Worker as ordered entries. The API provides read-only access to those logs
 through customer-scoped authorization, applies lightweight response-time redaction for obvious token/password

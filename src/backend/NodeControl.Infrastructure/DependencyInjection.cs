@@ -44,6 +44,22 @@ public static class DependencyInjection
             executionOptions.AnsiblePlaybookPath = executionSection[nameof(ExecutionOptions.AnsiblePlaybookPath)]!;
         }
 
+        if (!string.IsNullOrWhiteSpace(executionSection[nameof(ExecutionOptions.RemoteAnsiblePlaybookPath)]))
+        {
+            executionOptions.RemoteAnsiblePlaybookPath = executionSection[nameof(ExecutionOptions.RemoteAnsiblePlaybookPath)]!;
+        }
+
+        if (bool.TryParse(executionSection[nameof(ExecutionOptions.AllowLocalControlNodeExecution)], out var allowLocalExecution))
+        {
+            executionOptions.AllowLocalControlNodeExecution = allowLocalExecution;
+        }
+
+        var localHostnames = executionSection.GetSection(nameof(ExecutionOptions.LocalControlNodeHostnames)).Get<string[]>();
+        if (localHostnames is { Length: > 0 })
+        {
+            executionOptions.LocalControlNodeHostnames = localHostnames;
+        }
+
         services.AddSingleton(Options.Create(executionOptions));
 
         services.AddSingleton<IClock, SystemClock>();
