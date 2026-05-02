@@ -5,6 +5,7 @@ using NodeControl.Application.Auth;
 using NodeControl.Application.Customers;
 using NodeControl.Domain.Authorization;
 using NodeControl.Domain.Nodes;
+using NodeControl.Domain.Secrets;
 
 namespace NodeControl.Application.ManagedNodes;
 
@@ -75,6 +76,11 @@ public sealed class ManagedNodeService(
             return CustomerServiceResult<ManagedNodeDto>.Conflict();
         }
 
+        if (!await SshCredentialIsValidAsync(customerId, request.SshPrivateKeySecretId, cancellationToken))
+        {
+            return CustomerServiceResult<ManagedNodeDto>.BadRequest();
+        }
+
         try
         {
             var managedNode = ManagedNode.Create(
@@ -82,6 +88,8 @@ public sealed class ManagedNodeService(
                 request.Name,
                 request.Hostname,
                 request.SshPort,
+                request.SshUsername,
+                request.SshPrivateKeySecretId,
                 request.OperatingSystem,
                 request.Environment,
                 request.Description,
@@ -127,12 +135,19 @@ public sealed class ManagedNodeService(
             return CustomerServiceResult<ManagedNodeDto>.Conflict();
         }
 
+        if (!await SshCredentialIsValidAsync(customerId, request.SshPrivateKeySecretId, cancellationToken))
+        {
+            return CustomerServiceResult<ManagedNodeDto>.BadRequest();
+        }
+
         try
         {
             managedNode.Update(
                 request.Name,
                 request.Hostname,
                 request.SshPort,
+                request.SshUsername,
+                request.SshPrivateKeySecretId,
                 request.OperatingSystem,
                 request.Environment,
                 request.Description,
@@ -183,6 +198,8 @@ public sealed class ManagedNodeService(
             managedNode.Name,
             managedNode.Hostname,
             managedNode.SshPort,
+            managedNode.SshUsername,
+            managedNode.SshPrivateKeySecretId,
             managedNode.OperatingSystem,
             managedNode.Environment,
             managedNode.Description,
@@ -190,5 +207,22 @@ public sealed class ManagedNodeService(
             managedNode.CreatedAt,
             managedNode.UpdatedAt,
             managedNode.ArchivedAt);
+    }
+
+    private async Task<bool> SshCredentialIsValidAsync(
+        Guid customerId,
+        Guid? sshPrivateKeySecretId,
+        CancellationToken cancellationToken)
+    {
+        if (sshPrivateKeySecretId is null)
+        {
+            return true;
+        }
+
+        var secret = await dbContext.FindSecretAsync(customerId, sshPrivateKeySecretId.Value, cancellationToken);
+        return secret is not null
+            && secret.CustomerId == customerId
+            && secret.Status == SecretStatus.Active
+            && secret.Kind == SecretKind.SshPrivateKey;
     }
 }

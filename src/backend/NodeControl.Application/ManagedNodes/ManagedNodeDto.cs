@@ -8,6 +8,8 @@ public sealed record ManagedNodeDto(
     string Name,
     string Hostname,
     int SshPort,
+    string? SshUsername,
+    Guid? SshPrivateKeySecretId,
     string? OperatingSystem,
     string? Environment,
     string? Description,

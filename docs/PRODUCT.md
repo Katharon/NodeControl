@@ -110,6 +110,7 @@ The implemented dev/demo MVP is a customer-scoped automation control plane. It c
 - Job run history
 - Job logs
 - Run-bound Control Hosts with Worker-side dispatch preparation, local/dev execution fallback, and SSH remote dispatch
+- Managed Host SSH execution metadata for generated inventory, including optional Secret-backed private keys
 - Audit logs
 - Hostzustand / TCP reachability checks processed by the Worker
 - Template management as plain text resources with Action-linked workspace materialization
@@ -129,6 +130,8 @@ These product areas exist in the current MVP, but their scope is intentionally l
   future Runs use that managed content rather than syncing from Git.
 - Secrets store protected values and expose safe metadata/reference behavior. Secret values are never returned by the
   API; `secret://...` references are resolved only by the Worker during workspace preparation.
+- Managed Hosts can store minimal SSH targeting settings. Private key values are referenced through Secrets and are
+  materialized only by the Worker for Ansible execution.
 - Platform admin user overview is a review and administration aid for existing users, not user registration,
   invitation, password management, or identity-provider administration.
 - The local showcase/bootstrap flow demonstrates real API and Worker paths, but it is not production packaging.

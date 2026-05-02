@@ -12,6 +12,8 @@ public sealed class ManagedNode
         string name,
         string hostname,
         int sshPort,
+        string? sshUsername,
+        Guid? sshPrivateKeySecretId,
         string? operatingSystem,
         string? environment,
         string? description,
@@ -22,6 +24,8 @@ public sealed class ManagedNode
         Name = name.Trim();
         Hostname = hostname.Trim();
         SshPort = sshPort;
+        SshUsername = NormalizeOptionalSshUsername(sshUsername);
+        SshPrivateKeySecretId = sshPrivateKeySecretId;
         OperatingSystem = NodeValidation.NormalizeOptional(operatingSystem, 100, nameof(operatingSystem));
         Environment = NodeValidation.NormalizeOptional(environment, 100, nameof(environment));
         Description = NodeValidation.NormalizeOptional(description, 1000, nameof(description));
@@ -38,6 +42,10 @@ public sealed class ManagedNode
     public string Hostname { get; private set; } = string.Empty;
 
     public int SshPort { get; private set; }
+
+    public string? SshUsername { get; private set; }
+
+    public Guid? SshPrivateKeySecretId { get; private set; }
 
     public string? OperatingSystem { get; private set; }
 
@@ -63,9 +71,35 @@ public sealed class ManagedNode
         string? description,
         DateTimeOffset createdAt)
     {
+        return Create(
+            customerId,
+            name,
+            hostname,
+            sshPort,
+            sshUsername: null,
+            sshPrivateKeySecretId: null,
+            operatingSystem,
+            environment,
+            description,
+            createdAt);
+    }
+
+    public static ManagedNode Create(
+        Guid customerId,
+        string name,
+        string hostname,
+        int sshPort,
+        string? sshUsername,
+        Guid? sshPrivateKeySecretId,
+        string? operatingSystem,
+        string? environment,
+        string? description,
+        DateTimeOffset createdAt)
+    {
         NodeValidation.ValidateInventoryName(name);
         NodeValidation.ValidateHostname(hostname);
         NodeValidation.ValidateSshPort(sshPort);
+        ValidateSshSettings(sshUsername);
 
         return new ManagedNode(
             Guid.NewGuid(),
@@ -73,6 +107,8 @@ public sealed class ManagedNode
             name,
             hostname,
             sshPort,
+            sshUsername,
+            sshPrivateKeySecretId,
             operatingSystem,
             environment,
             description,
@@ -88,13 +124,39 @@ public sealed class ManagedNode
         string? description,
         DateTimeOffset updatedAt)
     {
+        Update(
+            name,
+            hostname,
+            sshPort,
+            sshUsername: null,
+            sshPrivateKeySecretId: null,
+            operatingSystem,
+            environment,
+            description,
+            updatedAt);
+    }
+
+    public void Update(
+        string name,
+        string hostname,
+        int sshPort,
+        string? sshUsername,
+        Guid? sshPrivateKeySecretId,
+        string? operatingSystem,
+        string? environment,
+        string? description,
+        DateTimeOffset updatedAt)
+    {
         NodeValidation.ValidateInventoryName(name);
         NodeValidation.ValidateHostname(hostname);
         NodeValidation.ValidateSshPort(sshPort);
+        ValidateSshSettings(sshUsername);
 
         Name = name.Trim();
         Hostname = hostname.Trim();
         SshPort = sshPort;
+        SshUsername = NormalizeOptionalSshUsername(sshUsername);
+        SshPrivateKeySecretId = sshPrivateKeySecretId;
         OperatingSystem = NodeValidation.NormalizeOptional(operatingSystem, 100, nameof(operatingSystem));
         Environment = NodeValidation.NormalizeOptional(environment, 100, nameof(environment));
         Description = NodeValidation.NormalizeOptional(description, 1000, nameof(description));
@@ -111,5 +173,24 @@ public sealed class ManagedNode
         Status = ManagedNodeStatus.Archived;
         ArchivedAt = archivedAt;
         UpdatedAt = archivedAt;
+    }
+
+    private static void ValidateSshSettings(string? sshUsername)
+    {
+        if (string.IsNullOrWhiteSpace(sshUsername))
+        {
+            return;
+        }
+
+        var normalizedUsername = sshUsername.Trim();
+        if (normalizedUsername.Length > 100 || normalizedUsername.Any(char.IsWhiteSpace))
+        {
+            throw new ArgumentException("SSH username is invalid.", nameof(sshUsername));
+        }
+    }
+
+    private static string? NormalizeOptionalSshUsername(string? sshUsername)
+    {
+        return string.IsNullOrWhiteSpace(sshUsername) ? null : sshUsername.Trim();
     }
 }

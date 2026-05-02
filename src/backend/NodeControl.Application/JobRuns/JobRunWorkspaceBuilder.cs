@@ -319,11 +319,7 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
             .OrderBy(managedNode => managedNode.Name, StringComparer.Ordinal)
             .ToDictionary(
                 managedNode => managedNode.Name,
-                managedNode => (object)new Dictionary<string, object>
-                {
-                    ["ansible_host"] = managedNode.Hostname,
-                    ["ansible_port"] = managedNode.SshPort
-                },
+                managedNode => (object)BuildInventoryHostVariables(managedNode),
                 StringComparer.Ordinal);
 
         var inventory = new Dictionary<string, object>
@@ -372,6 +368,36 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
                 }
             },
             ArtifactJsonOptions);
+    }
+
+    private static string GetManagedHostPrivateKeyRelativePath(ManagedNode managedNode)
+    {
+        return string.Join(
+            '/',
+            ".nodecontrol",
+            "managed-host-keys",
+            $"{managedNode.Id:D}.key");
+    }
+
+    private static Dictionary<string, object> BuildInventoryHostVariables(ManagedNode managedNode)
+    {
+        var variables = new Dictionary<string, object>
+        {
+            ["ansible_host"] = managedNode.Hostname,
+            ["ansible_port"] = managedNode.SshPort
+        };
+
+        if (!string.IsNullOrWhiteSpace(managedNode.SshUsername))
+        {
+            variables["ansible_user"] = managedNode.SshUsername;
+        }
+
+        if (managedNode.SshPrivateKeySecretId is not null)
+        {
+            variables["ansible_ssh_private_key_file"] = GetManagedHostPrivateKeyRelativePath(managedNode);
+        }
+
+        return variables;
     }
 
     private static bool IsWithinDirectory(string rootPath, string path)

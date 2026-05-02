@@ -55,24 +55,31 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
             return await DispatchRemoteAsync(request, cancellationToken);
         }
 
-        var runResult = await ansibleRunner.RunAsync(
-            new AnsiblePlaybookRunRequest(
-                request.Workspace.WorkspacePath,
-                request.Workspace.PlaybookFileName,
-                request.Workspace.VariableFileName,
-                request.Workspace.StdoutLogPath,
-                request.Workspace.StderrLogPath,
-                request.Timeout,
-                request.OnStdoutLine,
-                request.OnStderrLine,
-                request.IsCancellationRequested),
-            cancellationToken);
+        try
+        {
+            var runResult = await ansibleRunner.RunAsync(
+                new AnsiblePlaybookRunRequest(
+                    request.Workspace.WorkspacePath,
+                    request.Workspace.PlaybookFileName,
+                    request.Workspace.VariableFileName,
+                    request.Workspace.StdoutLogPath,
+                    request.Workspace.StderrLogPath,
+                    request.Timeout,
+                    request.OnStdoutLine,
+                    request.OnStderrLine,
+                    request.IsCancellationRequested),
+                cancellationToken);
 
-        return new ControlNodeDispatchResult(
-            runResult.ExitCode,
-            runResult.TimedOut,
-            runResult.Cancelled,
-            runResult.ErrorMessage);
+            return new ControlNodeDispatchResult(
+                runResult.ExitCode,
+                runResult.TimedOut,
+                runResult.Cancelled,
+                runResult.ErrorMessage);
+        }
+        finally
+        {
+            TryDeleteDirectory(BuildLocalManagedHostKeyDirectory(request.Workspace));
+        }
     }
 
     private async Task<ControlNodeDispatchResult> DispatchRemoteAsync(
@@ -178,11 +185,17 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
         }
         finally
         {
+            if (promoted)
+            {
+                await TryCleanupRemoteManagedHostKeysAsync(request, keyPath, remoteRunPath, cancellationToken);
+            }
+
             if (stagingPrepared && !promoted)
             {
                 await TryCleanupRemoteStagingAsync(request, keyPath, remoteStagingPath, cancellationToken);
             }
 
+            TryDeleteDirectory(BuildLocalManagedHostKeyDirectory(request.Workspace));
             TryDeleteSensitiveFile(keyPath);
             TryDeleteDirectory(tempDirectory);
         }
@@ -230,6 +243,28 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
                 request,
                 keyPath,
                 BuildRemoteCleanupCommand(remoteStagingPath),
+                request.Timeout,
+                request.OnSystemLine,
+                request.OnSystemLine,
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task TryCleanupRemoteManagedHostKeysAsync(
+        ControlNodeDispatchRequest request,
+        string keyPath,
+        string remoteRunPath,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await RunSshCommandAsync(
+                request,
+                keyPath,
+                BuildRemoteCleanupCommand($"{remoteRunPath}/.nodecontrol/managed-host-keys"),
                 request.Timeout,
                 request.OnSystemLine,
                 request.OnSystemLine,
@@ -398,6 +433,11 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
             Path.GetTempPath(),
             "nodecontrol-ssh",
             $"{jobRunId:D}-{Guid.NewGuid():N}");
+    }
+
+    private static string BuildLocalManagedHostKeyDirectory(JobRunWorkspace workspace)
+    {
+        return Path.Combine(workspace.WorkspacePath, ".nodecontrol", "managed-host-keys");
     }
 
     private static string QuoteForRemoteShell(string value)

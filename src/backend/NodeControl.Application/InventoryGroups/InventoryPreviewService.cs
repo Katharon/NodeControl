@@ -47,6 +47,15 @@ public sealed class InventoryPreviewService(
             builder.AppendLine($"        {managedNode.Name}:");
             builder.AppendLine($"          ansible_host: {managedNode.Hostname}");
             builder.AppendLine($"          ansible_port: {managedNode.SshPort}");
+            if (!string.IsNullOrWhiteSpace(managedNode.SshUsername))
+            {
+                builder.AppendLine($"          ansible_user: {managedNode.SshUsername}");
+            }
+
+            if (managedNode.SshPrivateKeySecretId is not null)
+            {
+                builder.AppendLine($"          ansible_ssh_private_key_file: .nodecontrol/managed-host-keys/{managedNode.Id:D}.key");
+            }
         }
 
         return CustomerServiceResult<InventoryPreviewDto>.Ok(new InventoryPreviewDto(

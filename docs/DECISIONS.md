@@ -262,3 +262,18 @@ Reason:
 - It reuses existing Secret protection and Worker-side secret resolution.
 - It is credible for an MVP without introducing agents, message buses, or a broad orchestration framework.
 - It gives retries and reprocessing deterministic workspace handling without adding a remote file-management subsystem.
+
+## DEC-022: Model minimal Managed Host SSH execution settings
+
+Status: Accepted
+
+Managed Nodes store SSH port, optional SSH username, and an optional SSH private key Secret reference. During queued
+Run processing, the Worker resolves those host key references, writes per-host key files into the run workspace, and
+generates inventory variables such as `ansible_user` and `ansible_ssh_private_key_file`.
+
+Reason:
+
+- It makes Ansible target-host execution more realistic without moving SSH behavior into the API.
+- It reuses existing customer-scoped Secret records instead of adding a separate credential store.
+- It keeps the model small enough for MVP use and leaves bastion/proxy behavior for a later slice.
+- The Worker can remove temporary key files after dispatch while retaining useful non-sensitive run artifacts.

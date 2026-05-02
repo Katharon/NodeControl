@@ -74,7 +74,14 @@ export function CustomerNodesSections({ customerId }: CustomerNodesSectionsProps
           showCreateButton={false}
         />
       ) : null}
-      {tab === 1 ? <ManagedNodeList canManageNodes={canManageNodes} customerId={customerId} showCreateButton={false} /> : null}
+      {tab === 1 ? (
+        <ManagedNodeList
+          canManageNodes={canManageNodes}
+          canViewSecrets={canViewSecrets}
+          customerId={customerId}
+          showCreateButton={false}
+        />
+      ) : null}
       {tab === 2 ? <InventoryGroupList canManageNodes={canManageNodes} customerId={customerId} /> : null}
 
       <Dialog fullWidth maxWidth="md" onClose={() => setCreateOpen(false)} open={createOpen}>

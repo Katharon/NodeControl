@@ -907,6 +907,15 @@ namespace NodeControl.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("ssh_port");
 
+                    b.Property<Guid?>("SshPrivateKeySecretId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ssh_private_key_secret_id");
+
+                    b.Property<string>("SshUsername")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("ssh_username");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -918,6 +927,9 @@ namespace NodeControl.Infrastructure.Migrations
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SshPrivateKeySecretId")
+                        .HasDatabaseName("ix_managed_nodes_ssh_private_key_secret_id");
 
                     b.HasIndex("CustomerId", "Name")
                         .IsUnique()
@@ -1524,6 +1536,11 @@ namespace NodeControl.Infrastructure.Migrations
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("NodeControl.Domain.Secrets.Secret", null)
+                        .WithMany()
+                        .HasForeignKey("SshPrivateKeySecretId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("NodeControl.Domain.Playbooks.Playbook", b =>

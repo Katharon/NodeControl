@@ -82,6 +82,20 @@ public sealed class JobRunExecutionService(
             }
 
             var workspace = buildResult.Workspace!;
+            var credentialMaterialization = await MaterializeManagedNodeCredentialsAsync(
+                workspace,
+                executionContext.ManagedNodes!,
+                executionContext.ManagedNodeSshPrivateKeysByNodeId!,
+                cancellationToken);
+            if (!credentialMaterialization.Succeeded)
+            {
+                var errorMessage = credentialMaterialization.ErrorMessage ?? "Managed host SSH credentials could not be materialized.";
+                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken);
+                jobRun.MarkFailed(null, errorMessage, clock.UtcNow);
+                await dbContext.SaveChangesAsync(cancellationToken);
+                return;
+            }
+
             jobRun.SetExecutionPaths(workspace.WorkspacePath, workspace.StdoutLogPath, workspace.StderrLogPath);
             await dbContext.SaveChangesAsync(cancellationToken);
             await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Info, "Execution workspace created.", cancellationToken);
@@ -245,6 +259,12 @@ public sealed class JobRunExecutionService(
             return JobRunExecutionContext.Failed(controlNodeCredential.ErrorMessage!);
         }
 
+        var managedNodeCredentials = await ResolveManagedNodeCredentialsAsync(jobRun.CustomerId, managedNodes, cancellationToken);
+        if (!managedNodeCredentials.Succeeded)
+        {
+            return JobRunExecutionContext.Failed(managedNodeCredentials.ErrorMessage!);
+        }
+
         return JobRunExecutionContext.Ok(
             job,
             controlNode,
@@ -254,7 +274,8 @@ public sealed class JobRunExecutionService(
             variableSet,
             templateArtifacts.Artifacts!,
             secretValues.SecretValuesBySlug!,
-            controlNodeCredential.SshPrivateKey);
+            controlNodeCredential.SshPrivateKey,
+            managedNodeCredentials.SshPrivateKeysByNodeId!);
     }
 
     private async Task<ControlNodeCredentialResolutionResult> ResolveControlNodeCredentialAsync(
@@ -280,6 +301,97 @@ public sealed class JobRunExecutionService(
         catch (Exception)
         {
             return ControlNodeCredentialResolutionResult.Failed("Control node SSH private key secret could not be resolved for execution.");
+        }
+    }
+
+    private async Task<ManagedNodeCredentialResolutionResult> ResolveManagedNodeCredentialsAsync(
+        Guid customerId,
+        IReadOnlyList<ManagedNode> managedNodes,
+        CancellationToken cancellationToken)
+    {
+        var valuesByNodeId = new Dictionary<Guid, string>();
+        var valuesBySecretId = new Dictionary<Guid, string>();
+
+        foreach (var managedNode in managedNodes
+            .Where(managedNode => managedNode.SshPrivateKeySecretId is not null)
+            .OrderBy(managedNode => managedNode.Name, StringComparer.Ordinal))
+        {
+            var secretId = managedNode.SshPrivateKeySecretId!.Value;
+            if (!valuesBySecretId.TryGetValue(secretId, out var privateKey))
+            {
+                var secret = await dbContext.FindSecretAsync(customerId, secretId, cancellationToken);
+                if (secret?.Status != SecretStatus.Active || secret.CustomerId != customerId || secret.Kind != SecretKind.SshPrivateKey)
+                {
+                    return ManagedNodeCredentialResolutionResult.Failed(
+                        $"Managed host '{managedNode.Name}' SSH private key secret is unavailable for execution.");
+                }
+
+                try
+                {
+                    privateKey = secretProtector.Unprotect(secret.ProtectedValue);
+                }
+                catch (Exception)
+                {
+                    return ManagedNodeCredentialResolutionResult.Failed(
+                        $"Managed host '{managedNode.Name}' SSH private key secret could not be resolved for execution.");
+                }
+
+                valuesBySecretId[secretId] = privateKey;
+            }
+
+            valuesByNodeId[managedNode.Id] = privateKey;
+        }
+
+        return ManagedNodeCredentialResolutionResult.Ok(valuesByNodeId);
+    }
+
+    private static async Task<CredentialMaterializationResult> MaterializeManagedNodeCredentialsAsync(
+        JobRunWorkspace workspace,
+        IReadOnlyList<ManagedNode> managedNodes,
+        IReadOnlyDictionary<Guid, string> sshPrivateKeysByNodeId,
+        CancellationToken cancellationToken)
+    {
+        if (sshPrivateKeysByNodeId.Count == 0)
+        {
+            return CredentialMaterializationResult.Ok();
+        }
+
+        var keyDirectory = Path.Combine(workspace.WorkspacePath, ".nodecontrol", "managed-host-keys");
+        try
+        {
+            Directory.CreateDirectory(keyDirectory);
+            foreach (var managedNode in managedNodes
+                .Where(managedNode => sshPrivateKeysByNodeId.ContainsKey(managedNode.Id))
+                .OrderBy(managedNode => managedNode.Name, StringComparer.Ordinal))
+            {
+                var keyPath = Path.Combine(keyDirectory, $"{managedNode.Id:D}.key");
+                await File.WriteAllTextAsync(keyPath, NormalizePrivateKey(sshPrivateKeysByNodeId[managedNode.Id]), cancellationToken);
+                TrySetPrivateKeyPermissions(keyPath);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            TryDeleteDirectory(keyDirectory);
+            return CredentialMaterializationResult.Failed($"Managed host SSH credentials could not be written: {exception.Message}");
+        }
+
+        return CredentialMaterializationResult.Ok();
+    }
+
+    private static void TryDeleteDirectory(string directory)
+    {
+        try
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
         }
     }
 
@@ -392,6 +504,36 @@ public sealed class JobRunExecutionService(
         {
             yield return executionContext.ControlNodeSshPrivateKey;
         }
+
+        if (executionContext.ManagedNodeSshPrivateKeysByNodeId is not null)
+        {
+            foreach (var privateKey in executionContext.ManagedNodeSshPrivateKeysByNodeId.Values)
+            {
+                yield return privateKey;
+            }
+        }
+    }
+
+    private static string NormalizePrivateKey(string privateKey)
+    {
+        return privateKey.EndsWith('\n') ? privateKey : privateKey + "\n";
+    }
+
+    private static void TrySetPrivateKeyPermissions(string keyPath)
+    {
+        try
+        {
+            if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD())
+            {
+                File.SetUnixFileMode(keyPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+        }
+        catch (PlatformNotSupportedException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 
     private sealed record TemplateArtifactLoadResult(
@@ -439,6 +581,37 @@ public sealed class JobRunExecutionService(
         public static ControlNodeCredentialResolutionResult Failed(string errorMessage)
         {
             return new ControlNodeCredentialResolutionResult(false, null, errorMessage);
+        }
+    }
+
+    private sealed record ManagedNodeCredentialResolutionResult(
+        bool Succeeded,
+        IReadOnlyDictionary<Guid, string>? SshPrivateKeysByNodeId,
+        string? ErrorMessage)
+    {
+        public static ManagedNodeCredentialResolutionResult Ok(IReadOnlyDictionary<Guid, string> sshPrivateKeysByNodeId)
+        {
+            return new ManagedNodeCredentialResolutionResult(true, sshPrivateKeysByNodeId, null);
+        }
+
+        public static ManagedNodeCredentialResolutionResult Failed(string errorMessage)
+        {
+            return new ManagedNodeCredentialResolutionResult(false, null, errorMessage);
+        }
+    }
+
+    private sealed record CredentialMaterializationResult(
+        bool Succeeded,
+        string? ErrorMessage)
+    {
+        public static CredentialMaterializationResult Ok()
+        {
+            return new CredentialMaterializationResult(true, null);
+        }
+
+        public static CredentialMaterializationResult Failed(string errorMessage)
+        {
+            return new CredentialMaterializationResult(false, errorMessage);
         }
     }
 }

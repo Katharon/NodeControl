@@ -38,7 +38,9 @@ const hostWizardSchema = z.object({
     message: "IP or DNS name must not contain whitespace",
   }),
   tags: z.string().trim().max(200).optional(),
-  sshUser: z.string().trim().max(100).optional(),
+  sshUser: z.string().trim().max(100).refine((value) => !/\s/.test(value), {
+    message: "SSH username must not contain whitespace",
+  }).optional(),
   sshPort: z.number().int().min(1).max(65535),
   controlNodeId: z.string().optional(),
   isControlHost: z.boolean(),
@@ -89,6 +91,8 @@ export function HostWizard({ customerId, customerName, onCreated }: HostWizardPr
         name: values.name,
         hostname: values.hostname,
         sshPort: values.sshPort,
+        sshUsername: values.sshUser || null,
+        sshPrivateKeySecretId: null,
         operatingSystem: values.hostType === "Generic" ? null : values.hostType,
         environment: null,
         description: null,
@@ -204,7 +208,7 @@ export function HostWizard({ customerId, customerName, onCreated }: HostWizardPr
           <Typography component="h2" variant="h6">
             Neuer Host — Verbindungsdetails
           </Typography>
-          <TextField disabled helperText="SSH-User ist im aktuellen Backend-Modell noch nicht vorhanden." label="SSH-User" {...register("sshUser")} />
+          <TextField error={Boolean(errors.sshUser)} helperText={errors.sshUser?.message} label="SSH-User" {...register("sshUser")} />
           <TextField
             error={Boolean(errors.sshPort)}
             helperText={errors.sshPort?.message}

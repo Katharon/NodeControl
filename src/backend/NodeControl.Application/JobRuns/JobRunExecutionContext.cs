@@ -18,6 +18,7 @@ internal sealed record JobRunExecutionContext(
     IReadOnlyList<JobRunTemplateArtifact>? TemplateArtifacts,
     IReadOnlyDictionary<string, string>? SecretValuesBySlug,
     string? ControlNodeSshPrivateKey,
+    IReadOnlyDictionary<Guid, string>? ManagedNodeSshPrivateKeysByNodeId,
     string? ErrorMessage)
 {
     public static JobRunExecutionContext Ok(
@@ -29,7 +30,8 @@ internal sealed record JobRunExecutionContext(
         VariableSet? variableSet,
         IReadOnlyList<JobRunTemplateArtifact> templateArtifacts,
         IReadOnlyDictionary<string, string> secretValuesBySlug,
-        string? controlNodeSshPrivateKey)
+        string? controlNodeSshPrivateKey,
+        IReadOnlyDictionary<Guid, string> managedNodeSshPrivateKeysByNodeId)
     {
         return new JobRunExecutionContext(
             true,
@@ -42,11 +44,12 @@ internal sealed record JobRunExecutionContext(
             templateArtifacts,
             secretValuesBySlug,
             controlNodeSshPrivateKey,
+            managedNodeSshPrivateKeysByNodeId,
             null);
     }
 
     public static JobRunExecutionContext Failed(string errorMessage)
     {
-        return new JobRunExecutionContext(false, null, null, null, null, null, null, null, null, null, errorMessage);
+        return new JobRunExecutionContext(false, null, null, null, null, null, null, null, null, null, null, errorMessage);
     }
 }

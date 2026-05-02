@@ -108,6 +108,47 @@ public sealed class NodesAndInventoryServiceTests
     }
 
     [Fact]
+    public async Task ManagedNodeService_creates_managed_node_with_ssh_private_key_secret_reference()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+        var secret = Secret.Create(fixture.Customer.Id, "Host key", "host-key", null, SecretKind.SshPrivateKey, "protected-key", TestTime);
+        fixture.Db.AddSecret(secret);
+        var service = fixture.CreateManagedNodeService();
+
+        var result = await service.CreateAsync(fixture.CurrentUser, fixture.Customer.Id, new CreateManagedNodeRequest(
+            "web_01",
+            "10.0.0.10",
+            22,
+            "deploy",
+            secret.Id));
+
+        Assert.Null(result.Error);
+        Assert.Equal("deploy", result.Value!.SshUsername);
+        Assert.Equal(secret.Id, result.Value.SshPrivateKeySecretId);
+    }
+
+    [Fact]
+    public async Task ManagedNodeService_rejects_ssh_private_key_secret_from_another_customer()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+        var otherCustomer = Customer.Create("Other Customer", "other-customer", null, TestTime);
+        var otherSecret = Secret.Create(otherCustomer.Id, "Host key", "host-key", null, SecretKind.SshPrivateKey, "protected-key", TestTime);
+        fixture.Db.AddCustomer(otherCustomer);
+        fixture.Db.AddSecret(otherSecret);
+        var service = fixture.CreateManagedNodeService();
+
+        var result = await service.CreateAsync(fixture.CurrentUser, fixture.Customer.Id, new CreateManagedNodeRequest(
+            "web_01",
+            "10.0.0.10",
+            22,
+            "deploy",
+            otherSecret.Id));
+
+        Assert.Equal(CustomerServiceError.BadRequest, result.Error);
+        Assert.Empty(fixture.Db.ManagedNodes);
+    }
+
+    [Fact]
     public async Task ManagedNodeService_rejects_cross_tenant_access()
     {
         var fixture = TestFixture.Create(CustomerRole.Owner);
@@ -243,6 +284,35 @@ public sealed class NodesAndInventoryServiceTests
         Assert.Contains("web_01:", result.Value.Content);
         Assert.Contains("ansible_host: 10.0.0.10", result.Value.Content);
         Assert.Contains("ansible_port: 22", result.Value.Content);
+    }
+
+    [Fact]
+    public async Task InventoryPreviewService_includes_managed_node_ssh_settings()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Viewer);
+        var group = InventoryGroup.Create(fixture.Customer.Id, "webservers", null, TestTime);
+        var secretId = Guid.NewGuid();
+        var managedNode = ManagedNode.Create(
+            fixture.Customer.Id,
+            "web_01",
+            "10.0.0.10",
+            2222,
+            "deploy",
+            secretId,
+            null,
+            null,
+            null,
+            TestTime);
+        fixture.Db.AddInventoryGroup(group);
+        fixture.Db.AddManagedNode(managedNode);
+        fixture.Db.AddInventoryGroupNode(InventoryGroupNode.Create(group, managedNode, TestTime));
+        var service = fixture.CreateInventoryPreviewService();
+
+        var result = await service.GetPreviewAsync(fixture.CurrentUser, fixture.Customer.Id, group.Id);
+
+        Assert.Null(result.Error);
+        Assert.Contains("ansible_user: deploy", result.Value!.Content);
+        Assert.Contains($".nodecontrol/managed-host-keys/{managedNode.Id:D}.key", result.Value.Content);
     }
 
     [Fact]

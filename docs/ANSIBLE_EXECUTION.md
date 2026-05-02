@@ -198,6 +198,9 @@ all:
       hosts:
         web-01:
           ansible_host: 10.0.0.10
+          ansible_port: 22
+          ansible_user: deploy
+          ansible_ssh_private_key_file: .nodecontrol/managed-host-keys/{managedNodeId}.key
 ```
 
 Do not overbuild dynamic inventory in the MVP.
@@ -206,14 +209,19 @@ The current implementation includes target structure, inventory group assignment
 
 - Control Nodes are modeled as customer-scoped records. Hostzustand can queue TCP reachability checks, but
   NodeControl does not perform SSH authentication checks.
-- Managed Nodes are modeled as customer-scoped records and can be linked to Inventory Groups.
+- Managed Nodes are modeled as customer-scoped records and can be linked to Inventory Groups. They can carry minimal
+  SSH execution metadata: port, optional username, and an optional SSH private key Secret reference.
 - Inventory Groups generate a YAML preview from active Managed Nodes.
 - Archived Managed Nodes are excluded from preview output.
 - The API still must not execute Ansible; execution belongs to the Worker.
 
 For Worker execution, the selected Job inventory group is rendered to `inventory.yml`. Active managed nodes
 linked to that group become hosts, and archived nodes are excluded. If the group has no active managed nodes,
-the JobRun fails before Ansible starts.
+the JobRun fails before Ansible starts. If a Managed Node references an SSH private key Secret, only the Worker
+decrypts that key and writes a temporary per-host key file under `.nodecontrol/managed-host-keys/` in the run
+workspace. Inventory points Ansible at that file with `ansible_ssh_private_key_file`. The dispatcher removes those
+key files after local execution and after remote execution best-effort, while leaving the non-sensitive run workspace
+structure available for diagnosis.
 
 ## Variable Sets
 
@@ -260,9 +268,9 @@ secrets and substitutes them while materializing `vars.yml` / `vars.json` and co
 Resolved values may exist in the local run workspace as execution-ready artifacts, but they are redacted from persisted
 run logs and are not returned in API-facing models.
 
-Control Host SSH private keys are also referenced through existing Secret records. Control Host API responses expose
-only the selected Secret id as configuration metadata; the key value is decrypted only by the Worker when a queued Run
-is dispatched to a non-local Control Host.
+Control Host and Managed Host SSH private keys are also referenced through existing Secret records. API responses expose
+only selected Secret ids as configuration metadata; key values are decrypted only by the Worker while preparing or
+dispatching a queued Run.
 
 ## Dangerous Execution Concerns
 
