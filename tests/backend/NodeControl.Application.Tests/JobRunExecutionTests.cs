@@ -48,6 +48,47 @@ public sealed class JobRunExecutionTests
     }
 
     [Fact]
+    public async Task JobRunWorkspaceBuilder_resets_existing_workspace_for_same_run()
+    {
+        using var fixture = ExecutionFixture.Create();
+        var first = await BuildWorkspaceAsync(fixture);
+        var staleFile = Path.Combine(first.WorkspacePath, "playbook", "stale.yml");
+        await File.WriteAllTextAsync(staleFile, "stale: true\n");
+
+        var second = await BuildWorkspaceAsync(fixture);
+
+        Assert.Equal(first.WorkspacePath, second.WorkspacePath);
+        Assert.False(File.Exists(staleFile));
+        Assert.True(File.Exists(second.PlaybookPath));
+    }
+
+    [Fact]
+    public async Task JobRunWorkspaceBuilder_uses_isolated_paths_for_retry_runs()
+    {
+        using var fixture = ExecutionFixture.Create();
+        fixture.JobRun.MarkRunning(TestTime.AddMinutes(1));
+        fixture.JobRun.MarkFailed(1, "failed", TestTime.AddMinutes(2));
+        var retry = JobRun.CreateRetry(fixture.JobRun, fixture.Job, fixture.User.Id, TestTime.AddMinutes(3));
+
+        var originalWorkspace = await BuildWorkspaceAsync(fixture);
+        var retryResult = await fixture.CreateWorkspaceBuilder().BuildAsync(
+            retry,
+            fixture.Job,
+            fixture.ControlNode,
+            fixture.InventoryGroup,
+            [fixture.ManagedNode],
+            fixture.Playbook,
+            fixture.VariableSet,
+            [],
+            EmptySecrets);
+
+        Assert.True(retryResult.Succeeded);
+        Assert.NotEqual(originalWorkspace.WorkspacePath, retryResult.Workspace!.WorkspacePath);
+        Assert.Equal(retry.Id.ToString("D"), Path.GetFileName(retryResult.Workspace.WorkspacePath));
+        Assert.Equal(fixture.JobRun.Id.ToString("D"), Path.GetFileName(originalWorkspace.WorkspacePath));
+    }
+
+    [Fact]
     public async Task JobRunWorkspaceBuilder_writes_inventory_yml()
     {
         using var fixture = ExecutionFixture.Create();
@@ -551,6 +592,68 @@ public sealed class JobRunExecutionTests
     }
 
     [Fact]
+    public async Task ControlNodeDispatcher_stages_remote_workspace_to_temporary_path_then_promotes()
+    {
+        using var fixture = ExecutionFixture.Create(controlNodeHostname: "control.example.test");
+        ConfigureRemoteControlNode(fixture);
+        var workspace = await BuildWorkspaceAsync(fixture);
+        var runner = new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null));
+        var remoteRunner = new FakeRemoteCommandRunner();
+        var dispatcher = new ControlNodeDispatcher(runner, Options.Create(new ExecutionOptions()), remoteRunner);
+
+        var result = await dispatcher.DispatchAsync(new ControlNodeDispatchRequest(
+            fixture.JobRun,
+            fixture.ControlNode,
+            workspace,
+            TimeSpan.FromSeconds(30),
+            new ControlNodeCredentialMaterial("-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----")));
+
+        var remoteRunPath = BuildExpectedRemoteRunPath(fixture);
+        Assert.Equal(0, result.ExitCode);
+        Assert.Empty(runner.Requests);
+        Assert.Equal(new[] { "ssh", "scp", "ssh", "ssh" }, remoteRunner.Invocations.Select(invocation => invocation.FileName).ToArray());
+        Assert.Contains(".staging-", remoteRunner.Invocations[0].Arguments[^1]);
+        Assert.Contains("mkdir -p", remoteRunner.Invocations[0].Arguments[^1]);
+        Assert.Contains(".staging-", remoteRunner.Invocations[1].Arguments[^1]);
+        Assert.Contains($"rm -rf -- '{remoteRunPath}'", remoteRunner.Invocations[2].Arguments[^1]);
+        Assert.Contains("mv --", remoteRunner.Invocations[2].Arguments[^1]);
+        Assert.Contains($"'{remoteRunPath}'", remoteRunner.Invocations[2].Arguments[^1]);
+        Assert.Contains($"cd '{remoteRunPath}'", remoteRunner.Invocations[3].Arguments[^1]);
+        Assert.Contains("exec 'ansible-playbook'", remoteRunner.Invocations[3].Arguments[^1]);
+        AssertNoTemporaryKeyDirectory(fixture.JobRun.Id);
+    }
+
+    [Fact]
+    public async Task ControlNodeDispatcher_cleans_remote_staging_directory_when_staging_fails()
+    {
+        using var fixture = ExecutionFixture.Create(controlNodeHostname: "control.example.test");
+        ConfigureRemoteControlNode(fixture);
+        var workspace = await BuildWorkspaceAsync(fixture);
+        var runner = new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null));
+        var remoteRunner = new FakeRemoteCommandRunner(
+            new RemoteCommandResult(0, false, false, null),
+            new RemoteCommandResult(1, false, false, "scp failed"));
+        var dispatcher = new ControlNodeDispatcher(runner, Options.Create(new ExecutionOptions()), remoteRunner);
+
+        var result = await dispatcher.DispatchAsync(new ControlNodeDispatchRequest(
+            fixture.JobRun,
+            fixture.ControlNode,
+            workspace,
+            TimeSpan.FromSeconds(30),
+            new ControlNodeCredentialMaterial("-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----")));
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Equal("scp failed", result.ErrorMessage);
+        Assert.Equal(new[] { "ssh", "scp", "ssh" }, remoteRunner.Invocations.Select(invocation => invocation.FileName).ToArray());
+        Assert.Contains("rm -rf --", remoteRunner.Invocations[^1].Arguments[^1]);
+        Assert.Contains(".staging-", remoteRunner.Invocations[^1].Arguments[^1]);
+        Assert.DoesNotContain(remoteRunner.Invocations, invocation =>
+            invocation.FileName == "ssh"
+            && invocation.Arguments[^1].Contains("exec 'ansible-playbook'", StringComparison.Ordinal));
+        AssertNoTemporaryKeyDirectory(fixture.JobRun.Id);
+    }
+
+    [Fact]
     public async Task QueuedJobRunWorker_ignores_when_no_queued_job_runs_exist()
     {
         using var fixture = ExecutionFixture.Create(addJobRun: false);
@@ -605,6 +708,42 @@ public sealed class JobRunExecutionTests
         return result.Workspace!;
     }
 
+    private static void ConfigureRemoteControlNode(ExecutionFixture fixture)
+    {
+        fixture.ControlNode.Update(
+            fixture.ControlNode.Name,
+            fixture.ControlNode.Hostname,
+            fixture.ControlNode.SshPort,
+            "ansible",
+            Guid.NewGuid(),
+            "/var/lib/nodecontrol/remote-runs",
+            fixture.ControlNode.Description,
+            TestTime.AddMinutes(1));
+    }
+
+    private static string BuildExpectedRemoteRunPath(ExecutionFixture fixture)
+    {
+        return string.Join(
+            '/',
+            "/var/lib/nodecontrol/remote-runs",
+            fixture.JobRun.CustomerId.ToString("D"),
+            "control-nodes",
+            fixture.ControlNode.Id.ToString("D"),
+            "runs",
+            fixture.JobRun.Id.ToString("D"));
+    }
+
+    private static void AssertNoTemporaryKeyDirectory(Guid jobRunId)
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "nodecontrol-ssh");
+        if (!Directory.Exists(tempRoot))
+        {
+            return;
+        }
+
+        Assert.Empty(Directory.GetDirectories(tempRoot, $"{jobRunId:D}-*"));
+    }
+
     private sealed class FakeAnsibleRunner(
         Func<AnsiblePlaybookRunRequest, AnsiblePlaybookRunResult> handler,
         string[]? StdoutLines = null,
@@ -637,6 +776,32 @@ public sealed class JobRunExecutionTests
             return handler(request);
         }
     }
+
+    private sealed class FakeRemoteCommandRunner(params RemoteCommandResult[] results) : IRemoteCommandRunner
+    {
+        private readonly Queue<RemoteCommandResult> resultQueue = new(results);
+
+        public List<RemoteCommandInvocation> Invocations { get; } = [];
+
+        public Task<RemoteCommandResult> RunAsync(
+            string fileName,
+            IReadOnlyList<string> arguments,
+            TimeSpan timeout,
+            Func<CancellationToken, Task<bool>>? isCancellationRequested,
+            Func<string, CancellationToken, Task>? onStdoutLine,
+            Func<string, CancellationToken, Task>? onStderrLine,
+            CancellationToken cancellationToken = default)
+        {
+            Invocations.Add(new RemoteCommandInvocation(fileName, arguments.ToArray()));
+            return Task.FromResult(resultQueue.Count == 0
+                ? new RemoteCommandResult(0, false, false, null)
+                : resultQueue.Dequeue());
+        }
+    }
+
+    private sealed record RemoteCommandInvocation(
+        string FileName,
+        string[] Arguments);
 
     private sealed class CancellingAnsibleRunner(JobRun jobRun, Guid userId) : IAnsiblePlaybookRunner
     {

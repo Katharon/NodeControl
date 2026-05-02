@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 using Microsoft.Extensions.Options;
 using NodeControl.Application.Abstractions.Execution;
@@ -6,10 +5,29 @@ using NodeControl.Infrastructure.Execution;
 
 namespace NodeControl.Worker.JobRuns;
 
-public sealed class ControlNodeDispatcher(
-    IAnsiblePlaybookRunner ansibleRunner,
-    IOptions<ExecutionOptions> options) : IControlNodeDispatcher
+public sealed class ControlNodeDispatcher : IControlNodeDispatcher
 {
+    private readonly IAnsiblePlaybookRunner ansibleRunner;
+    private readonly IOptions<ExecutionOptions> options;
+    private readonly IRemoteCommandRunner remoteCommandRunner;
+
+    public ControlNodeDispatcher(
+        IAnsiblePlaybookRunner ansibleRunner,
+        IOptions<ExecutionOptions> options,
+        IRemoteCommandRunner remoteCommandRunner)
+    {
+        this.ansibleRunner = ansibleRunner;
+        this.options = options;
+        this.remoteCommandRunner = remoteCommandRunner;
+    }
+
+    public ControlNodeDispatcher(
+        IAnsiblePlaybookRunner ansibleRunner,
+        IOptions<ExecutionOptions> options)
+        : this(ansibleRunner, options, new RemoteCommandRunner())
+    {
+    }
+
     public async Task<ControlNodeDispatchResult> DispatchAsync(
         ControlNodeDispatchRequest request,
         CancellationToken cancellationToken = default)
@@ -83,34 +101,42 @@ public sealed class ControlNodeDispatcher(
 
         await EmitSystemAsync(request, "Preparing SSH remote dispatch.", cancellationToken);
 
-        var tempDirectory = Path.Combine(Path.GetTempPath(), "nodecontrol-ssh", request.JobRun.Id.ToString("D"));
+        var tempDirectory = BuildTemporaryDispatchDirectory(request.JobRun.Id);
         var keyPath = Path.Combine(tempDirectory, "id_control_node");
+        var remoteRunPath = BuildRemoteRunPath(request.ControlNode.RemoteWorkspaceRoot, request);
+        var remoteStagingPath = BuildRemoteStagingPath(remoteRunPath);
+        var stagingPrepared = false;
+        var promoted = false;
+
         try
         {
             Directory.CreateDirectory(tempDirectory);
             await File.WriteAllTextAsync(keyPath, NormalizePrivateKey(request.CredentialMaterial.SshPrivateKey), cancellationToken);
             TrySetPrivateKeyPermissions(keyPath);
 
-            var remoteRunPath = BuildRemoteRunPath(request.ControlNode.RemoteWorkspaceRoot, request);
-            await EmitSystemAsync(request, $"Staging execution workspace to remote control node path {remoteRunPath}.", cancellationToken);
+            await EmitSystemAsync(
+                request,
+                $"Staging execution workspace to remote control node path {remoteRunPath}.",
+                cancellationToken);
 
-            var mkdirResult = await RunSshCommandAsync(
+            var prepareResult = await RunSshCommandAsync(
                 request,
                 keyPath,
-                $"mkdir -p -- {QuoteForRemoteShell(remoteRunPath)}",
+                BuildRemotePrepareStagingCommand(remoteStagingPath),
                 request.Timeout,
                 request.OnSystemLine,
                 request.OnSystemLine,
                 cancellationToken);
-            if (mkdirResult.ExitCode != 0 || mkdirResult.TimedOut || mkdirResult.Cancelled)
+            if (prepareResult.ExitCode != 0 || prepareResult.TimedOut || prepareResult.Cancelled)
             {
-                return ToDispatchResult(mkdirResult, "Remote workspace directory could not be prepared.");
+                return ToDispatchResult(prepareResult, "Remote staging workspace could not be prepared.");
             }
 
+            stagingPrepared = true;
             var stageResult = await RunScpAsync(
                 request,
                 keyPath,
-                remoteRunPath,
+                remoteStagingPath,
                 request.Timeout,
                 request.OnSystemLine,
                 request.OnSystemLine,
@@ -120,6 +146,20 @@ public sealed class ControlNodeDispatcher(
                 return ToDispatchResult(stageResult, "Execution workspace could not be staged to the remote control node.");
             }
 
+            var promoteResult = await RunSshCommandAsync(
+                request,
+                keyPath,
+                BuildRemotePromoteStagingCommand(remoteStagingPath, remoteRunPath),
+                request.Timeout,
+                request.OnSystemLine,
+                request.OnSystemLine,
+                cancellationToken);
+            if (promoteResult.ExitCode != 0 || promoteResult.TimedOut || promoteResult.Cancelled)
+            {
+                return ToDispatchResult(promoteResult, "Remote staging workspace could not be promoted to the run workspace.");
+            }
+
+            promoted = true;
             await EmitSystemAsync(request, "Starting ansible-playbook on remote control node.", cancellationToken);
             var ansibleResult = await RunSshCommandAsync(
                 request,
@@ -138,11 +178,17 @@ public sealed class ControlNodeDispatcher(
         }
         finally
         {
+            if (stagingPrepared && !promoted)
+            {
+                await TryCleanupRemoteStagingAsync(request, keyPath, remoteStagingPath, cancellationToken);
+            }
+
+            TryDeleteSensitiveFile(keyPath);
             TryDeleteDirectory(tempDirectory);
         }
     }
 
-    private async Task<CommandResult> RunSshCommandAsync(
+    private async Task<RemoteCommandResult> RunSshCommandAsync(
         ControlNodeDispatchRequest request,
         string keyPath,
         string remoteCommand,
@@ -154,10 +200,10 @@ public sealed class ControlNodeDispatcher(
         var arguments = BuildSshArguments(request, keyPath);
         arguments.Add(BuildRemoteLogin(request));
         arguments.Add(remoteCommand);
-        return await RunProcessAsync("ssh", arguments, timeout, request.IsCancellationRequested, onStdoutLine, onStderrLine, cancellationToken);
+        return await remoteCommandRunner.RunAsync("ssh", arguments, timeout, request.IsCancellationRequested, onStdoutLine, onStderrLine, cancellationToken);
     }
 
-    private async Task<CommandResult> RunScpAsync(
+    private async Task<RemoteCommandResult> RunScpAsync(
         ControlNodeDispatchRequest request,
         string keyPath,
         string remoteRunPath,
@@ -169,126 +215,32 @@ public sealed class ControlNodeDispatcher(
         var arguments = BuildScpArguments(request, keyPath);
         arguments.Add(Path.Combine(request.Workspace.WorkspacePath, "."));
         arguments.Add(BuildRemoteScpTarget(request, remoteRunPath));
-        return await RunProcessAsync("scp", arguments, timeout, request.IsCancellationRequested, onStdoutLine, onStderrLine, cancellationToken);
+        return await remoteCommandRunner.RunAsync("scp", arguments, timeout, request.IsCancellationRequested, onStdoutLine, onStderrLine, cancellationToken);
     }
 
-    private static async Task<CommandResult> RunProcessAsync(
-        string fileName,
-        IReadOnlyList<string> arguments,
-        TimeSpan timeout,
-        Func<CancellationToken, Task<bool>>? isCancellationRequested,
-        Func<string, CancellationToken, Task>? onStdoutLine,
-        Func<string, CancellationToken, Task>? onStderrLine,
+    private async Task TryCleanupRemoteStagingAsync(
+        ControlNodeDispatchRequest request,
+        string keyPath,
+        string remoteStagingPath,
         CancellationToken cancellationToken)
-    {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = fileName,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
-
-        foreach (var argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
-        using var process = new Process { StartInfo = startInfo };
-
-        try
-        {
-            if (!process.Start())
-            {
-                return new CommandResult(null, false, false, $"{fileName} could not be started.");
-            }
-        }
-        catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
-        {
-            return new CommandResult(null, false, false, $"{fileName} could not be started: {exception.Message}");
-        }
-
-        var stdoutCopy = CaptureLinesAsync(process.StandardOutput, onStdoutLine, cancellationToken);
-        var stderrCopy = CaptureLinesAsync(process.StandardError, onStderrLine, cancellationToken);
-        var deadlineUtc = DateTimeOffset.UtcNow.Add(timeout);
-
-        while (!process.HasExited)
-        {
-            if (isCancellationRequested is not null && await isCancellationRequested(cancellationToken))
-            {
-                TryKillProcessTree(process);
-                await process.WaitForExitAsync(CancellationToken.None);
-                await Task.WhenAll(IgnoreCancellation(stdoutCopy), IgnoreCancellation(stderrCopy));
-                return new CommandResult(TryGetExitCode(process), false, true, $"{fileName} was cancelled.");
-            }
-
-            if (DateTimeOffset.UtcNow >= deadlineUtc)
-            {
-                TryKillProcessTree(process);
-                await process.WaitForExitAsync(CancellationToken.None);
-                await Task.WhenAll(IgnoreCancellation(stdoutCopy), IgnoreCancellation(stderrCopy));
-                return new CommandResult(TryGetExitCode(process), true, false, $"{fileName} exceeded the timeout of {timeout.TotalSeconds:N0} seconds.");
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
-        }
-
-        await Task.WhenAll(stdoutCopy, stderrCopy);
-        return new CommandResult(process.ExitCode, false, false, null);
-    }
-
-    private static async Task CaptureLinesAsync(
-        StreamReader reader,
-        Func<string, CancellationToken, Task>? onLine,
-        CancellationToken cancellationToken)
-    {
-        while (await reader.ReadLineAsync(cancellationToken) is { } line)
-        {
-            if (!string.IsNullOrWhiteSpace(line) && onLine is not null)
-            {
-                await onLine(line, cancellationToken);
-            }
-        }
-    }
-
-    private static async Task IgnoreCancellation(Task task)
     {
         try
         {
-            await task;
+            await RunSshCommandAsync(
+                request,
+                keyPath,
+                BuildRemoteCleanupCommand(remoteStagingPath),
+                request.Timeout,
+                request.OnSystemLine,
+                request.OnSystemLine,
+                cancellationToken);
         }
         catch (OperationCanceledException)
         {
         }
     }
 
-    private static void TryKillProcessTree(Process process)
-    {
-        try
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-            }
-        }
-        catch (InvalidOperationException)
-        {
-        }
-    }
-
-    private static int? TryGetExitCode(Process process)
-    {
-        try
-        {
-            return process.HasExited ? process.ExitCode : null;
-        }
-        catch (InvalidOperationException)
-        {
-            return null;
-        }
-    }
-
-    private static ControlNodeDispatchResult ToDispatchResult(CommandResult result, string fallbackErrorMessage)
+    private static ControlNodeDispatchResult ToDispatchResult(RemoteCommandResult result, string fallbackErrorMessage)
     {
         return new ControlNodeDispatchResult(
             result.ExitCode,
@@ -388,6 +340,66 @@ public sealed class ControlNodeDispatcher(
             request.JobRun.Id.ToString("D"));
     }
 
+    private static string BuildRemoteStagingPath(string remoteRunPath)
+    {
+        return $"{remoteRunPath}.staging-{Guid.NewGuid():N}";
+    }
+
+    private static string BuildRemotePrepareStagingCommand(string remoteStagingPath)
+    {
+        return string.Join(
+            " ",
+            "rm",
+            "-rf",
+            "--",
+            QuoteForRemoteShell(remoteStagingPath),
+            "&&",
+            "mkdir",
+            "-p",
+            "--",
+            QuoteForRemoteShell(remoteStagingPath));
+    }
+
+    private static string BuildRemotePromoteStagingCommand(string remoteStagingPath, string remoteRunPath)
+    {
+        return string.Join(
+            " ",
+            "rm",
+            "-rf",
+            "--",
+            QuoteForRemoteShell(remoteRunPath),
+            "&&",
+            "mkdir",
+            "-p",
+            "--",
+            QuoteForRemoteShell(GetRemoteDirectoryName(remoteRunPath)),
+            "&&",
+            "mv",
+            "--",
+            QuoteForRemoteShell(remoteStagingPath),
+            QuoteForRemoteShell(remoteRunPath));
+    }
+
+    private static string BuildRemoteCleanupCommand(string remoteStagingPath)
+    {
+        return string.Join(" ", "rm", "-rf", "--", QuoteForRemoteShell(remoteStagingPath));
+    }
+
+    private static string GetRemoteDirectoryName(string remotePath)
+    {
+        var trimmed = remotePath.TrimEnd('/');
+        var separatorIndex = trimmed.LastIndexOf('/');
+        return separatorIndex <= 0 ? "." : trimmed[..separatorIndex];
+    }
+
+    private static string BuildTemporaryDispatchDirectory(Guid jobRunId)
+    {
+        return Path.Combine(
+            Path.GetTempPath(),
+            "nodecontrol-ssh",
+            $"{jobRunId:D}-{Guid.NewGuid():N}");
+    }
+
     private static string QuoteForRemoteShell(string value)
     {
         return $"'{value.Replace("'", "'\"'\"'", StringComparison.Ordinal)}'";
@@ -432,6 +444,26 @@ public sealed class ControlNodeDispatcher(
         }
     }
 
+    private static void TryDeleteSensitiveFile(string path)
+    {
+        try
+        {
+            if (!File.Exists(path))
+            {
+                return;
+            }
+
+            File.WriteAllText(path, string.Empty);
+            File.Delete(path);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
     private bool CanUseLocalExecution(string hostname)
     {
         if (!options.Value.AllowLocalControlNodeExecution)
@@ -453,10 +485,4 @@ public sealed class ControlNodeDispatcher(
 
         return IPAddress.TryParse(normalized, out var address) && IPAddress.IsLoopback(address);
     }
-
-    private sealed record CommandResult(
-        int? ExitCode,
-        bool TimedOut,
-        bool Cancelled,
-        string? ErrorMessage);
 }

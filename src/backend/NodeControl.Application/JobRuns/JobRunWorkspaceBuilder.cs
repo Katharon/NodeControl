@@ -97,6 +97,18 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
         var stdoutLogPath = Path.Combine(workspacePath, "stdout.log");
         var stderrLogPath = Path.Combine(workspacePath, "stderr.log");
 
+        try
+        {
+            if (Directory.Exists(workspacePath))
+            {
+                Directory.Delete(workspacePath, recursive: true);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return JobRunWorkspaceBuildResult.Failed($"Execution workspace could not be reset: {exception.Message}");
+        }
+
         Directory.CreateDirectory(playbookDirectory);
         Directory.CreateDirectory(dispatchDirectory);
 

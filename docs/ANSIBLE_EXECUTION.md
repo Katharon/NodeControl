@@ -88,7 +88,9 @@ managed NodeControl content during Runs; it does not clone Git repositories duri
 
 ## JobRun Workspace
 
-Each JobRun gets its own workspace.
+Each JobRun gets its own workspace. The Worker deletes and recreates that run workspace before materializing artifacts
+for the run, so a retried or reprocessed run does not accidentally inherit stale files from a previous materialization
+of the same JobRun. Retry runs are separate JobRun records and therefore get separate workspace paths.
 
 Suggested path:
 
@@ -126,6 +128,12 @@ The current remote-dispatch MVP has an explicit Worker-side dispatch boundary:
 - The Worker materializes the SSH private key into a temporary file, stages the prepared workspace to the remote
   Control Node with `scp`, starts `ansible-playbook` there with `ssh`, captures stdout/stderr into the existing JobRun
   log model, and removes the temporary key file after dispatch.
+- Remote staging uses a unique temporary path beside the final run directory, then promotes that staged tree to the
+  final path after a successful copy. If staging fails before promotion, the Worker makes a best-effort attempt to
+  remove the temporary remote staging directory.
+- The final remote run path is scoped as
+  `{remoteWorkspaceRoot}/{customerId}/control-nodes/{controlNodeId}/runs/{jobRunId}` and is retained after execution
+  for operational diagnosis.
 
 ## Execution Command
 

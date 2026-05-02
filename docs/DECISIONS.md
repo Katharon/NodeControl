@@ -252,10 +252,13 @@ Status: Accepted
 
 NodeControl stores minimal SSH dispatch configuration on Control Nodes: username, remote workspace root, and an SSH
 private key Secret reference. For non-local Control Nodes, the Worker materializes that key into a temporary file,
-uses `scp` to stage the already-prepared run workspace, and uses `ssh` to start `ansible-playbook` remotely.
+uses `scp` to stage the already-prepared run workspace, and uses `ssh` to start `ansible-playbook` remotely. Remote
+dispatch stages into a unique `.staging-*` directory beside the final run path, promotes the staged tree after a
+successful copy, and cleans up temporary local SSH material plus best-effort remote staging leftovers.
 
 Reason:
 
 - It keeps API behavior non-operational.
 - It reuses existing Secret protection and Worker-side secret resolution.
 - It is credible for an MVP without introducing agents, message buses, or a broad orchestration framework.
+- It gives retries and reprocessing deterministic workspace handling without adding a remote file-management subsystem.
