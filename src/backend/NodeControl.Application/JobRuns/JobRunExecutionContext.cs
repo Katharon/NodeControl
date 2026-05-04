@@ -13,6 +13,7 @@ internal sealed record JobRunExecutionContext(
     ControlNode? ControlNode,
     InventoryGroup? InventoryGroup,
     IReadOnlyList<ManagedNode>? ManagedNodes,
+    IReadOnlyDictionary<Guid, ManagedNode>? JumpHostsByNodeId,
     Playbook? Playbook,
     VariableSet? VariableSet,
     IReadOnlyList<JobRunTemplateArtifact>? TemplateArtifacts,
@@ -26,6 +27,7 @@ internal sealed record JobRunExecutionContext(
         ControlNode controlNode,
         InventoryGroup inventoryGroup,
         IReadOnlyList<ManagedNode> managedNodes,
+        IReadOnlyDictionary<Guid, ManagedNode> jumpHostsByNodeId,
         Playbook playbook,
         VariableSet? variableSet,
         IReadOnlyList<JobRunTemplateArtifact> templateArtifacts,
@@ -39,6 +41,7 @@ internal sealed record JobRunExecutionContext(
             controlNode,
             inventoryGroup,
             managedNodes,
+            jumpHostsByNodeId,
             playbook,
             variableSet,
             templateArtifacts,
@@ -50,6 +53,6 @@ internal sealed record JobRunExecutionContext(
 
     public static JobRunExecutionContext Failed(string errorMessage)
     {
-        return new JobRunExecutionContext(false, null, null, null, null, null, null, null, null, null, null, errorMessage);
+        return new JobRunExecutionContext(false, null, null, null, null, null, null, null, null, null, null, null, errorMessage);
     }
 }

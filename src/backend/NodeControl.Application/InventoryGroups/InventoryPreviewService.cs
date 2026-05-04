@@ -36,6 +36,8 @@ public sealed class InventoryPreviewService(
         var managedNodes = await dbContext.ListActiveManagedNodesForInventoryGroupAsync(
             inventoryGroupId,
             cancellationToken);
+        var activeNodesById = (await dbContext.ListActiveManagedNodesAsync(customerId, cancellationToken))
+            .ToDictionary(managedNode => managedNode.Id);
         var builder = new StringBuilder();
         builder.AppendLine("all:");
         builder.AppendLine("  children:");
@@ -45,7 +47,10 @@ public sealed class InventoryPreviewService(
         foreach (var managedNode in managedNodes.OrderBy(managedNode => managedNode.Name))
         {
             builder.AppendLine($"        {managedNode.Name}:");
-            foreach (var (name, value) in ManagedNodeInventoryVariables.Build(managedNode))
+            var jumpHost = managedNode.JumpHostManagedNodeId is null
+                ? null
+                : activeNodesById.GetValueOrDefault(managedNode.JumpHostManagedNodeId.Value);
+            foreach (var (name, value) in ManagedNodeInventoryVariables.Build(managedNode, jumpHost))
             {
                 builder.AppendLine($"          {name}: {value}");
             }

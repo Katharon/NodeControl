@@ -10,6 +10,7 @@ public sealed record ManagedNodeDto(
     int SshPort,
     string? SshUsername,
     Guid? SshPrivateKeySecretId,
+    Guid? JumpHostManagedNodeId,
     string? OperatingSystem,
     string? Environment,
     string? Description,

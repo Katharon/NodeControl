@@ -66,6 +66,7 @@ public sealed class JobRunExecutionService(
                 executionContext.ControlNode!,
                 executionContext.InventoryGroup!,
                 executionContext.ManagedNodes!,
+                executionContext.JumpHostsByNodeId!,
                 executionContext.Playbook!,
                 executionContext.VariableSet,
                 executionContext.TemplateArtifacts!,
@@ -84,7 +85,7 @@ public sealed class JobRunExecutionService(
             var workspace = buildResult.Workspace!;
             var credentialMaterialization = await MaterializeManagedNodeCredentialsAsync(
                 workspace,
-                executionContext.ManagedNodes!,
+                executionContext.ManagedNodes!.Concat(executionContext.JumpHostsByNodeId!.Values).DistinctBy(managedNode => managedNode.Id).ToArray(),
                 executionContext.ManagedNodeSshPrivateKeysByNodeId!,
                 cancellationToken);
             if (!credentialMaterialization.Succeeded)
@@ -241,6 +242,12 @@ public sealed class JobRunExecutionService(
             return JobRunExecutionContext.Failed("Inventory group contains managed nodes outside the JobRun customer.");
         }
 
+        var jumpHosts = await ResolveJumpHostsAsync(jobRun.CustomerId, managedNodes, cancellationToken);
+        if (!jumpHosts.Succeeded)
+        {
+            return JobRunExecutionContext.Failed(jumpHosts.ErrorMessage!);
+        }
+
         var templateArtifacts = await LoadTemplateArtifactsAsync(jobRun.CustomerId, job.TemplateArtifactsJson, cancellationToken);
         if (!templateArtifacts.Succeeded)
         {
@@ -259,7 +266,11 @@ public sealed class JobRunExecutionService(
             return JobRunExecutionContext.Failed(controlNodeCredential.ErrorMessage!);
         }
 
-        var managedNodeCredentials = await ResolveManagedNodeCredentialsAsync(jobRun.CustomerId, managedNodes, cancellationToken);
+        var credentialNodes = managedNodes
+            .Concat(jumpHosts.JumpHostsByNodeId!.Values)
+            .DistinctBy(managedNode => managedNode.Id)
+            .ToArray();
+        var managedNodeCredentials = await ResolveManagedNodeCredentialsAsync(jobRun.CustomerId, credentialNodes, cancellationToken);
         if (!managedNodeCredentials.Succeeded)
         {
             return JobRunExecutionContext.Failed(managedNodeCredentials.ErrorMessage!);
@@ -270,6 +281,7 @@ public sealed class JobRunExecutionService(
             controlNode,
             inventoryGroup,
             managedNodes,
+            jumpHosts.JumpHostsByNodeId!,
             playbook,
             variableSet,
             templateArtifacts.Artifacts!,
@@ -302,6 +314,53 @@ public sealed class JobRunExecutionService(
         {
             return ControlNodeCredentialResolutionResult.Failed("Control node SSH private key secret could not be resolved for execution.");
         }
+    }
+
+    private async Task<JumpHostResolutionResult> ResolveJumpHostsAsync(
+        Guid customerId,
+        IReadOnlyList<ManagedNode> managedNodes,
+        CancellationToken cancellationToken)
+    {
+        var jumpHostIds = managedNodes
+            .Where(managedNode => managedNode.JumpHostManagedNodeId is not null)
+            .Select(managedNode => managedNode.JumpHostManagedNodeId!.Value)
+            .Distinct()
+            .ToArray();
+        if (jumpHostIds.Length == 0)
+        {
+            return JumpHostResolutionResult.Ok(new Dictionary<Guid, ManagedNode>());
+        }
+
+        var activeNodes = await dbContext.ListActiveManagedNodesAsync(customerId, cancellationToken);
+        var activeNodesById = activeNodes.ToDictionary(managedNode => managedNode.Id);
+        var jumpHostsByNodeId = new Dictionary<Guid, ManagedNode>();
+        foreach (var managedNode in managedNodes.OrderBy(managedNode => managedNode.Name, StringComparer.Ordinal))
+        {
+            if (managedNode.JumpHostManagedNodeId is null)
+            {
+                continue;
+            }
+
+            if (managedNode.JumpHostManagedNodeId.Value == managedNode.Id)
+            {
+                return JumpHostResolutionResult.Failed($"Managed host '{managedNode.Name}' cannot use itself as a jump host.");
+            }
+
+            if (!activeNodesById.TryGetValue(managedNode.JumpHostManagedNodeId.Value, out var jumpHost)
+                || jumpHost.CustomerId != customerId)
+            {
+                return JumpHostResolutionResult.Failed($"Managed host '{managedNode.Name}' references an unavailable jump host.");
+            }
+
+            if (jumpHost.JumpHostManagedNodeId is not null)
+            {
+                return JumpHostResolutionResult.Failed($"Managed host '{managedNode.Name}' references a jump host that is itself jump-routed.");
+            }
+
+            jumpHostsByNodeId[managedNode.Id] = jumpHost;
+        }
+
+        return JumpHostResolutionResult.Ok(jumpHostsByNodeId);
     }
 
     private async Task<ManagedNodeCredentialResolutionResult> ResolveManagedNodeCredentialsAsync(
@@ -581,6 +640,22 @@ public sealed class JobRunExecutionService(
         public static ControlNodeCredentialResolutionResult Failed(string errorMessage)
         {
             return new ControlNodeCredentialResolutionResult(false, null, errorMessage);
+        }
+    }
+
+    private sealed record JumpHostResolutionResult(
+        bool Succeeded,
+        IReadOnlyDictionary<Guid, ManagedNode>? JumpHostsByNodeId,
+        string? ErrorMessage)
+    {
+        public static JumpHostResolutionResult Ok(IReadOnlyDictionary<Guid, ManagedNode> jumpHostsByNodeId)
+        {
+            return new JumpHostResolutionResult(true, jumpHostsByNodeId, null);
+        }
+
+        public static JumpHostResolutionResult Failed(string errorMessage)
+        {
+            return new JumpHostResolutionResult(false, null, errorMessage);
         }
     }
 

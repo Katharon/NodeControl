@@ -81,6 +81,11 @@ public sealed class ManagedNodeService(
             return CustomerServiceResult<ManagedNodeDto>.BadRequest();
         }
 
+        if (!await JumpHostReferenceIsValidAsync(customerId, managedNodeId: null, request.JumpHostManagedNodeId, cancellationToken))
+        {
+            return CustomerServiceResult<ManagedNodeDto>.BadRequest();
+        }
+
         try
         {
             var managedNode = ManagedNode.Create(
@@ -93,7 +98,8 @@ public sealed class ManagedNodeService(
                 request.OperatingSystem,
                 request.Environment,
                 request.Description,
-                clock.UtcNow);
+                clock.UtcNow,
+                request.JumpHostManagedNodeId);
 
             dbContext.AddManagedNode(managedNode);
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -140,6 +146,11 @@ public sealed class ManagedNodeService(
             return CustomerServiceResult<ManagedNodeDto>.BadRequest();
         }
 
+        if (!await JumpHostReferenceIsValidAsync(customerId, managedNodeId, request.JumpHostManagedNodeId, cancellationToken))
+        {
+            return CustomerServiceResult<ManagedNodeDto>.BadRequest();
+        }
+
         try
         {
             managedNode.Update(
@@ -151,7 +162,8 @@ public sealed class ManagedNodeService(
                 request.OperatingSystem,
                 request.Environment,
                 request.Description,
-                clock.UtcNow);
+                clock.UtcNow,
+                request.JumpHostManagedNodeId);
             await dbContext.SaveChangesAsync(cancellationToken);
 
             return CustomerServiceResult<ManagedNodeDto>.Ok(Map(managedNode));
@@ -200,6 +212,7 @@ public sealed class ManagedNodeService(
             managedNode.SshPort,
             managedNode.SshUsername,
             managedNode.SshPrivateKeySecretId,
+            managedNode.JumpHostManagedNodeId,
             managedNode.OperatingSystem,
             managedNode.Environment,
             managedNode.Description,
@@ -224,5 +237,42 @@ public sealed class ManagedNodeService(
             && secret.CustomerId == customerId
             && secret.Status == SecretStatus.Active
             && secret.Kind == SecretKind.SshPrivateKey;
+    }
+
+    private async Task<bool> JumpHostReferenceIsValidAsync(
+        Guid customerId,
+        Guid? managedNodeId,
+        Guid? jumpHostManagedNodeId,
+        CancellationToken cancellationToken)
+    {
+        if (jumpHostManagedNodeId is null)
+        {
+            return true;
+        }
+
+        if (managedNodeId == jumpHostManagedNodeId)
+        {
+            return false;
+        }
+
+        var activeNodes = await dbContext.ListActiveManagedNodesAsync(customerId, cancellationToken);
+        var jumpHost = activeNodes.FirstOrDefault(managedNode => managedNode.Id == jumpHostManagedNodeId.Value);
+        if (jumpHost is null || jumpHost.CustomerId != customerId)
+        {
+            return false;
+        }
+
+        if (jumpHost.JumpHostManagedNodeId is not null)
+        {
+            return false;
+        }
+
+        if (managedNodeId is not null
+            && activeNodes.Any(managedNode => managedNode.JumpHostManagedNodeId == managedNodeId.Value))
+        {
+            return false;
+        }
+
+        return true;
     }
 }

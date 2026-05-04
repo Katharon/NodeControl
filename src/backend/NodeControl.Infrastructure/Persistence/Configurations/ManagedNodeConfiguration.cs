@@ -43,6 +43,9 @@ public sealed class ManagedNodeConfiguration : IEntityTypeConfiguration<ManagedN
         builder.Property(managedNode => managedNode.SshPrivateKeySecretId)
             .HasColumnName("ssh_private_key_secret_id");
 
+        builder.Property(managedNode => managedNode.JumpHostManagedNodeId)
+            .HasColumnName("jump_host_managed_node_id");
+
         builder.Property(managedNode => managedNode.OperatingSystem)
             .HasColumnName("operating_system")
             .HasMaxLength(100);
@@ -82,11 +85,19 @@ public sealed class ManagedNodeConfiguration : IEntityTypeConfiguration<ManagedN
             .HasForeignKey(managedNode => managedNode.SshPrivateKeySecretId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne<ManagedNode>()
+            .WithMany()
+            .HasForeignKey(managedNode => managedNode.JumpHostManagedNodeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(managedNode => new { managedNode.CustomerId, managedNode.Name })
             .IsUnique()
             .HasDatabaseName("ux_managed_nodes_customer_id_name");
 
         builder.HasIndex(managedNode => managedNode.SshPrivateKeySecretId)
             .HasDatabaseName("ix_managed_nodes_ssh_private_key_secret_id");
+
+        builder.HasIndex(managedNode => managedNode.JumpHostManagedNodeId)
+            .HasDatabaseName("ix_managed_nodes_jump_host_managed_node_id");
     }
 }

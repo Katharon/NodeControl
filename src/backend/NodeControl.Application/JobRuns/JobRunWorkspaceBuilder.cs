@@ -26,6 +26,7 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
         ControlNode controlNode,
         InventoryGroup inventoryGroup,
         IReadOnlyList<ManagedNode> managedNodes,
+        IReadOnlyDictionary<Guid, ManagedNode> jumpHostsByNodeId,
         Playbook playbook,
         VariableSet? variableSet,
         IReadOnlyList<JobRunTemplateArtifact> templateArtifacts,
@@ -42,9 +43,18 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
             return JobRunWorkspaceBuildResult.Failed("JobRun references resources outside its customer.");
         }
 
-        if (managedNodes.Any(managedNode => managedNode.CustomerId != jobRun.CustomerId))
+        if (managedNodes.Any(managedNode => managedNode.CustomerId != jobRun.CustomerId)
+            || jumpHostsByNodeId.Values.Any(managedNode => managedNode.CustomerId != jobRun.CustomerId))
         {
             return JobRunWorkspaceBuildResult.Failed("Inventory group contains managed nodes outside the JobRun customer.");
+        }
+
+        if (managedNodes.Any(managedNode =>
+                managedNode.JumpHostManagedNodeId is not null
+                && (!jumpHostsByNodeId.TryGetValue(managedNode.Id, out var jumpHost)
+                    || jumpHost.Id != managedNode.JumpHostManagedNodeId.Value)))
+        {
+            return JobRunWorkspaceBuildResult.Failed("Inventory group contains a managed node with an unavailable jump host.");
         }
 
         if (managedNodes.Count == 0)
@@ -113,7 +123,7 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
         Directory.CreateDirectory(playbookDirectory);
         Directory.CreateDirectory(dispatchDirectory);
 
-        await File.WriteAllTextAsync(inventoryPath, BuildInventoryYaml(inventoryGroup, managedNodes), cancellationToken);
+        await File.WriteAllTextAsync(inventoryPath, BuildInventoryYaml(inventoryGroup, managedNodes, jumpHostsByNodeId), cancellationToken);
         await File.WriteAllTextAsync(
             variablePath,
             variableSet is null ? "{}" : ResolveSecretReferences(variableSet.Content, secretValuesBySlug),
@@ -314,13 +324,16 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
         return normalized;
     }
 
-    private string BuildInventoryYaml(InventoryGroup inventoryGroup, IReadOnlyList<ManagedNode> managedNodes)
+    private string BuildInventoryYaml(
+        InventoryGroup inventoryGroup,
+        IReadOnlyList<ManagedNode> managedNodes,
+        IReadOnlyDictionary<Guid, ManagedNode> jumpHostsByNodeId)
     {
         var hosts = managedNodes
             .OrderBy(managedNode => managedNode.Name, StringComparer.Ordinal)
             .ToDictionary(
                 managedNode => managedNode.Name,
-                managedNode => (object)BuildInventoryHostVariables(managedNode),
+                managedNode => (object)BuildInventoryHostVariables(managedNode, jumpHostsByNodeId),
                 StringComparer.Ordinal);
 
         var inventory = new Dictionary<string, object>
@@ -371,10 +384,16 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
             ArtifactJsonOptions);
     }
 
-    private static Dictionary<string, object> BuildInventoryHostVariables(ManagedNode managedNode)
+    private static Dictionary<string, object> BuildInventoryHostVariables(
+        ManagedNode managedNode,
+        IReadOnlyDictionary<Guid, ManagedNode> jumpHostsByNodeId)
     {
+        var jumpHost = managedNode.JumpHostManagedNodeId is null
+            ? null
+            : jumpHostsByNodeId.GetValueOrDefault(managedNode.Id);
+
         return ManagedNodeInventoryVariables
-            .Build(managedNode)
+            .Build(managedNode, jumpHost)
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
     }
 

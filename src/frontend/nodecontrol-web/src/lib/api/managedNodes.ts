@@ -10,6 +10,7 @@ export type ManagedNode = {
   sshPort: number;
   sshUsername: string | null;
   sshPrivateKeySecretId: string | null;
+  jumpHostManagedNodeId: string | null;
   operatingSystem: string | null;
   environment: string | null;
   description: string | null;
@@ -25,6 +26,7 @@ export type ManagedNodeInput = {
   sshPort: number;
   sshUsername?: string | null;
   sshPrivateKeySecretId?: string | null;
+  jumpHostManagedNodeId?: string | null;
   operatingSystem?: string | null;
   environment?: string | null;
   description?: string | null;

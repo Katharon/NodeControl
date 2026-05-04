@@ -275,5 +275,22 @@ Reason:
 
 - It makes Ansible target-host execution more realistic without moving SSH behavior into the API.
 - It reuses existing customer-scoped Secret records instead of adding a separate credential store.
-- It keeps the model small enough for MVP use and leaves bastion/proxy behavior for a later slice.
+- It keeps the model small enough for MVP use and provides the credential foundation for one-hop bastion behavior.
 - The Worker can remove temporary key files after dispatch while retaining useful non-sensitive run artifacts.
+
+## DEC-023: Model one-hop Managed Host Jump Host paths
+
+Status: Accepted
+
+Managed Nodes may optionally reference exactly one Jump Host, modeled as another active Managed Node in the same
+customer. The Application layer validates same-customer scope, rejects self-reference, and rejects nested jump chains.
+The API remains metadata-only. During Worker-side run workspace preparation, inventory renders an OpenSSH
+`ProxyCommand` in `ansible_ssh_common_args` so Ansible reaches the target through the Jump Host.
+
+Reason:
+
+- It closes the common bastion-host realism gap without introducing agents, proxy services, message buses, or a
+  generic network-routing platform.
+- It keeps customer scoping and Secret-backed SSH key handling in the existing Managed Host model.
+- It preserves direct-host and localhost/dev execution paths.
+- It keeps SSH command/process behavior in the Worker execution boundary.

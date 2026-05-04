@@ -36,6 +36,7 @@ public sealed class JobRunExecutionTests
             fixture.ControlNode,
             fixture.InventoryGroup,
             [fixture.ManagedNode],
+            new Dictionary<Guid, ManagedNode>(),
             fixture.Playbook,
             fixture.VariableSet,
             [],
@@ -77,6 +78,7 @@ public sealed class JobRunExecutionTests
             fixture.ControlNode,
             fixture.InventoryGroup,
             [fixture.ManagedNode],
+            new Dictionary<Guid, ManagedNode>(),
             fixture.Playbook,
             fixture.VariableSet,
             [],
@@ -99,6 +101,7 @@ public sealed class JobRunExecutionTests
             fixture.ControlNode,
             fixture.InventoryGroup,
             [fixture.ManagedNode],
+            new Dictionary<Guid, ManagedNode>(),
             fixture.Playbook,
             fixture.VariableSet,
             [],
@@ -132,6 +135,7 @@ public sealed class JobRunExecutionTests
             fixture.ControlNode,
             fixture.InventoryGroup,
             [fixture.ManagedNode],
+            new Dictionary<Guid, ManagedNode>(),
             fixture.Playbook,
             fixture.VariableSet,
             [],
@@ -163,6 +167,7 @@ public sealed class JobRunExecutionTests
             fixture.ControlNode,
             fixture.InventoryGroup,
             [fixture.ManagedNode],
+            new Dictionary<Guid, ManagedNode>(),
             fixture.Playbook,
             fixture.VariableSet,
             [],
@@ -177,6 +182,54 @@ public sealed class JobRunExecutionTests
     }
 
     [Fact]
+    public async Task JobRunWorkspaceBuilder_writes_jump_host_proxy_command_to_inventory()
+    {
+        using var fixture = ExecutionFixture.Create();
+        var jumpKeySecretId = Guid.NewGuid();
+        var jumpHost = ManagedNode.Create(
+            fixture.Customer.Id,
+            "bastion_01",
+            "bastion.example.test",
+            2222,
+            "jump",
+            jumpKeySecretId,
+            null,
+            null,
+            null,
+            TestTime);
+        fixture.Db.AddManagedNode(jumpHost);
+        fixture.ManagedNode.Update(
+            fixture.ManagedNode.Name,
+            fixture.ManagedNode.Hostname,
+            fixture.ManagedNode.SshPort,
+            "deploy",
+            null,
+            fixture.ManagedNode.OperatingSystem,
+            fixture.ManagedNode.Environment,
+            fixture.ManagedNode.Description,
+            TestTime.AddMinutes(1),
+            jumpHost.Id);
+
+        var result = await fixture.CreateWorkspaceBuilder().BuildAsync(
+            fixture.JobRun,
+            fixture.Job,
+            fixture.ControlNode,
+            fixture.InventoryGroup,
+            [fixture.ManagedNode],
+            new Dictionary<Guid, ManagedNode> { [fixture.ManagedNode.Id] = jumpHost },
+            fixture.Playbook,
+            fixture.VariableSet,
+            [],
+            EmptySecrets);
+
+        var inventory = await File.ReadAllTextAsync(result.Workspace!.InventoryPath);
+        Assert.Contains("ansible_user: deploy", inventory);
+        Assert.Contains("-o ProxyCommand=\"ssh -W %h:%p -q -p 2222 -i", inventory);
+        Assert.Contains($".nodecontrol/managed-host-keys/{jumpHost.Id:D}.key", inventory);
+        Assert.Contains("jump@bastion.example.test", inventory);
+    }
+
+    [Fact]
     public async Task JobRunWorkspaceBuilder_writes_vars_yml_for_yaml_variable_set()
     {
         using var fixture = ExecutionFixture.Create(variableFormat: VariableSetFormat.Yaml, variableContent: "app_name: nodecontrol\n");
@@ -187,6 +240,7 @@ public sealed class JobRunExecutionTests
             fixture.ControlNode,
             fixture.InventoryGroup,
             [fixture.ManagedNode],
+            new Dictionary<Guid, ManagedNode>(),
             fixture.Playbook,
             fixture.VariableSet,
             [],
@@ -207,6 +261,7 @@ public sealed class JobRunExecutionTests
             fixture.ControlNode,
             fixture.InventoryGroup,
             [fixture.ManagedNode],
+            new Dictionary<Guid, ManagedNode>(),
             fixture.Playbook,
             fixture.VariableSet,
             [],
@@ -227,6 +282,7 @@ public sealed class JobRunExecutionTests
             fixture.ControlNode,
             fixture.InventoryGroup,
             [fixture.ManagedNode],
+            new Dictionary<Guid, ManagedNode>(),
             fixture.Playbook,
             null,
             [],
@@ -247,6 +303,7 @@ public sealed class JobRunExecutionTests
             fixture.ControlNode,
             fixture.InventoryGroup,
             [fixture.ManagedNode],
+            new Dictionary<Guid, ManagedNode>(),
             fixture.Playbook,
             fixture.VariableSet,
             [],
@@ -267,6 +324,7 @@ public sealed class JobRunExecutionTests
             fixture.ControlNode,
             fixture.InventoryGroup,
             [fixture.ManagedNode],
+            new Dictionary<Guid, ManagedNode>(),
             fixture.Playbook,
             fixture.VariableSet,
             [],
@@ -290,6 +348,7 @@ public sealed class JobRunExecutionTests
             fixture.ControlNode,
             fixture.InventoryGroup,
             [fixture.ManagedNode],
+            new Dictionary<Guid, ManagedNode>(),
             fixture.Playbook,
             fixture.VariableSet,
             [],
@@ -323,6 +382,7 @@ public sealed class JobRunExecutionTests
             fixture.ControlNode,
             fixture.InventoryGroup,
             [fixture.ManagedNode],
+            new Dictionary<Guid, ManagedNode>(),
             fixture.Playbook,
             fixture.VariableSet,
             [new JobRunTemplateArtifact(template, "templates/app.conf")],
@@ -377,6 +437,7 @@ public sealed class JobRunExecutionTests
             fixture.ControlNode,
             fixture.InventoryGroup,
             [],
+            new Dictionary<Guid, ManagedNode>(),
             fixture.Playbook,
             fixture.VariableSet,
             [],
@@ -510,6 +571,65 @@ public sealed class JobRunExecutionTests
         Assert.Equal(JobRunStatus.Failed, fixture.JobRun.Status);
         Assert.DoesNotContain("managed-node-private-key", fixture.JobRun.ErrorMessage);
         Assert.DoesNotContain(fixture.Db.JobRunLogEntries, entry => entry.Message.Contains("managed-node-private-key", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task JobRunExecutionService_materializes_jump_host_ssh_key_for_proxy_command()
+    {
+        using var fixture = ExecutionFixture.Create();
+        var jumpKeySecret = Secret.Create(
+            fixture.Customer.Id,
+            "Jump key",
+            "jump-key",
+            null,
+            SecretKind.SshPrivateKey,
+            "protected:jump-host-private-key",
+            TestTime);
+        var jumpHost = ManagedNode.Create(
+            fixture.Customer.Id,
+            "bastion_01",
+            "bastion.example.test",
+            2222,
+            "jump",
+            jumpKeySecret.Id,
+            null,
+            null,
+            null,
+            TestTime);
+        fixture.Db.AddSecret(jumpKeySecret);
+        fixture.Db.AddManagedNode(jumpHost);
+        fixture.ManagedNode.Update(
+            fixture.ManagedNode.Name,
+            fixture.ManagedNode.Hostname,
+            fixture.ManagedNode.SshPort,
+            "deploy",
+            null,
+            fixture.ManagedNode.OperatingSystem,
+            fixture.ManagedNode.Environment,
+            fixture.ManagedNode.Description,
+            TestTime.AddMinutes(1),
+            jumpHost.Id);
+        var dispatcher = new InspectingControlNodeDispatcher(request =>
+        {
+            var keyPath = Path.Combine(
+                request.Workspace.WorkspacePath,
+                ".nodecontrol",
+                "managed-host-keys",
+                $"{jumpHost.Id:D}.key");
+            var inventory = File.ReadAllText(request.Workspace.InventoryPath);
+            Assert.True(File.Exists(keyPath));
+            Assert.Equal("jump-host-private-key\n", File.ReadAllText(keyPath));
+            Assert.Contains($".nodecontrol/managed-host-keys/{jumpHost.Id:D}.key", inventory);
+            Assert.Contains("jump@bastion.example.test", inventory);
+
+            return new ControlNodeDispatchResult(0, false, false, null);
+        });
+        var service = fixture.CreateExecutionService(dispatcher);
+
+        await service.ExecuteAsync(fixture.JobRun);
+
+        Assert.Equal(JobRunStatus.Succeeded, fixture.JobRun.Status);
+        Assert.DoesNotContain(fixture.Db.JobRunLogEntries, entry => entry.Message.Contains("jump-host-private-key", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -833,6 +953,7 @@ public sealed class JobRunExecutionTests
             fixture.ControlNode,
             fixture.InventoryGroup,
             [fixture.ManagedNode],
+            new Dictionary<Guid, ManagedNode>(),
             fixture.Playbook,
             fixture.VariableSet,
             [],
@@ -1011,6 +1132,7 @@ public sealed class JobRunExecutionTests
             ControlNode controlNode,
             InventoryGroup inventoryGroup,
             IReadOnlyList<ManagedNode> managedNodes,
+            IReadOnlyDictionary<Guid, ManagedNode> jumpHostsByNodeId,
             Playbook playbook,
             VariableSet? variableSet,
             IReadOnlyList<JobRunTemplateArtifact> templateArtifacts,

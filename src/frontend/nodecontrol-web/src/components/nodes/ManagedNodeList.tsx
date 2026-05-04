@@ -82,6 +82,8 @@ export function ManagedNodeList({ customerId, canManageNodes, canViewSecrets = f
     return <Alert severity="error">Hosts konnten nicht geladen werden.</Alert>;
   }
 
+  const managedNodesById = new Map(managedNodesQuery.data.map((node) => [node.id, node]));
+
   return (
     <Stack sx={{ gap: 2 }}>
       <Stack direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
@@ -118,6 +120,9 @@ export function ManagedNodeList({ customerId, canManageNodes, canViewSecrets = f
                     </Typography>
                     <Typography color="text.secondary" variant="body2">
                       SSH: {sshLabel(managedNode)}
+                    </Typography>
+                    <Typography color="text.secondary" variant="body2">
+                      Pfad: {jumpHostLabel(managedNode, managedNodesById)}
                     </Typography>
                   </Stack>
                 </Stack>
@@ -157,6 +162,7 @@ export function ManagedNodeList({ customerId, canManageNodes, canViewSecrets = f
         <DialogTitle>Neuer Host</DialogTitle>
         <DialogContent>
           <ManagedNodeForm
+            managedNodes={managedNodesQuery.data}
             onSubmit={async (input) => {
               await createMutation.mutateAsync(input);
             }}
@@ -172,6 +178,7 @@ export function ManagedNodeList({ customerId, canManageNodes, canViewSecrets = f
           {editingManagedNode ? (
             <ManagedNodeForm
               managedNode={editingManagedNode}
+              managedNodes={managedNodesQuery.data}
               onSubmit={async (input) => {
                 await updateMutation.mutateAsync({ managedNodeId: editingManagedNode.id, input });
               }}
@@ -188,4 +195,13 @@ export function ManagedNodeList({ customerId, canManageNodes, canViewSecrets = f
 function sshLabel(managedNode: ManagedNode) {
   const user = managedNode.sshUsername ? `user ${managedNode.sshUsername}` : "default user";
   return managedNode.sshPrivateKeySecretId ? `${user}, key-backed` : `${user}, basic`;
+}
+
+function jumpHostLabel(managedNode: ManagedNode, managedNodesById: Map<string, ManagedNode>) {
+  if (!managedNode.jumpHostManagedNodeId) {
+    return "Direct";
+  }
+
+  const jumpHost = managedNodesById.get(managedNode.jumpHostManagedNodeId);
+  return jumpHost ? `Via ${jumpHost.name}` : "Via configured jump host";
 }

@@ -14,6 +14,7 @@ public sealed class ManagedNode
         int sshPort,
         string? sshUsername,
         Guid? sshPrivateKeySecretId,
+        Guid? jumpHostManagedNodeId,
         string? operatingSystem,
         string? environment,
         string? description,
@@ -26,6 +27,7 @@ public sealed class ManagedNode
         SshPort = sshPort;
         SshUsername = NormalizeOptionalSshUsername(sshUsername);
         SshPrivateKeySecretId = sshPrivateKeySecretId;
+        JumpHostManagedNodeId = jumpHostManagedNodeId;
         OperatingSystem = NodeValidation.NormalizeOptional(operatingSystem, 100, nameof(operatingSystem));
         Environment = NodeValidation.NormalizeOptional(environment, 100, nameof(environment));
         Description = NodeValidation.NormalizeOptional(description, 1000, nameof(description));
@@ -46,6 +48,8 @@ public sealed class ManagedNode
     public string? SshUsername { get; private set; }
 
     public Guid? SshPrivateKeySecretId { get; private set; }
+
+    public Guid? JumpHostManagedNodeId { get; private set; }
 
     public string? OperatingSystem { get; private set; }
 
@@ -69,7 +73,8 @@ public sealed class ManagedNode
         string? operatingSystem,
         string? environment,
         string? description,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        Guid? jumpHostManagedNodeId = null)
     {
         return Create(
             customerId,
@@ -78,10 +83,11 @@ public sealed class ManagedNode
             sshPort,
             sshUsername: null,
             sshPrivateKeySecretId: null,
-            operatingSystem,
-            environment,
-            description,
-            createdAt);
+            operatingSystem: operatingSystem,
+            environment: environment,
+            description: description,
+            createdAt: createdAt,
+            jumpHostManagedNodeId: jumpHostManagedNodeId);
     }
 
     public static ManagedNode Create(
@@ -94,7 +100,8 @@ public sealed class ManagedNode
         string? operatingSystem,
         string? environment,
         string? description,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        Guid? jumpHostManagedNodeId = null)
     {
         NodeValidation.ValidateInventoryName(name);
         NodeValidation.ValidateHostname(hostname);
@@ -109,6 +116,7 @@ public sealed class ManagedNode
             sshPort,
             sshUsername,
             sshPrivateKeySecretId,
+            jumpHostManagedNodeId,
             operatingSystem,
             environment,
             description,
@@ -122,7 +130,8 @@ public sealed class ManagedNode
         string? operatingSystem,
         string? environment,
         string? description,
-        DateTimeOffset updatedAt)
+        DateTimeOffset updatedAt,
+        Guid? jumpHostManagedNodeId = null)
     {
         Update(
             name,
@@ -130,10 +139,11 @@ public sealed class ManagedNode
             sshPort,
             sshUsername: null,
             sshPrivateKeySecretId: null,
-            operatingSystem,
-            environment,
-            description,
-            updatedAt);
+            operatingSystem: operatingSystem,
+            environment: environment,
+            description: description,
+            updatedAt: updatedAt,
+            jumpHostManagedNodeId: jumpHostManagedNodeId);
     }
 
     public void Update(
@@ -145,7 +155,8 @@ public sealed class ManagedNode
         string? operatingSystem,
         string? environment,
         string? description,
-        DateTimeOffset updatedAt)
+        DateTimeOffset updatedAt,
+        Guid? jumpHostManagedNodeId = null)
     {
         NodeValidation.ValidateInventoryName(name);
         NodeValidation.ValidateHostname(hostname);
@@ -157,6 +168,7 @@ public sealed class ManagedNode
         SshPort = sshPort;
         SshUsername = NormalizeOptionalSshUsername(sshUsername);
         SshPrivateKeySecretId = sshPrivateKeySecretId;
+        JumpHostManagedNodeId = jumpHostManagedNodeId;
         OperatingSystem = NodeValidation.NormalizeOptional(operatingSystem, 100, nameof(operatingSystem));
         Environment = NodeValidation.NormalizeOptional(environment, 100, nameof(environment));
         Description = NodeValidation.NormalizeOptional(description, 1000, nameof(description));

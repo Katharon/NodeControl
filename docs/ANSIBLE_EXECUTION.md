@@ -211,7 +211,8 @@ The current implementation includes target structure, inventory group assignment
 - Control Nodes are modeled as customer-scoped records. Hostzustand can queue TCP reachability checks, but
   NodeControl does not perform SSH authentication checks.
 - Managed Nodes are modeled as customer-scoped records and can be linked to Inventory Groups. They can carry minimal
-  SSH execution metadata: port, optional username, and an optional SSH private key Secret reference.
+  SSH execution metadata: port, optional username, an optional SSH private key Secret reference, and an optional
+  one-hop Jump Host reference to another active same-customer Managed Node.
 - Inventory Groups generate a YAML preview from active Managed Nodes.
 - Archived Managed Nodes are excluded from preview output.
 - The API still must not execute Ansible; execution belongs to the Worker.
@@ -228,6 +229,14 @@ writes a temporary per-host key file under `.nodecontrol/managed-host-keys/` in 
 Ansible at that file with `ansible_ssh_private_key_file` and adds `ansible_ssh_common_args: -o IdentitiesOnly=yes`
 so Ansible prefers the materialized host key. The dispatcher removes those key files after local execution and after
 remote execution best-effort, while leaving the non-sensitive run workspace structure available for diagnosis.
+
+For one-hop Jump Host execution, the target Managed Node references another active Managed Node from the same customer.
+The Application layer rejects self-references, cross-customer references, and nested jump chains. During Worker-side
+workspace preparation, inventory keeps the target host's own SSH user/port/key settings and adds an OpenSSH
+`ProxyCommand` in `ansible_ssh_common_args` for the jump path. If the Jump Host has its own SSH username, port, or
+SSH private key Secret reference, those settings are used in that proxy command and the jump key is materialized by
+the Worker into the same temporary managed-host key directory. The API only stores and validates metadata; it never
+performs SSH or command execution.
 
 ## Variable Sets
 

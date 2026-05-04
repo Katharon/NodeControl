@@ -207,8 +207,9 @@ A machine or execution environment from which Ansible is run.
 ### ManagedNode
 
 A target system managed by Ansible. Managed Nodes store customer-scoped connection metadata used for generated
-inventory: hostname, SSH port, optional SSH username, and an optional SSH private key Secret reference. The Secret
-value is not exposed through API responses and is decrypted only by the Worker during run workspace preparation.
+inventory: hostname, SSH port, optional SSH username, an optional SSH private key Secret reference, and an optional
+one-hop Jump Host reference to another active Managed Node in the same customer. The Secret value is not exposed
+through API responses and is decrypted only by the Worker during run workspace preparation.
 
 ### HostConnectionCheck
 

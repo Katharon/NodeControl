@@ -8,4 +8,5 @@ public sealed record CreateManagedNodeRequest(
     Guid? SshPrivateKeySecretId = null,
     string? OperatingSystem = null,
     string? Environment = null,
-    string? Description = null);
+    string? Description = null,
+    Guid? JumpHostManagedNodeId = null);

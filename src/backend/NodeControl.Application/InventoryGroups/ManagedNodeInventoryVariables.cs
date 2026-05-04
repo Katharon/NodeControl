@@ -4,7 +4,7 @@ namespace NodeControl.Application.InventoryGroups;
 
 internal static class ManagedNodeInventoryVariables
 {
-    public static IReadOnlyDictionary<string, object> Build(ManagedNode managedNode)
+    public static IReadOnlyDictionary<string, object> Build(ManagedNode managedNode, ManagedNode? jumpHost = null)
     {
         var variables = new Dictionary<string, object>
         {
@@ -12,7 +12,7 @@ internal static class ManagedNodeInventoryVariables
             ["ansible_port"] = managedNode.SshPort
         };
 
-        if (ShouldUseLocalConnection(managedNode))
+        if (jumpHost is null && ShouldUseLocalConnection(managedNode))
         {
             variables["ansible_connection"] = "local";
         }
@@ -25,7 +25,12 @@ internal static class ManagedNodeInventoryVariables
         if (managedNode.SshPrivateKeySecretId is not null)
         {
             variables["ansible_ssh_private_key_file"] = GetPrivateKeyRelativePath(managedNode);
-            variables["ansible_ssh_common_args"] = "-o IdentitiesOnly=yes";
+        }
+
+        var sshCommonArgs = BuildSshCommonArgs(managedNode, jumpHost);
+        if (!string.IsNullOrWhiteSpace(sshCommonArgs))
+        {
+            variables["ansible_ssh_common_args"] = sshCommonArgs;
         }
 
         return variables;
@@ -38,6 +43,58 @@ internal static class ManagedNodeInventoryVariables
             ".nodecontrol",
             "managed-host-keys",
             $"{managedNode.Id:D}.key");
+    }
+
+    private static string? BuildSshCommonArgs(ManagedNode managedNode, ManagedNode? jumpHost)
+    {
+        var options = new List<string>();
+        if (managedNode.SshPrivateKeySecretId is not null)
+        {
+            options.Add("-o IdentitiesOnly=yes");
+        }
+
+        if (jumpHost is not null)
+        {
+            options.Add($"-o ProxyCommand=\"{BuildProxyCommand(jumpHost)}\"");
+        }
+
+        return options.Count == 0 ? null : string.Join(' ', options);
+    }
+
+    private static string BuildProxyCommand(ManagedNode jumpHost)
+    {
+        var commandParts = new List<string>
+        {
+            "ssh",
+            "-W",
+            "%h:%p",
+            "-q",
+            "-p",
+            jumpHost.SshPort.ToString()
+        };
+
+        if (jumpHost.SshPrivateKeySecretId is not null)
+        {
+            commandParts.Add("-i");
+            commandParts.Add(ShellQuote(GetPrivateKeyRelativePath(jumpHost)));
+            commandParts.Add("-o");
+            commandParts.Add("IdentitiesOnly=yes");
+        }
+
+        commandParts.Add(ShellQuote(BuildJumpLogin(jumpHost)));
+        return string.Join(' ', commandParts);
+    }
+
+    private static string BuildJumpLogin(ManagedNode jumpHost)
+    {
+        return string.IsNullOrWhiteSpace(jumpHost.SshUsername)
+            ? jumpHost.Hostname
+            : $"{jumpHost.SshUsername}@{jumpHost.Hostname}";
+    }
+
+    private static string ShellQuote(string value)
+    {
+        return $"'{value.Replace("'", "'\"'\"'", StringComparison.Ordinal)}'";
     }
 
     private static bool ShouldUseLocalConnection(ManagedNode managedNode)

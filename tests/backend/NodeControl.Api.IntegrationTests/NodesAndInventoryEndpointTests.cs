@@ -271,6 +271,20 @@ public sealed class NodesAndInventoryEndpointTests
             }
         }
 
+        public Task<IReadOnlyList<ManagedNode>> ListActiveManagedNodesAsync(
+            Guid customerId,
+            CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult<IReadOnlyList<ManagedNode>>(
+                    ManagedNodes
+                        .Where(managedNode => managedNode.CustomerId == customerId
+                            && managedNode.Status == ManagedNodeStatus.Active)
+                        .ToArray());
+            }
+        }
+
         public Task<InventoryGroup?> FindInventoryGroupAsync(
             Guid customerId,
             Guid inventoryGroupId,

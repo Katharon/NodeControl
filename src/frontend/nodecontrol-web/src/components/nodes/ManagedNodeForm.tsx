@@ -20,6 +20,7 @@ const managedNodeSchema = z.object({
     message: "SSH username must not contain whitespace",
   }).optional(),
   sshPrivateKeySecretId: z.string().trim().optional(),
+  jumpHostManagedNodeId: z.string().trim().optional(),
   operatingSystem: z.string().trim().max(100).optional(),
   environment: z.string().trim().max(100).optional(),
   description: z.string().trim().max(1000).optional(),
@@ -29,14 +30,19 @@ type ManagedNodeFormValues = z.infer<typeof managedNodeSchema>;
 
 type ManagedNodeFormProps = {
   managedNode?: ManagedNode;
+  managedNodes?: ManagedNode[];
   sshPrivateKeySecrets?: Secret[];
   submitLabel: string;
   onSubmit: (input: ManagedNodeInput) => Promise<void>;
 };
 
-export function ManagedNodeForm({ managedNode, sshPrivateKeySecrets = [], submitLabel, onSubmit }: ManagedNodeFormProps) {
+export function ManagedNodeForm({ managedNode, managedNodes = [], sshPrivateKeySecrets = [], submitLabel, onSubmit }: ManagedNodeFormProps) {
   const configuredSecretIsNotListed = Boolean(managedNode?.sshPrivateKeySecretId)
     && !sshPrivateKeySecrets.some((secret) => secret.id === managedNode?.sshPrivateKeySecretId);
+  const jumpHostOptions = managedNodes.filter((node) =>
+    node.id !== managedNode?.id && node.status === "Active" && !node.jumpHostManagedNodeId);
+  const configuredJumpHostIsNotListed = Boolean(managedNode?.jumpHostManagedNodeId)
+    && !jumpHostOptions.some((node) => node.id === managedNode?.jumpHostManagedNodeId);
   const {
     formState: { errors, isSubmitting },
     handleSubmit,
@@ -49,6 +55,7 @@ export function ManagedNodeForm({ managedNode, sshPrivateKeySecrets = [], submit
       sshPort: managedNode?.sshPort ?? 22,
       sshUsername: managedNode?.sshUsername ?? "",
       sshPrivateKeySecretId: managedNode?.sshPrivateKeySecretId ?? "",
+      jumpHostManagedNodeId: managedNode?.jumpHostManagedNodeId ?? "",
       operatingSystem: managedNode?.operatingSystem ?? "",
       environment: managedNode?.environment ?? "",
       description: managedNode?.description ?? "",
@@ -65,6 +72,7 @@ export function ManagedNodeForm({ managedNode, sshPrivateKeySecrets = [], submit
           sshPort: values.sshPort,
           sshUsername: values.sshUsername || null,
           sshPrivateKeySecretId: values.sshPrivateKeySecretId || null,
+          jumpHostManagedNodeId: values.jumpHostManagedNodeId || null,
           operatingSystem: values.operatingSystem || null,
           environment: values.environment || null,
           description: values.description || null,
@@ -109,6 +117,23 @@ export function ManagedNodeForm({ managedNode, sshPrivateKeySecrets = [], submit
         {sshPrivateKeySecrets.map((secret) => (
           <MenuItem key={secret.id} value={secret.id}>
             {secret.name} · secret://{secret.slug}
+          </MenuItem>
+        ))}
+      </TextField>
+      <TextField
+        error={Boolean(errors.jumpHostManagedNodeId)}
+        helperText={errors.jumpHostManagedNodeId?.message ?? "Optional one-hop bastion host from the same customer."}
+        label="Jump host"
+        select
+        {...register("jumpHostManagedNodeId")}
+      >
+        <MenuItem value="">Direct connection</MenuItem>
+        {configuredJumpHostIsNotListed ? (
+          <MenuItem value={managedNode!.jumpHostManagedNodeId!}>Configured jump host</MenuItem>
+        ) : null}
+        {jumpHostOptions.map((node) => (
+          <MenuItem key={node.id} value={node.id}>
+            {node.name} · {node.hostname}:{node.sshPort}
           </MenuItem>
         ))}
       </TextField>

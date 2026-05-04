@@ -168,6 +168,85 @@ public sealed class NodesAndInventoryServiceTests
     }
 
     [Fact]
+    public async Task ManagedNodeService_creates_managed_node_with_same_customer_jump_host()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+        var jumpHost = ManagedNode.Create(fixture.Customer.Id, "bastion_01", "bastion.example.test", 2222, "Linux", "prod", null, TestTime);
+        fixture.Db.AddManagedNode(jumpHost);
+        var service = fixture.CreateManagedNodeService();
+
+        var result = await service.CreateAsync(fixture.CurrentUser, fixture.Customer.Id, new CreateManagedNodeRequest(
+            "web_01",
+            "10.0.0.10",
+            JumpHostManagedNodeId: jumpHost.Id));
+
+        Assert.Null(result.Error);
+        Assert.Equal(jumpHost.Id, result.Value!.JumpHostManagedNodeId);
+    }
+
+    [Fact]
+    public async Task ManagedNodeService_rejects_cross_customer_jump_host_reference()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+        var otherCustomer = Customer.Create("Other Customer", "other-customer", null, TestTime);
+        var jumpHost = ManagedNode.Create(otherCustomer.Id, "bastion_01", "bastion.example.test", 22, null, null, null, TestTime);
+        fixture.Db.AddCustomer(otherCustomer);
+        fixture.Db.AddManagedNode(jumpHost);
+        var service = fixture.CreateManagedNodeService();
+
+        var result = await service.CreateAsync(fixture.CurrentUser, fixture.Customer.Id, new CreateManagedNodeRequest(
+            "web_01",
+            "10.0.0.10",
+            JumpHostManagedNodeId: jumpHost.Id));
+
+        Assert.Equal(CustomerServiceError.BadRequest, result.Error);
+    }
+
+    [Fact]
+    public async Task ManagedNodeService_rejects_self_jump_host_reference_on_update()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+        var managedNode = ManagedNode.Create(fixture.Customer.Id, "web_01", "10.0.0.10", 22, null, null, null, TestTime);
+        fixture.Db.AddManagedNode(managedNode);
+        var service = fixture.CreateManagedNodeService();
+
+        var result = await service.UpdateAsync(fixture.CurrentUser, fixture.Customer.Id, managedNode.Id, new UpdateManagedNodeRequest(
+            managedNode.Name,
+            managedNode.Hostname,
+            JumpHostManagedNodeId: managedNode.Id));
+
+        Assert.Equal(CustomerServiceError.BadRequest, result.Error);
+        Assert.Null(managedNode.JumpHostManagedNodeId);
+    }
+
+    [Fact]
+    public async Task ManagedNodeService_rejects_nested_jump_host_reference()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+        var firstJump = ManagedNode.Create(fixture.Customer.Id, "bastion_01", "bastion-01.example.test", 22, null, null, null, TestTime);
+        var nestedJump = ManagedNode.Create(
+            fixture.Customer.Id,
+            "bastion_02",
+            "bastion-02.example.test",
+            22,
+            null,
+            null,
+            null,
+            TestTime,
+            firstJump.Id);
+        fixture.Db.AddManagedNode(firstJump);
+        fixture.Db.AddManagedNode(nestedJump);
+        var service = fixture.CreateManagedNodeService();
+
+        var result = await service.CreateAsync(fixture.CurrentUser, fixture.Customer.Id, new CreateManagedNodeRequest(
+            "web_01",
+            "10.0.0.10",
+            JumpHostManagedNodeId: nestedJump.Id));
+
+        Assert.Equal(CustomerServiceError.BadRequest, result.Error);
+    }
+
+    [Fact]
     public async Task ManagedNodeService_rejects_cross_tenant_access()
     {
         var fixture = TestFixture.Create(CustomerRole.Owner);
@@ -351,6 +430,50 @@ public sealed class NodesAndInventoryServiceTests
         Assert.Contains($".nodecontrol/managed-host-keys/{managedNode.Id:D}.key", result.Value.Content);
         Assert.Contains("ansible_ssh_common_args: -o IdentitiesOnly=yes", result.Value.Content);
         Assert.DoesNotContain("ansible_connection: local", result.Value.Content);
+    }
+
+    [Fact]
+    public async Task InventoryPreviewService_includes_jump_host_proxy_command()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Viewer);
+        var group = InventoryGroup.Create(fixture.Customer.Id, "webservers", null, TestTime);
+        var jumpKeySecretId = Guid.NewGuid();
+        var jumpHost = ManagedNode.Create(
+            fixture.Customer.Id,
+            "bastion_01",
+            "bastion.example.test",
+            2222,
+            "jump",
+            jumpKeySecretId,
+            null,
+            null,
+            null,
+            TestTime);
+        var managedNode = ManagedNode.Create(
+            fixture.Customer.Id,
+            "web_01",
+            "10.0.0.10",
+            22,
+            "deploy",
+            null,
+            null,
+            null,
+            null,
+            TestTime,
+            jumpHost.Id);
+        fixture.Db.AddInventoryGroup(group);
+        fixture.Db.AddManagedNode(jumpHost);
+        fixture.Db.AddManagedNode(managedNode);
+        fixture.Db.AddInventoryGroupNode(InventoryGroupNode.Create(group, managedNode, TestTime));
+        var service = fixture.CreateInventoryPreviewService();
+
+        var result = await service.GetPreviewAsync(fixture.CurrentUser, fixture.Customer.Id, group.Id);
+
+        Assert.Null(result.Error);
+        Assert.Contains("ansible_user: deploy", result.Value!.Content);
+        Assert.Contains("-o ProxyCommand=\"ssh -W %h:%p -q -p 2222 -i", result.Value.Content);
+        Assert.Contains($".nodecontrol/managed-host-keys/{jumpHost.Id:D}.key", result.Value.Content);
+        Assert.Contains("jump@bastion.example.test", result.Value.Content);
     }
 
     [Fact]

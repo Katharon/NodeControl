@@ -15,6 +15,7 @@ public interface IJobRunWorkspaceBuilder
         ControlNode controlNode,
         InventoryGroup inventoryGroup,
         IReadOnlyList<ManagedNode> managedNodes,
+        IReadOnlyDictionary<Guid, ManagedNode> jumpHostsByNodeId,
         Playbook playbook,
         VariableSet? variableSet,
         IReadOnlyList<JobRunTemplateArtifact> templateArtifacts,
