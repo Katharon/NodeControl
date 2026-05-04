@@ -33,6 +33,8 @@ export function CustomerNodesSections({ customerId }: CustomerNodesSectionsProps
   }
 
   const customer = customerQuery.data;
+  const hostKind = tab === 0 ? "control" : "managed";
+  const createHostLabel = tab === 0 ? "Neuer Control Host" : "Neuer Host";
   const canViewNodes = hasPermission(customer.permissions, "ViewNodes");
   const canManageNodes = hasPermission(customer.permissions, "ManageNodes");
   const canViewSecrets = hasPermission(customer.permissions, "ViewSecrets");
@@ -53,9 +55,9 @@ export function CustomerNodesSections({ customerId }: CustomerNodesSectionsProps
             <Typography color="text.secondary">{customer.name} · Hosts, Control Hosts und Inventare.</Typography>
           </Box>
         </Stack>
-        {canManageNodes ? (
+        {canManageNodes && tab !== 2 ? (
           <Button startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} variant="contained">
-            Neuer Host
+            {createHostLabel}
           </Button>
         ) : null}
       </Stack>
@@ -85,11 +87,12 @@ export function CustomerNodesSections({ customerId }: CustomerNodesSectionsProps
       {tab === 2 ? <InventoryGroupList canManageNodes={canManageNodes} customerId={customerId} /> : null}
 
       <Dialog fullWidth maxWidth="md" onClose={() => setCreateOpen(false)} open={createOpen}>
-        <DialogTitle>Neuer Host</DialogTitle>
+        <DialogTitle>{createHostLabel}</DialogTitle>
         <DialogContent>
           <HostWizard
             customerId={customerId}
             customerName={customer.name}
+            hostKind={hostKind}
             onCreated={() => setCreateOpen(false)}
           />
         </DialogContent>

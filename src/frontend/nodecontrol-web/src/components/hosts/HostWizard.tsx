@@ -8,9 +8,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Alert,
   Button,
-  Checkbox,
-  FormControlLabel,
-  MenuItem,
   Paper,
   Stack,
   Step,
@@ -23,47 +20,58 @@ import {
 } from "@mui/material";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { createControlNode } from "@/lib/api/controlNodes";
 import { createManagedNode } from "@/lib/api/managedNodes";
 
 const hostTypes = ["Linux", "Windows", "Netzwerk", "SNMP", "Generic"] as const;
 const inventoryName = /^[a-zA-Z][a-zA-Z0-9_-]{1,99}$/;
+type HostWizardKind = "control" | "managed";
 
-const hostWizardSchema = z.object({
-  hostType: z.enum(hostTypes),
-  name: z.string().trim().regex(inventoryName, "Use an inventory-safe hostname"),
-  hostname: z.string().trim().min(1).max(253).refine((value) => !/\s/.test(value), {
-    message: "IP or DNS name must not contain whitespace",
-  }),
-  tags: z.string().trim().max(200).optional(),
-  sshUser: z.string().trim().max(100).refine((value) => !/\s/.test(value), {
-    message: "SSH username must not contain whitespace",
-  }).optional(),
-  sshPort: z.number().int().min(1).max(65535),
-  controlNodeId: z.string().optional(),
-  isControlHost: z.boolean(),
-});
+type HostWizardValues = {
+  hostType: (typeof hostTypes)[number];
+  name: string;
+  hostname: string;
+  sshUser?: string;
+  sshPort: number;
+};
 
-type HostWizardValues = z.infer<typeof hostWizardSchema>;
+function createHostWizardSchema(hostKind: HostWizardKind) {
+  return z.object({
+    hostType: z.enum(hostTypes),
+    name: hostKind === "managed"
+      ? z.string().trim().regex(inventoryName, "Use an inventory-safe hostname")
+      : z.string().trim().min(1).max(200),
+    hostname: z.string().trim().min(1).max(253).refine((value) => !/\s/.test(value), {
+      message: "IP or DNS name must not contain whitespace",
+    }),
+    sshUser: z.string().trim().max(100).refine((value) => !/\s/.test(value), {
+      message: "SSH username must not contain whitespace",
+    }).optional(),
+    sshPort: z.number().int().min(1).max(65535),
+  });
+}
 
 type HostWizardProps = {
   customerId: string;
   customerName: string;
+  hostKind: HostWizardKind;
   onCreated: () => void;
 };
 
-const steps = [
-  "Was willst du anlegen?",
-  "Basisdaten",
-  "Verbindungsdetails",
-  "Prüfen & Anlegen",
-];
+const stepsByKind: Record<HostWizardKind, string[]> = {
+  control: ["Basisdaten", "SSH-Verbindung", "Prüfen & Anlegen"],
+  managed: ["Host-Typ", "Basisdaten", "SSH-Ziel", "Prüfen & Anlegen"],
+};
 
-export function HostWizard({ customerId, customerName, onCreated }: HostWizardProps) {
+export function HostWizard({ customerId, customerName, hostKind, onCreated }: HostWizardProps) {
   const queryClient = useQueryClient();
   const [activeStep, setActiveStep] = useState(0);
+  const steps = stepsByKind[hostKind];
+  const isControlFlow = hostKind === "control";
+  const titlePrefix = isControlFlow ? "Neuer Control Host" : "Neuer Host";
+  const submitLabel = isControlFlow ? "Control Host anlegen" : "Host anlegen";
   const {
     control,
     formState: { errors, isSubmitting },
@@ -72,16 +80,13 @@ export function HostWizard({ customerId, customerName, onCreated }: HostWizardPr
     register,
     trigger,
   } = useForm<HostWizardValues>({
-    resolver: zodResolver(hostWizardSchema),
+    resolver: zodResolver(createHostWizardSchema(hostKind)),
     defaultValues: {
       hostType: "Linux",
       name: "",
       hostname: "",
-      tags: "",
       sshUser: "",
       sshPort: 22,
-      controlNodeId: "",
-      isControlHost: false,
     },
   });
 
@@ -115,12 +120,9 @@ export function HostWizard({ customerId, customerName, onCreated }: HostWizardPr
   }
 
   async function nextStep() {
-    const fieldsByStep: Array<Array<keyof HostWizardValues>> = [
-      ["hostType"],
-      ["name", "hostname", "tags"],
-      ["sshUser", "sshPort", "controlNodeId", "isControlHost"],
-      [],
-    ];
+    const fieldsByStep: Array<Array<keyof HostWizardValues>> = isControlFlow
+      ? [["name", "hostname"], ["sshPort"], []]
+      : [["hostType"], ["name", "hostname"], ["sshUser", "sshPort"], []];
     const valid = await trigger(fieldsByStep[activeStep]);
     if (valid) {
       setActiveStep((step) => Math.min(step + 1, steps.length - 1));
@@ -128,7 +130,7 @@ export function HostWizard({ customerId, customerName, onCreated }: HostWizardPr
   }
 
   async function submit(values: HostWizardValues) {
-    if (values.isControlHost) {
+    if (isControlFlow) {
       await createControlMutation.mutateAsync(values);
     } else {
       await createManagedMutation.mutateAsync(values);
@@ -139,7 +141,10 @@ export function HostWizard({ customerId, customerName, onCreated }: HostWizardPr
   }
 
   const values = getValues();
-  const isControlHost = useWatch({ control, name: "isControlHost" });
+  const showTypeStep = !isControlFlow && activeStep === 0;
+  const showBasisStep = isControlFlow ? activeStep === 0 : activeStep === 1;
+  const showConnectionStep = isControlFlow ? activeStep === 1 : activeStep === 2;
+  const showSummaryStep = isControlFlow ? activeStep === 2 : activeStep === 3;
 
   return (
     <Stack component="form" onSubmit={handleSubmit(submit)} sx={{ gap: 3, pt: 1 }}>
@@ -151,10 +156,10 @@ export function HostWizard({ customerId, customerName, onCreated }: HostWizardPr
         ))}
       </Stepper>
 
-      {activeStep === 0 ? (
+      {showTypeStep ? (
         <Stack sx={{ gap: 2 }}>
           <Typography component="h2" variant="h6">
-            Neuer Host — Was willst du anlegen?
+            {titlePrefix} — Host-Typ
           </Typography>
           <Controller
             control={control}
@@ -181,10 +186,10 @@ export function HostWizard({ customerId, customerName, onCreated }: HostWizardPr
         </Stack>
       ) : null}
 
-      {activeStep === 1 ? (
+      {showBasisStep ? (
         <Stack sx={{ gap: 2 }}>
           <Typography component="h2" variant="h6">
-            Neuer Host — Basisdaten
+            {titlePrefix} — Basisdaten
           </Typography>
           <TextField error={Boolean(errors.name)} helperText={errors.name?.message} label="Hostname" {...register("name")} />
           <TextField
@@ -194,21 +199,17 @@ export function HostWizard({ customerId, customerName, onCreated }: HostWizardPr
             {...register("hostname")}
           />
           <TextField disabled label="Kunde" value={customerName} />
-          <TextField
-            disabled
-            helperText="Tags sind im aktuellen Backend-Modell noch nicht vorhanden."
-            label="Tags, kommagetrennt"
-            {...register("tags")}
-          />
         </Stack>
       ) : null}
 
-      {activeStep === 2 ? (
+      {showConnectionStep ? (
         <Stack sx={{ gap: 2 }}>
           <Typography component="h2" variant="h6">
-            Neuer Host — Verbindungsdetails
+            {titlePrefix} — {isControlFlow ? "SSH-Verbindung" : "SSH-Ziel"}
           </Typography>
-          <TextField error={Boolean(errors.sshUser)} helperText={errors.sshUser?.message} label="SSH-User" {...register("sshUser")} />
+          {!isControlFlow ? (
+            <TextField error={Boolean(errors.sshUser)} helperText={errors.sshUser?.message} label="SSH-User" {...register("sshUser")} />
+          ) : null}
           <TextField
             error={Boolean(errors.sshPort)}
             helperText={errors.sshPort?.message}
@@ -216,41 +217,26 @@ export function HostWizard({ customerId, customerName, onCreated }: HostWizardPr
             type="number"
             {...register("sshPort", { valueAsNumber: true })}
           />
-          <TextField
-            disabled
-            helperText="Jump-Host-Zuordnung ist noch nicht im Backend-Modell vorhanden."
-            label="Control-Host / Jump-Host"
-            select
-            value=""
-          >
-            <MenuItem value="">Nicht verfügbar</MenuItem>
-          </TextField>
-          <Controller
-            control={control}
-            name="isControlHost"
-            render={({ field }) => (
-              <FormControlLabel
-                control={<Checkbox checked={field.value} onChange={(event) => field.onChange(event.target.checked)} />}
-                label="Dies ist ein Control-Host"
-              />
-            )}
-          />
+          {isControlFlow ? (
+            <Alert severity="info">
+              Remote-Dispatch-Details wie SSH-Key und Workspace-Pfad werden nach dem Anlegen in der Control-Host-Konfiguration gepflegt.
+            </Alert>
+          ) : null}
         </Stack>
       ) : null}
 
-      {activeStep === 3 ? (
+      {showSummaryStep ? (
         <Stack sx={{ gap: 2 }}>
           <Typography component="h2" variant="h6">
-            Neuer Host — Prüfen & Anlegen
+            {titlePrefix} — Prüfen & Anlegen
           </Typography>
           <Paper variant="outlined" sx={{ p: 2 }}>
             <Stack sx={{ gap: 1 }}>
-              <SummaryRow label="Typ" value={isControlHost ? "Control Host" : values.hostType} />
+              <SummaryRow label="Typ" value={isControlFlow ? "Control Host" : values.hostType} />
               <SummaryRow label="Hostname" value={values.name} />
               <SummaryRow label="IP oder DNS-Name" value={values.hostname} />
               <SummaryRow label="Kunde" value={customerName} />
-              <SummaryRow label="Tags" value={values.tags || "Keine"} />
-              <SummaryRow label="SSH-User" value={values.sshUser || "Nicht gesetzt"} />
+              {!isControlFlow ? <SummaryRow label="SSH-User" value={values.sshUser || "Nicht gesetzt"} /> : null}
               <SummaryRow label="SSH-Port" value={values.sshPort.toString()} />
             </Stack>
           </Paper>
@@ -275,7 +261,7 @@ export function HostWizard({ customerId, customerName, onCreated }: HostWizardPr
           </Button>
         ) : (
           <Button disabled={isSubmitting} startIcon={<SaveIcon />} type="submit" variant="contained">
-            Host anlegen
+            {submitLabel}
           </Button>
         )}
       </Stack>
