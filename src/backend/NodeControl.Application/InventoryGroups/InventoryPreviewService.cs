@@ -45,16 +45,9 @@ public sealed class InventoryPreviewService(
         foreach (var managedNode in managedNodes.OrderBy(managedNode => managedNode.Name))
         {
             builder.AppendLine($"        {managedNode.Name}:");
-            builder.AppendLine($"          ansible_host: {managedNode.Hostname}");
-            builder.AppendLine($"          ansible_port: {managedNode.SshPort}");
-            if (!string.IsNullOrWhiteSpace(managedNode.SshUsername))
+            foreach (var (name, value) in ManagedNodeInventoryVariables.Build(managedNode))
             {
-                builder.AppendLine($"          ansible_user: {managedNode.SshUsername}");
-            }
-
-            if (managedNode.SshPrivateKeySecretId is not null)
-            {
-                builder.AppendLine($"          ansible_ssh_private_key_file: .nodecontrol/managed-host-keys/{managedNode.Id:D}.key");
+                builder.AppendLine($"          {name}: {value}");
             }
         }
 

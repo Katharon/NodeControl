@@ -1,6 +1,7 @@
 using System.Text.Json;
 using YamlDotNet.Serialization;
 using NodeControl.Application.Abstractions.Execution;
+using NodeControl.Application.InventoryGroups;
 using NodeControl.Application.Playbooks;
 using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
@@ -370,34 +371,11 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
             ArtifactJsonOptions);
     }
 
-    private static string GetManagedHostPrivateKeyRelativePath(ManagedNode managedNode)
-    {
-        return string.Join(
-            '/',
-            ".nodecontrol",
-            "managed-host-keys",
-            $"{managedNode.Id:D}.key");
-    }
-
     private static Dictionary<string, object> BuildInventoryHostVariables(ManagedNode managedNode)
     {
-        var variables = new Dictionary<string, object>
-        {
-            ["ansible_host"] = managedNode.Hostname,
-            ["ansible_port"] = managedNode.SshPort
-        };
-
-        if (!string.IsNullOrWhiteSpace(managedNode.SshUsername))
-        {
-            variables["ansible_user"] = managedNode.SshUsername;
-        }
-
-        if (managedNode.SshPrivateKeySecretId is not null)
-        {
-            variables["ansible_ssh_private_key_file"] = GetManagedHostPrivateKeyRelativePath(managedNode);
-        }
-
-        return variables;
+        return ManagedNodeInventoryVariables
+            .Build(managedNode)
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
     }
 
     private static bool IsWithinDirectory(string rootPath, string path)

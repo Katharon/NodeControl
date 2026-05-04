@@ -90,6 +90,7 @@ export function CustomerNodesSections({ customerId }: CustomerNodesSectionsProps
         <DialogTitle>{createHostLabel}</DialogTitle>
         <DialogContent>
           <HostWizard
+            canViewSecrets={canViewSecrets}
             customerId={customerId}
             customerName={customer.name}
             hostKind={hostKind}

@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Alert,
   Button,
+  MenuItem,
   Paper,
   Stack,
   Step,
@@ -18,12 +19,13 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { createControlNode } from "@/lib/api/controlNodes";
 import { createManagedNode } from "@/lib/api/managedNodes";
+import { getSecrets } from "@/lib/api/secrets";
 
 const hostTypes = ["Linux", "Windows", "Netzwerk", "SNMP", "Generic"] as const;
 const inventoryName = /^[a-zA-Z][a-zA-Z0-9_-]{1,99}$/;
@@ -35,6 +37,7 @@ type HostWizardValues = {
   hostname: string;
   sshUser?: string;
   sshPort: number;
+  sshPrivateKeySecretId?: string;
 };
 
 function createHostWizardSchema(hostKind: HostWizardKind) {
@@ -50,12 +53,14 @@ function createHostWizardSchema(hostKind: HostWizardKind) {
       message: "SSH username must not contain whitespace",
     }).optional(),
     sshPort: z.number().int().min(1).max(65535),
+    sshPrivateKeySecretId: z.string().trim().optional(),
   });
 }
 
 type HostWizardProps = {
   customerId: string;
   customerName: string;
+  canViewSecrets?: boolean;
   hostKind: HostWizardKind;
   onCreated: () => void;
 };
@@ -65,13 +70,19 @@ const stepsByKind: Record<HostWizardKind, string[]> = {
   managed: ["Host-Typ", "Basisdaten", "SSH-Ziel", "Prüfen & Anlegen"],
 };
 
-export function HostWizard({ customerId, customerName, hostKind, onCreated }: HostWizardProps) {
+export function HostWizard({ customerId, customerName, canViewSecrets = false, hostKind, onCreated }: HostWizardProps) {
   const queryClient = useQueryClient();
   const [activeStep, setActiveStep] = useState(0);
   const steps = stepsByKind[hostKind];
   const isControlFlow = hostKind === "control";
   const titlePrefix = isControlFlow ? "Neuer Control Host" : "Neuer Host";
   const submitLabel = isControlFlow ? "Control Host anlegen" : "Host anlegen";
+  const secretsQuery = useQuery({
+    enabled: !isControlFlow && canViewSecrets,
+    queryKey: ["secrets", customerId],
+    queryFn: () => getSecrets(customerId),
+  });
+  const sshPrivateKeySecrets = (secretsQuery.data ?? []).filter((secret) => secret.kind === "SshPrivateKey" && secret.status === "Active");
   const {
     control,
     formState: { errors, isSubmitting },
@@ -87,6 +98,7 @@ export function HostWizard({ customerId, customerName, hostKind, onCreated }: Ho
       hostname: "",
       sshUser: "",
       sshPort: 22,
+      sshPrivateKeySecretId: "",
     },
   });
 
@@ -97,7 +109,7 @@ export function HostWizard({ customerId, customerName, hostKind, onCreated }: Ho
         hostname: values.hostname,
         sshPort: values.sshPort,
         sshUsername: values.sshUser || null,
-        sshPrivateKeySecretId: null,
+        sshPrivateKeySecretId: values.sshPrivateKeySecretId || null,
         operatingSystem: values.hostType === "Generic" ? null : values.hostType,
         environment: null,
         description: null,
@@ -122,7 +134,7 @@ export function HostWizard({ customerId, customerName, hostKind, onCreated }: Ho
   async function nextStep() {
     const fieldsByStep: Array<Array<keyof HostWizardValues>> = isControlFlow
       ? [["name", "hostname"], ["sshPort"], []]
-      : [["hostType"], ["name", "hostname"], ["sshUser", "sshPort"], []];
+      : [["hostType"], ["name", "hostname"], ["sshUser", "sshPort", "sshPrivateKeySecretId"], []];
     const valid = await trigger(fieldsByStep[activeStep]);
     if (valid) {
       setActiveStep((step) => Math.min(step + 1, steps.length - 1));
@@ -217,6 +229,31 @@ export function HostWizard({ customerId, customerName, hostKind, onCreated }: Ho
             type="number"
             {...register("sshPort", { valueAsNumber: true })}
           />
+          {!isControlFlow ? (
+            <>
+              {canViewSecrets && sshPrivateKeySecrets.length === 0 ? (
+                <Alert severity="info">Lege ein aktives SSH-Private-Key-Secret an, wenn dieser Host mit eigenem Key laufen soll.</Alert>
+              ) : null}
+              {!canViewSecrets ? (
+                <Alert severity="info">SSH-Key-Secret-Zuordnung kann in der Host-Konfiguration gepflegt werden, wenn Secret-Leserechte vorhanden sind.</Alert>
+              ) : null}
+              <TextField
+                disabled={!canViewSecrets}
+                error={Boolean(errors.sshPrivateKeySecretId)}
+                helperText={errors.sshPrivateKeySecretId?.message ?? "Nur die Secret-Referenz wird gespeichert; der Key-Wert wird nicht angezeigt."}
+                label="SSH Private Key Secret"
+                select
+                {...register("sshPrivateKeySecretId")}
+              >
+                <MenuItem value="">Kein Key-Secret</MenuItem>
+                {sshPrivateKeySecrets.map((secret) => (
+                  <MenuItem key={secret.id} value={secret.id}>
+                    {secret.name} · secret://{secret.slug}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </>
+          ) : null}
           {isControlFlow ? (
             <Alert severity="info">
               Remote-Dispatch-Details wie SSH-Key und Workspace-Pfad werden nach dem Anlegen in der Control-Host-Konfiguration gepflegt.
@@ -238,6 +275,7 @@ export function HostWizard({ customerId, customerName, hostKind, onCreated }: Ho
               <SummaryRow label="Kunde" value={customerName} />
               {!isControlFlow ? <SummaryRow label="SSH-User" value={values.sshUser || "Nicht gesetzt"} /> : null}
               <SummaryRow label="SSH-Port" value={values.sshPort.toString()} />
+              {!isControlFlow ? <SummaryRow label="SSH-Key" value={values.sshPrivateKeySecretId ? "Secret-backed" : "Nicht gesetzt"} /> : null}
             </Stack>
           </Paper>
           {createManagedMutation.isError || createControlMutation.isError ? (

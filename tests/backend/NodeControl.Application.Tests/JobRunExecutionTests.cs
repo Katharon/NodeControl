@@ -112,6 +112,36 @@ public sealed class JobRunExecutionTests
     }
 
     [Fact]
+    public async Task JobRunWorkspaceBuilder_marks_simple_localhost_managed_nodes_as_local_connection()
+    {
+        using var fixture = ExecutionFixture.Create();
+        fixture.ManagedNode.Update(
+            fixture.ManagedNode.Name,
+            "localhost",
+            fixture.ManagedNode.SshPort,
+            null,
+            null,
+            fixture.ManagedNode.OperatingSystem,
+            fixture.ManagedNode.Environment,
+            fixture.ManagedNode.Description,
+            TestTime.AddMinutes(1));
+
+        var result = await fixture.CreateWorkspaceBuilder().BuildAsync(
+            fixture.JobRun,
+            fixture.Job,
+            fixture.ControlNode,
+            fixture.InventoryGroup,
+            [fixture.ManagedNode],
+            fixture.Playbook,
+            fixture.VariableSet,
+            [],
+            EmptySecrets);
+
+        var inventory = await File.ReadAllTextAsync(result.Workspace!.InventoryPath);
+        Assert.Contains("ansible_connection: local", inventory);
+    }
+
+    [Fact]
     public async Task JobRunWorkspaceBuilder_writes_managed_node_ssh_settings_to_inventory()
     {
         using var fixture = ExecutionFixture.Create();
@@ -142,6 +172,8 @@ public sealed class JobRunExecutionTests
         Assert.Contains("ansible_port: 2222", inventory);
         Assert.Contains("ansible_user: deploy", inventory);
         Assert.Contains($".nodecontrol/managed-host-keys/{fixture.ManagedNode.Id:D}.key", inventory);
+        Assert.Contains("ansible_ssh_common_args: -o IdentitiesOnly=yes", inventory);
+        Assert.DoesNotContain("ansible_connection: local", inventory);
     }
 
     [Fact]
@@ -467,6 +499,7 @@ public sealed class JobRunExecutionTests
             Assert.Equal("managed-node-private-key\n", File.ReadAllText(keyPath));
             Assert.Contains("ansible_user: deploy", File.ReadAllText(request.Workspace.InventoryPath));
             Assert.Contains($".nodecontrol/managed-host-keys/{fixture.ManagedNode.Id:D}.key", File.ReadAllText(request.Workspace.InventoryPath));
+            Assert.Contains("ansible_ssh_common_args: -o IdentitiesOnly=yes", File.ReadAllText(request.Workspace.InventoryPath));
 
             return new ControlNodeDispatchResult(2, false, false, "failed with managed-node-private-key");
         });

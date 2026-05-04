@@ -201,6 +201,7 @@ all:
           ansible_port: 22
           ansible_user: deploy
           ansible_ssh_private_key_file: .nodecontrol/managed-host-keys/{managedNodeId}.key
+          ansible_ssh_common_args: -o IdentitiesOnly=yes
 ```
 
 Do not overbuild dynamic inventory in the MVP.
@@ -217,11 +218,16 @@ The current implementation includes target structure, inventory group assignment
 
 For Worker execution, the selected Job inventory group is rendered to `inventory.yml`. Active managed nodes
 linked to that group become hosts, and archived nodes are excluded. If the group has no active managed nodes,
-the JobRun fails before Ansible starts. If a Managed Node references an SSH private key Secret, only the Worker
-decrypts that key and writes a temporary per-host key file under `.nodecontrol/managed-host-keys/` in the run
-workspace. Inventory points Ansible at that file with `ansible_ssh_private_key_file`. The dispatcher removes those
-key files after local execution and after remote execution best-effort, while leaving the non-sensitive run workspace
-structure available for diagnosis.
+the JobRun fails before Ansible starts. Simple local/dev targets such as `localhost`, `127.0.0.1`, and `::1`
+are rendered with `ansible_connection: local` when no explicit SSH user or key Secret is configured. This keeps the
+local showcase path working without pretending to authenticate over SSH.
+
+For real SSH targets, Managed Nodes can provide an SSH port, optional SSH username, and optional SSH private key
+Secret reference. If a Managed Node references an SSH private key Secret, only the Worker decrypts that key and
+writes a temporary per-host key file under `.nodecontrol/managed-host-keys/` in the run workspace. Inventory points
+Ansible at that file with `ansible_ssh_private_key_file` and adds `ansible_ssh_common_args: -o IdentitiesOnly=yes`
+so Ansible prefers the materialized host key. The dispatcher removes those key files after local execution and after
+remote execution best-effort, while leaving the non-sensitive run workspace structure available for diagnosis.
 
 ## Variable Sets
 
