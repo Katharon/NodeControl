@@ -11,6 +11,7 @@ using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Playbooks;
+using NodeControl.Domain.Secrets;
 using NodeControl.Domain.VariableSets;
 
 namespace NodeControl.Application.JobRuns;
@@ -222,6 +223,11 @@ public sealed class JobRunService(
             return false;
         }
 
+        if (!await SshPrivateKeySecretReferenceIsValidAsync(job.CustomerId, controlNode.SshPrivateKeySecretId, cancellationToken))
+        {
+            return false;
+        }
+
         var inventoryGroup = await dbContext.FindInventoryGroupAsync(job.CustomerId, job.InventoryGroupId, cancellationToken);
         if (inventoryGroup is null || inventoryGroup.IsArchived)
         {
@@ -243,7 +249,57 @@ public sealed class JobRunService(
             }
         }
 
+        if (!await ManagedNodeSecretReferencesAreValidAsync(job.CustomerId, job.InventoryGroupId, cancellationToken))
+        {
+            return false;
+        }
+
         return true;
+    }
+
+    private async Task<bool> ManagedNodeSecretReferencesAreValidAsync(
+        Guid customerId,
+        Guid inventoryGroupId,
+        CancellationToken cancellationToken)
+    {
+        var managedNodes = await dbContext.ListActiveManagedNodesForInventoryGroupAsync(inventoryGroupId, cancellationToken);
+        foreach (var managedNode in managedNodes)
+        {
+            if (!await SshPrivateKeySecretReferenceIsValidAsync(customerId, managedNode.SshPrivateKeySecretId, cancellationToken))
+            {
+                return false;
+            }
+        }
+
+        var activeCustomerManagedNodes = await dbContext.ListActiveManagedNodesAsync(customerId, cancellationToken);
+        foreach (var jumpHost in managedNodes
+            .Where(managedNode => managedNode.JumpHostManagedNodeId is not null)
+            .Select(managedNode => activeCustomerManagedNodes.FirstOrDefault(candidate => candidate.Id == managedNode.JumpHostManagedNodeId!.Value)))
+        {
+            if (jumpHost is null || !await SshPrivateKeySecretReferenceIsValidAsync(customerId, jumpHost.SshPrivateKeySecretId, cancellationToken))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private async Task<bool> SshPrivateKeySecretReferenceIsValidAsync(
+        Guid customerId,
+        Guid? secretId,
+        CancellationToken cancellationToken)
+    {
+        if (secretId is null)
+        {
+            return true;
+        }
+
+        var secret = await dbContext.FindSecretAsync(customerId, secretId.Value, cancellationToken);
+        return secret is not null
+            && secret.CustomerId == customerId
+            && secret.Status == SecretStatus.Active
+            && secret.Kind == SecretKind.SshPrivateKey;
     }
 
     private async Task<CustomerAuthorizationResult> AuthorizeAsync(

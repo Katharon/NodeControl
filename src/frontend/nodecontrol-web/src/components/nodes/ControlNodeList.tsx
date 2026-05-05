@@ -156,6 +156,7 @@ export function ControlNodeList({ customerId, canManageNodes, canViewSecrets = f
         <DialogTitle>Neuer Control Host</DialogTitle>
         <DialogContent>
           <ControlNodeForm
+            canValidateSecretReferences={canViewSecrets}
             onSubmit={async (input) => {
               await createMutation.mutateAsync(input);
             }}
@@ -170,6 +171,7 @@ export function ControlNodeList({ customerId, canManageNodes, canViewSecrets = f
         <DialogContent>
           {editingControlNode ? (
             <ControlNodeForm
+              canValidateSecretReferences={canViewSecrets}
               controlNode={editingControlNode}
               onSubmit={async (input) => {
                 await updateMutation.mutateAsync({ controlNodeId: editingControlNode.id, input });

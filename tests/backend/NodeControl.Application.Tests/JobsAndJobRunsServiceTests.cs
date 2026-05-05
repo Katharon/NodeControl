@@ -10,6 +10,7 @@ using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Playbooks;
+using NodeControl.Domain.Secrets;
 using NodeControl.Domain.Users;
 using NodeControl.Domain.VariableSets;
 
@@ -262,6 +263,64 @@ public sealed class JobsAndJobRunsServiceTests
             job.Id);
 
         Assert.Equal(CustomerServiceError.BadRequest, result.Error);
+    }
+
+    [Fact]
+    public async Task JobRunService_rejects_manual_run_when_control_node_ssh_secret_is_archived()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Operator);
+        var secret = Secret.Create(fixture.Customer.Id, "Control key", "control-key", null, SecretKind.SshPrivateKey, "protected-key", TestTime);
+        fixture.Db.AddSecret(secret);
+        fixture.Resources.ControlNode.Update(
+            fixture.Resources.ControlNode.Name,
+            fixture.Resources.ControlNode.Hostname,
+            fixture.Resources.ControlNode.SshPort,
+            "ansible",
+            secret.Id,
+            "/var/lib/nodecontrol/remote-runs",
+            fixture.Resources.ControlNode.Description,
+            TestTime);
+        var job = fixture.AddValidJob();
+        secret.Archive(TestTime);
+
+        var result = await fixture.CreateJobRunService().CreateManualAsync(
+            fixture.CurrentUser,
+            fixture.Customer.Id,
+            job.Id);
+
+        Assert.Equal(CustomerServiceError.BadRequest, result.Error);
+        Assert.Empty(fixture.Db.JobRuns);
+    }
+
+    [Fact]
+    public async Task JobRunService_rejects_manual_run_when_managed_host_ssh_secret_is_archived()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Operator);
+        var secret = Secret.Create(fixture.Customer.Id, "Host key", "host-key", null, SecretKind.SshPrivateKey, "protected-key", TestTime);
+        var managedNode = ManagedNode.Create(
+            fixture.Customer.Id,
+            "web_01",
+            "10.0.0.10",
+            22,
+            "deploy",
+            secret.Id,
+            null,
+            null,
+            null,
+            TestTime);
+        fixture.Db.AddSecret(secret);
+        fixture.Db.AddManagedNode(managedNode);
+        fixture.Db.AddInventoryGroupNode(InventoryGroupNode.Create(fixture.Resources.InventoryGroup, managedNode, TestTime));
+        var job = fixture.AddValidJob();
+        secret.Archive(TestTime);
+
+        var result = await fixture.CreateJobRunService().CreateManualAsync(
+            fixture.CurrentUser,
+            fixture.Customer.Id,
+            job.Id);
+
+        Assert.Equal(CustomerServiceError.BadRequest, result.Error);
+        Assert.Empty(fixture.Db.JobRuns);
     }
 
     [Fact]

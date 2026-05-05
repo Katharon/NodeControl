@@ -3,7 +3,8 @@
 import SaveIcon from "@mui/icons-material/Save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Alert, Button, MenuItem, Stack, TextField } from "@mui/material";
-import { useForm } from "react-hook-form";
+import { useEffect } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import type { CreateSecretInput, Secret, SecretKind, UpdateSecretInput } from "@/lib/api/secrets";
 
@@ -13,7 +14,7 @@ const secretSchema = z.object({
   name: z.string().trim().min(1).max(200),
   slug: z.string().trim().regex(slugPattern, "Use lowercase letters, numbers, and hyphens"),
   description: z.string().trim().max(1000).optional(),
-  kind: z.enum(["Generic", "Password", "ApiToken", "SshPrivateKey", "Certificate", "ConnectionString"]),
+  kind: z.enum(["Generic", "Password", "ApiToken", "SshPrivateKey", "Certificate", "ConnectionString"]).catch("Generic"),
   value: z.string().max(100000).optional(),
 });
 
@@ -28,20 +29,20 @@ type SecretFormProps = {
 
 export function SecretForm({ secret, requireValue, submitLabel, onSubmit }: SecretFormProps) {
   const {
+    control,
     formState: { errors, isSubmitting },
     handleSubmit,
     register,
+    reset,
     setError,
   } = useForm<SecretFormValues>({
     resolver: zodResolver(secretSchema),
-    defaultValues: {
-      name: secret?.name ?? "",
-      slug: secret?.slug ?? "",
-      description: secret?.description ?? "",
-      kind: secret?.kind ?? "Generic",
-      value: "",
-    },
+    defaultValues: getSecretFormDefaults(secret),
   });
+
+  useEffect(() => {
+    reset(getSecretFormDefaults(secret));
+  }, [reset, secret]);
 
   return (
     <Stack
@@ -71,14 +72,28 @@ export function SecretForm({ secret, requireValue, submitLabel, onSubmit }: Secr
       <TextField error={Boolean(errors.name)} helperText={errors.name?.message} label="Name" {...register("name")} />
       <TextField error={Boolean(errors.slug)} helperText={errors.slug?.message} label="Slug" {...register("slug")} />
       <TextField label="Description" minRows={2} multiline {...register("description")} />
-      <TextField label="Kind" select {...register("kind")}>
-        <MenuItem value="Generic">Generic</MenuItem>
-        <MenuItem value="Password">Password</MenuItem>
-        <MenuItem value="ApiToken">API Token</MenuItem>
-        <MenuItem value="SshPrivateKey">SSH Private Key</MenuItem>
-        <MenuItem value="Certificate">Certificate</MenuItem>
-        <MenuItem value="ConnectionString">Connection String</MenuItem>
-      </TextField>
+      <Controller
+        control={control}
+        name="kind"
+        render={({ field }) => (
+          <TextField
+            error={Boolean(errors.kind)}
+            helperText={errors.kind?.message}
+            label="Kind"
+            onBlur={field.onBlur}
+            onChange={field.onChange}
+            select
+            value={field.value ?? "Generic"}
+          >
+            <MenuItem value="Generic">Generic</MenuItem>
+            <MenuItem value="Password">Password</MenuItem>
+            <MenuItem value="ApiToken">API Token</MenuItem>
+            <MenuItem value="SshPrivateKey">SSH Private Key</MenuItem>
+            <MenuItem value="Certificate">Certificate</MenuItem>
+            <MenuItem value="ConnectionString">Connection String</MenuItem>
+          </TextField>
+        )}
+      />
       {requireValue ? (
         <Stack sx={{ gap: 1 }}>
           <Alert severity="warning">Secret values cannot be viewed again after saving.</Alert>
@@ -98,4 +113,20 @@ export function SecretForm({ secret, requireValue, submitLabel, onSubmit }: Secr
       </Button>
     </Stack>
   );
+}
+
+function getSecretFormDefaults(secret?: Secret): SecretFormValues {
+  return {
+    name: secret?.name ?? "",
+    slug: secret?.slug ?? "",
+    description: secret?.description ?? "",
+    kind: normalizeSecretKind(secret?.kind),
+    value: "",
+  };
+}
+
+function normalizeSecretKind(kind: SecretKind | undefined): SecretKind {
+  return kind && ["Generic", "Password", "ApiToken", "SshPrivateKey", "Certificate", "ConnectionString"].includes(kind)
+    ? kind
+    : "Generic";
 }

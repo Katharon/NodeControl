@@ -18,6 +18,7 @@ using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
 using NodeControl.Domain.Nodes;
 using NodeControl.Domain.Playbooks;
+using NodeControl.Domain.Secrets;
 using NodeControl.Domain.Users;
 using NodeControl.Domain.VariableSets;
 
@@ -626,9 +627,15 @@ public sealed class JobsAndJobRunsEndpointTests
 
         public List<InventoryGroup> InventoryGroups { get; } = [];
 
+        public List<ManagedNode> ManagedNodes { get; } = [];
+
+        public List<InventoryGroupNode> InventoryGroupNodes { get; } = [];
+
         public List<Playbook> Playbooks { get; } = [];
 
         public List<VariableSet> VariableSets { get; } = [];
+
+        public List<Secret> Secrets { get; } = [];
 
         public List<Job> Jobs { get; } = [];
 
@@ -754,6 +761,32 @@ public sealed class JobsAndJobRunsEndpointTests
             }
         }
 
+        public Task<IReadOnlyList<ManagedNode>> ListActiveManagedNodesAsync(Guid customerId, CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult<IReadOnlyList<ManagedNode>>(
+                    ManagedNodes
+                        .Where(managedNode => managedNode.CustomerId == customerId && managedNode.Status == ManagedNodeStatus.Active)
+                        .ToArray());
+            }
+        }
+
+        public Task<IReadOnlyList<ManagedNode>> ListActiveManagedNodesForInventoryGroupAsync(Guid inventoryGroupId, CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                var managedNodeIds = InventoryGroupNodes
+                    .Where(link => link.InventoryGroupId == inventoryGroupId)
+                    .Select(link => link.ManagedNodeId)
+                    .ToHashSet();
+                return Task.FromResult<IReadOnlyList<ManagedNode>>(
+                    ManagedNodes
+                        .Where(managedNode => managedNodeIds.Contains(managedNode.Id) && managedNode.Status == ManagedNodeStatus.Active)
+                        .ToArray());
+            }
+        }
+
         public Task<InventoryGroup?> FindInventoryGroupAsync(Guid customerId, Guid inventoryGroupId, CancellationToken cancellationToken)
         {
             lock (syncRoot)
@@ -778,6 +811,15 @@ public sealed class JobsAndJobRunsEndpointTests
             {
                 return Task.FromResult(VariableSets.FirstOrDefault(variableSet =>
                     variableSet.CustomerId == customerId && variableSet.Id == variableSetId));
+            }
+        }
+
+        public Task<Secret?> FindSecretAsync(Guid customerId, Guid secretId, CancellationToken cancellationToken)
+        {
+            lock (syncRoot)
+            {
+                return Task.FromResult(Secrets.FirstOrDefault(secret =>
+                    secret.CustomerId == customerId && secret.Id == secretId));
             }
         }
 

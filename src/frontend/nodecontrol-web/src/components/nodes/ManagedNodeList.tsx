@@ -162,6 +162,7 @@ export function ManagedNodeList({ customerId, canManageNodes, canViewSecrets = f
         <DialogTitle>Neuer Host</DialogTitle>
         <DialogContent>
           <ManagedNodeForm
+            canValidateSecretReferences={canViewSecrets}
             managedNodes={managedNodesQuery.data}
             onSubmit={async (input) => {
               await createMutation.mutateAsync(input);
@@ -177,6 +178,7 @@ export function ManagedNodeList({ customerId, canManageNodes, canViewSecrets = f
         <DialogContent>
           {editingManagedNode ? (
             <ManagedNodeForm
+              canValidateSecretReferences={canViewSecrets}
               managedNode={editingManagedNode}
               managedNodes={managedNodesQuery.data}
               onSubmit={async (input) => {

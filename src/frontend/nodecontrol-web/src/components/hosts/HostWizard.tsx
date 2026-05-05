@@ -237,21 +237,29 @@ export function HostWizard({ customerId, customerName, canViewSecrets = false, h
               {!canViewSecrets ? (
                 <Alert severity="info">SSH-Key-Secret-Zuordnung kann in der Host-Konfiguration gepflegt werden, wenn Secret-Leserechte vorhanden sind.</Alert>
               ) : null}
-              <TextField
-                disabled={!canViewSecrets}
-                error={Boolean(errors.sshPrivateKeySecretId)}
-                helperText={errors.sshPrivateKeySecretId?.message ?? "Nur die Secret-Referenz wird gespeichert; der Key-Wert wird nicht angezeigt."}
-                label="SSH Private Key Secret"
-                select
-                {...register("sshPrivateKeySecretId")}
-              >
-                <MenuItem value="">Kein Key-Secret</MenuItem>
-                {sshPrivateKeySecrets.map((secret) => (
-                  <MenuItem key={secret.id} value={secret.id}>
-                    {secret.name} · secret://{secret.slug}
-                  </MenuItem>
-                ))}
-              </TextField>
+              <Controller
+                control={control}
+                name="sshPrivateKeySecretId"
+                render={({ field }) => (
+                  <TextField
+                    disabled={!canViewSecrets}
+                    error={Boolean(errors.sshPrivateKeySecretId)}
+                    helperText={errors.sshPrivateKeySecretId?.message ?? "Nur die Secret-Referenz wird gespeichert; der Key-Wert wird nicht angezeigt."}
+                    label="SSH Private Key Secret"
+                    onBlur={field.onBlur}
+                    onChange={field.onChange}
+                    select
+                    value={field.value ?? ""}
+                  >
+                    <MenuItem value="">Kein Key-Secret</MenuItem>
+                    {sshPrivateKeySecrets.map((secret) => (
+                      <MenuItem key={secret.id} value={secret.id}>
+                        {secret.name} · secret://{secret.slug}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+              />
             </>
           ) : null}
           {isControlFlow ? (

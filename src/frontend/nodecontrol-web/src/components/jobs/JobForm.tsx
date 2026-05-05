@@ -6,7 +6,8 @@ import SaveIcon from "@mui/icons-material/Save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Alert, Box, Button, CircularProgress, Divider, IconButton, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useEffect } from "react";
+import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import { getControlNodes } from "@/lib/api/controlNodes";
 import { getInventoryGroups } from "@/lib/api/inventoryGroups";
@@ -75,21 +76,16 @@ export function JobForm({ customerId, job, submitLabel, onSubmit }: JobFormProps
     control,
     handleSubmit,
     register,
+    reset,
   } = useForm<JobFormValues>({
     resolver: zodResolver(jobSchema),
-    defaultValues: {
-      name: job?.name ?? "",
-      slug: job?.slug ?? "",
-      description: job?.description ?? "",
-      controlNodeId: job?.controlNodeId ?? "",
-      inventoryGroupId: job?.inventoryGroupId ?? "",
-      playbookId: job?.playbookId ?? "",
-      variableSetId: job?.variableSetId ?? "",
-      templateArtifacts: job?.templateArtifacts ?? [],
-      defaultTimeoutSeconds: job?.defaultTimeoutSeconds ?? 1800,
-    },
+    defaultValues: getJobFormDefaults(job),
   });
   const { append, fields, remove } = useFieldArray({ control, name: "templateArtifacts" });
+
+  useEffect(() => {
+    reset(getJobFormDefaults(job));
+  }, [job, reset]);
 
   if (controlNodesQuery.isPending || inventoryGroupsQuery.isPending || playbooksQuery.isPending || variableSetsQuery.isPending || templatesQuery.isPending) {
     return <CircularProgress size={22} />;
@@ -126,19 +122,90 @@ export function JobForm({ customerId, job, submitLabel, onSubmit }: JobFormProps
       <TextField error={Boolean(errors.name)} helperText={errors.name?.message} label="Name" {...register("name")} />
       <TextField error={Boolean(errors.slug)} helperText={errors.slug?.message} label="Slug" {...register("slug")} />
       <TextField label="Description" minRows={2} multiline {...register("description")} />
-      <TextField error={Boolean(errors.controlNodeId)} helperText={errors.controlNodeId?.message} label="Control Host" select {...register("controlNodeId")}>
-        {controlNodesQuery.data.map((controlNode) => <MenuItem key={controlNode.id} value={controlNode.id}>{controlNode.name}</MenuItem>)}
-      </TextField>
-      <TextField error={Boolean(errors.inventoryGroupId)} helperText={errors.inventoryGroupId?.message} label="Inventar" select {...register("inventoryGroupId")}>
-        {inventoryGroupsQuery.data.map((group) => <MenuItem key={group.id} value={group.id}>{group.name}</MenuItem>)}
-      </TextField>
-      <TextField error={Boolean(errors.playbookId)} helperText={errors.playbookId?.message} label="Playbook" select {...register("playbookId")}>
-        {playbooksQuery.data.map((playbook) => <MenuItem key={playbook.id} value={playbook.id}>{playbook.name}</MenuItem>)}
-      </TextField>
-      <TextField label="Variablen" select {...register("variableSetId")}>
-        <MenuItem value="">None</MenuItem>
-        {variableSetsQuery.data.map((variableSet) => <MenuItem key={variableSet.id} value={variableSet.id}>{variableSet.name}</MenuItem>)}
-      </TextField>
+      <Controller
+        control={control}
+        name="controlNodeId"
+        render={({ field }) => (
+          <TextField
+            error={Boolean(errors.controlNodeId)}
+            helperText={errors.controlNodeId?.message}
+            label="Control Host"
+            onBlur={field.onBlur}
+            onChange={field.onChange}
+            select
+            value={field.value ?? ""}
+          >
+            <MenuItem value="">Select Control Host</MenuItem>
+            {job?.controlNodeId && !controlNodesQuery.data.some((controlNode) => controlNode.id === job.controlNodeId) ? (
+              <MenuItem value={job.controlNodeId}>Configured Control Host</MenuItem>
+            ) : null}
+            {controlNodesQuery.data.map((controlNode) => <MenuItem key={controlNode.id} value={controlNode.id}>{controlNode.name}</MenuItem>)}
+          </TextField>
+        )}
+      />
+      <Controller
+        control={control}
+        name="inventoryGroupId"
+        render={({ field }) => (
+          <TextField
+            error={Boolean(errors.inventoryGroupId)}
+            helperText={errors.inventoryGroupId?.message}
+            label="Inventar"
+            onBlur={field.onBlur}
+            onChange={field.onChange}
+            select
+            value={field.value ?? ""}
+          >
+            <MenuItem value="">Select inventory</MenuItem>
+            {job?.inventoryGroupId && !inventoryGroupsQuery.data.some((group) => group.id === job.inventoryGroupId) ? (
+              <MenuItem value={job.inventoryGroupId}>Configured inventory</MenuItem>
+            ) : null}
+            {inventoryGroupsQuery.data.map((group) => <MenuItem key={group.id} value={group.id}>{group.name}</MenuItem>)}
+          </TextField>
+        )}
+      />
+      <Controller
+        control={control}
+        name="playbookId"
+        render={({ field }) => (
+          <TextField
+            error={Boolean(errors.playbookId)}
+            helperText={errors.playbookId?.message}
+            label="Playbook"
+            onBlur={field.onBlur}
+            onChange={field.onChange}
+            select
+            value={field.value ?? ""}
+          >
+            <MenuItem value="">Select playbook</MenuItem>
+            {job?.playbookId && !playbooksQuery.data.some((playbook) => playbook.id === job.playbookId) ? (
+              <MenuItem value={job.playbookId}>Configured playbook</MenuItem>
+            ) : null}
+            {playbooksQuery.data.map((playbook) => <MenuItem key={playbook.id} value={playbook.id}>{playbook.name}</MenuItem>)}
+          </TextField>
+        )}
+      />
+      <Controller
+        control={control}
+        name="variableSetId"
+        render={({ field }) => (
+          <TextField
+            error={Boolean(errors.variableSetId)}
+            helperText={errors.variableSetId?.message}
+            label="Variablen"
+            onBlur={field.onBlur}
+            onChange={field.onChange}
+            select
+            value={field.value ?? ""}
+          >
+            <MenuItem value="">None</MenuItem>
+            {job?.variableSetId && !variableSetsQuery.data.some((variableSet) => variableSet.id === job.variableSetId) ? (
+              <MenuItem value={job.variableSetId}>Configured variable set</MenuItem>
+            ) : null}
+            {variableSetsQuery.data.map((variableSet) => <MenuItem key={variableSet.id} value={variableSet.id}>{variableSet.name}</MenuItem>)}
+          </TextField>
+        )}
+      />
       <Box sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}>
         <Stack divider={<Divider />}>
           <Stack direction={{ xs: "column", sm: "row" }} sx={{ alignItems: { sm: "center" }, justifyContent: "space-between", gap: 1, p: 2 }}>
@@ -162,17 +229,28 @@ export function JobForm({ customerId, job, submitLabel, onSubmit }: JobFormProps
           ) : (
             fields.map((field, index) => (
               <Stack direction={{ xs: "column", md: "row" }} key={field.id} sx={{ alignItems: { md: "flex-start" }, gap: 1, p: 2 }}>
-                <TextField
-                  error={Boolean(errors.templateArtifacts?.[index]?.templateId)}
-                  helperText={errors.templateArtifacts?.[index]?.templateId?.message}
-                  label="Template"
-                  select
-                  sx={{ flex: 1 }}
-                  {...register(`templateArtifacts.${index}.templateId`)}
-                >
-                  <MenuItem value="">Select template</MenuItem>
-                  {templatesQuery.data.map((template) => <MenuItem key={template.id} value={template.id}>{template.name}</MenuItem>)}
-                </TextField>
+                <Controller
+                  control={control}
+                  name={`templateArtifacts.${index}.templateId`}
+                  render={({ field: templateField }) => (
+                    <TextField
+                      error={Boolean(errors.templateArtifacts?.[index]?.templateId)}
+                      helperText={errors.templateArtifacts?.[index]?.templateId?.message}
+                      label="Template"
+                      onBlur={templateField.onBlur}
+                      onChange={templateField.onChange}
+                      select
+                      sx={{ flex: 1 }}
+                      value={templateField.value ?? ""}
+                    >
+                      <MenuItem value="">Select template</MenuItem>
+                      {templateField.value && !templatesQuery.data.some((template) => template.id === templateField.value) ? (
+                        <MenuItem value={templateField.value}>Configured template</MenuItem>
+                      ) : null}
+                      {templatesQuery.data.map((template) => <MenuItem key={template.id} value={template.id}>{template.name}</MenuItem>)}
+                    </TextField>
+                  )}
+                />
                 <TextField
                   error={Boolean(errors.templateArtifacts?.[index]?.path)}
                   helperText={errors.templateArtifacts?.[index]?.path?.message ?? "Relative path, for example templates/app.conf"}
@@ -200,6 +278,20 @@ export function JobForm({ customerId, job, submitLabel, onSubmit }: JobFormProps
       </Button>
     </Stack>
   );
+}
+
+function getJobFormDefaults(job?: Job): JobFormValues {
+  return {
+    name: job?.name ?? "",
+    slug: job?.slug ?? "",
+    description: job?.description ?? "",
+    controlNodeId: job?.controlNodeId ?? "",
+    inventoryGroupId: job?.inventoryGroupId ?? "",
+    playbookId: job?.playbookId ?? "",
+    variableSetId: job?.variableSetId ?? "",
+    templateArtifacts: job?.templateArtifacts ?? [],
+    defaultTimeoutSeconds: job?.defaultTimeoutSeconds ?? 1800,
+  };
 }
 
 function normalizeArtifactPath(value: string | undefined): { ok: true; path: string } | { ok: false; message: string } {

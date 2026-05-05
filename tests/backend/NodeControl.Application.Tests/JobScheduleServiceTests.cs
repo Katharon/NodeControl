@@ -5,7 +5,10 @@ using NodeControl.Application.Authorization;
 using NodeControl.Application.Customers;
 using NodeControl.Application.Schedules;
 using NodeControl.Domain.Customers;
+using NodeControl.Domain.Inventories;
 using NodeControl.Domain.Jobs;
+using NodeControl.Domain.Nodes;
+using NodeControl.Domain.Playbooks;
 using NodeControl.Domain.Users;
 
 namespace NodeControl.Application.Tests;
@@ -341,14 +344,30 @@ public sealed class JobScheduleServiceTests
 
         private static Job AddJob(NodeControlTestDbContext db, Guid customerId, string suffix)
         {
+            var controlNode = ControlNode.Create(customerId, $"control-{suffix}", $"control-{suffix}.local", 22, null, TestTime);
+            var inventoryGroup = InventoryGroup.Create(customerId, $"web-{suffix}", null, TestTime);
+            var playbook = Playbook.Create(
+                customerId,
+                $"Deploy {suffix}",
+                $"deploy-{suffix}",
+                null,
+                PlaybookSourceType.InlineYaml,
+                "- hosts: all\n  tasks:\n    - debug:\n        msg: hello\n",
+                null,
+                TestTime);
+
+            db.AddControlNode(controlNode);
+            db.AddInventoryGroup(inventoryGroup);
+            db.AddPlaybook(playbook);
+
             var job = Job.Create(
                 customerId,
                 $"Deploy {suffix}",
                 $"deploy-{suffix}",
                 null,
-                Guid.NewGuid(),
-                Guid.NewGuid(),
-                Guid.NewGuid(),
+                controlNode.Id,
+                inventoryGroup.Id,
+                playbook.Id,
                 null,
                 1800,
                 TestTime);

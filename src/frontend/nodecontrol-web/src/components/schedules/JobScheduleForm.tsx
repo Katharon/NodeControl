@@ -4,7 +4,8 @@ import SaveIcon from "@mui/icons-material/Save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Alert, Button, CircularProgress, MenuItem, Stack, TextField } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useEffect } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { getJobs } from "@/lib/api/jobs";
 import type { JobSchedule, JobScheduleInput } from "@/lib/api/schedules";
@@ -33,19 +34,18 @@ export function JobScheduleForm({ customerId, schedule, submitLabel, onSubmit }:
   const jobsQuery = useQuery({ queryKey: ["jobs", customerId], queryFn: () => getJobs(customerId) });
   const {
     formState: { errors, isSubmitting },
+    control,
     handleSubmit,
     register,
+    reset,
   } = useForm<JobScheduleFormValues>({
     resolver: zodResolver(scheduleSchema),
-    defaultValues: {
-      name: schedule?.name ?? "",
-      slug: schedule?.slug ?? "",
-      description: schedule?.description ?? "",
-      jobId: schedule?.jobId ?? "",
-      cronExpression: schedule?.cronExpression ?? "0 * * * *",
-      timeZoneId: schedule?.timeZoneId ?? "UTC",
-    },
+    defaultValues: getScheduleFormDefaults(schedule),
   });
+
+  useEffect(() => {
+    reset(getScheduleFormDefaults(schedule));
+  }, [schedule, reset]);
 
   if (jobsQuery.isPending) {
     return <CircularProgress size={22} />;
@@ -73,9 +73,27 @@ export function JobScheduleForm({ customerId, schedule, submitLabel, onSubmit }:
       <TextField error={Boolean(errors.name)} helperText={errors.name?.message} label="Name" {...register("name")} />
       <TextField error={Boolean(errors.slug)} helperText={errors.slug?.message} label="Slug" {...register("slug")} />
       <TextField label="Description" minRows={2} multiline {...register("description")} />
-      <TextField error={Boolean(errors.jobId)} helperText={errors.jobId?.message} label="Action" select {...register("jobId")}>
-        {jobsQuery.data.map((job) => <MenuItem key={job.id} value={job.id}>{job.name}</MenuItem>)}
-      </TextField>
+      <Controller
+        control={control}
+        name="jobId"
+        render={({ field }) => (
+          <TextField
+            error={Boolean(errors.jobId)}
+            helperText={errors.jobId?.message}
+            label="Action"
+            onBlur={field.onBlur}
+            onChange={field.onChange}
+            select
+            value={field.value ?? ""}
+          >
+            <MenuItem value="">Select Action</MenuItem>
+            {schedule?.jobId && !jobsQuery.data.some((job) => job.id === schedule.jobId) ? (
+              <MenuItem value={schedule.jobId}>Configured Action</MenuItem>
+            ) : null}
+            {jobsQuery.data.map((job) => <MenuItem key={job.id} value={job.id}>{job.name}</MenuItem>)}
+          </TextField>
+        )}
+      />
       <TextField
         error={Boolean(errors.cronExpression)}
         helperText={errors.cronExpression?.message ?? "Five-field cron, for example */5 * * * *"}
@@ -93,4 +111,15 @@ export function JobScheduleForm({ customerId, schedule, submitLabel, onSubmit }:
       </Button>
     </Stack>
   );
+}
+
+function getScheduleFormDefaults(schedule?: JobSchedule): JobScheduleFormValues {
+  return {
+    name: schedule?.name ?? "",
+    slug: schedule?.slug ?? "",
+    description: schedule?.description ?? "",
+    jobId: schedule?.jobId ?? "",
+    cronExpression: schedule?.cronExpression ?? "0 * * * *",
+    timeZoneId: schedule?.timeZoneId ?? "UTC",
+  };
 }
