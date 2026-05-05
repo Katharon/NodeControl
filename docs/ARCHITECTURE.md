@@ -259,6 +259,12 @@ returning secret values. During JobRun preparation, the Worker resolves active s
 VariableSets and configured template artifacts, writes the resulting execution files into the run workspace, and redacts
 resolved values from persisted run logs.
 
+Secret protection uses ASP.NET Data Protection from shared Infrastructure. API and Worker use the same
+`NodeControl:DataProtection:ApplicationName` and persistent `NodeControl:DataProtection:KeyRingPath`, so Secrets
+protected while handling API requests can be unprotected later by the Worker. Development uses
+`.nodecontrol/data-protection-keys`; production-style configuration uses `/var/lib/nodecontrol/data-protection-keys`.
+Secrets created under an older isolated key ring may need rotation or recreation.
+
 ### Job
 
 Reusable execution template.
@@ -398,6 +404,7 @@ The database stores:
 
 JobRun metadata, log entries, schedules, audit logs, templates, and secret metadata are stored in the database.
 Worker run workspaces are stored on the filesystem.
+Data Protection keys are stored on the filesystem and must be shared by API and Worker.
 
 ## Execution Storage
 

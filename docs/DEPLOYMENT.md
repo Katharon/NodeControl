@@ -65,6 +65,9 @@ OIDC development, but it is not required for the default demo path.
 
 - PostgreSQL stores product data, users, memberships, schedules, run metadata, run log entries, audit logs,
   templates, and secret metadata.
+- ASP.NET Data Protection stores its shared API/Worker key ring under `NodeControl:DataProtection:KeyRingPath`.
+  Development uses `.nodecontrol/data-protection-keys`; production-style configuration uses
+  `/var/lib/nodecontrol/data-protection-keys`. API and Worker must use the same `ApplicationName` and key ring path.
 - The API exposes HTTP endpoints, validates input, performs authorization, and queues work.
 - The Worker processes queued Runs, due schedules, Hostzustand checks, run workspaces, local/SSH remote Ansible
   execution, logs, and status transitions.
@@ -81,6 +84,7 @@ Production deployment still needs explicit work:
 - External OIDC provider configuration
 - Secure cookie and host configuration
 - Persistent volume layout for Worker workspaces
+- Persistent shared Data Protection key-ring volume for API and Worker
 - Backup and restore procedure for PostgreSQL and runtime artifacts
 - Log handling and operational monitoring
 - Production configuration validation and documentation

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -29,7 +30,17 @@ public static class DependencyInjection
         services.AddScoped<INodeControlDbContext>(serviceProvider =>
             serviceProvider.GetRequiredService<NodeControlDbContext>());
 
-        services.AddDataProtection();
+        var dataProtectionOptions = configuration
+            .GetSection(NodeControlDataProtectionOptions.SectionName)
+            .Get<NodeControlDataProtectionOptions>()
+            ?? new NodeControlDataProtectionOptions();
+
+        var keyRingDirectory = new DirectoryInfo(NormalizeDataProtectionKeyRingPath(dataProtectionOptions.KeyRingPath));
+        Directory.CreateDirectory(keyRingDirectory.FullName);
+
+        services.AddDataProtection()
+            .SetApplicationName(NormalizeDataProtectionApplicationName(dataProtectionOptions.ApplicationName))
+            .PersistKeysToFileSystem(keyRingDirectory);
         services.TryAddScoped<ISecretProtector, DataProtectionSecretProtector>();
 
         var executionOptions = new ExecutionOptions();
@@ -67,5 +78,21 @@ public static class DependencyInjection
         services.TryAddScoped<IAuditLogWriter, AuditLogWriter>();
 
         return services;
+    }
+
+    private static string NormalizeDataProtectionApplicationName(string? applicationName)
+    {
+        return string.IsNullOrWhiteSpace(applicationName)
+            ? "NodeControl"
+            : applicationName.Trim();
+    }
+
+    private static string NormalizeDataProtectionKeyRingPath(string? keyRingPath)
+    {
+        var path = string.IsNullOrWhiteSpace(keyRingPath)
+            ? new NodeControlDataProtectionOptions().KeyRingPath
+            : keyRingPath.Trim();
+
+        return Path.GetFullPath(path);
     }
 }

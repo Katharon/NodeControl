@@ -281,6 +281,17 @@ This is intentionally narrow:
 Secrets are customer-scoped protected values managed through metadata-only API responses. Plaintext values are accepted
 only on create and rotate, protected before persistence, and never returned from normal API responses.
 
+API and Worker share one ASP.NET Data Protection configuration for these protected values:
+
+- `NodeControl:DataProtection:ApplicationName` defaults to `NodeControl`.
+- `NodeControl:DataProtection:KeyRingPath` points both processes at the same persistent key ring.
+- Development uses `.nodecontrol/data-protection-keys` from the repository root.
+- Production-style configuration uses `/var/lib/nodecontrol/data-protection-keys` and should mount/persist that path
+  for both API and Worker.
+
+Secrets protected before this shared key-ring setup may not be decryptable by the Worker. Rotate or recreate those
+Secrets so they are protected with the shared key ring.
+
 Safe `secret://secret-slug` references are supported for Templates and VariableSets. Reference validation checks
 same-customer active metadata without decrypting. During JobRun execution, only the Worker decrypts active referenced
 secrets and substitutes them while materializing `vars.yml` / `vars.json` and configured template artifact files.

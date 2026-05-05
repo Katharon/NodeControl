@@ -58,7 +58,8 @@ Supporting MVP surfaces have intentionally narrow scope:
 - Templates are materialized as configured run workspace files only; NodeControl does not provide a full template
   orchestration or remote upload system.
 - Secrets expose protected metadata and safe `secret://...` references through the API. Secret values are not returned
-  and are resolved only by the Worker while preparing execution artifacts.
+  and are resolved only by the Worker while preparing execution artifacts. API and Worker share the same ASP.NET Data
+  Protection application name and key ring so values protected through the API can be unprotected by the Worker.
 - The platform admin user overview is not a full identity-provider administration system.
 
 Important current boundaries:
@@ -197,6 +198,10 @@ With the API still running, start the Worker and frontend in separate terminals:
 Open `http://localhost:3000`. In the default Development configuration, the API uses Fake Auth and signs you in as `Dev Admin`.
 
 For a meaningful demo, start the infrastructure, apply migrations, and run all three app processes: API, Worker, and frontend. Without the Worker, Runs, scheduled Runs, and Hostzustand checks can be queued but will not be processed.
+
+Development stores the shared ASP.NET Data Protection key ring in `.nodecontrol/data-protection-keys` from the
+repository root. Keep this directory intact across API/Worker restarts if you want existing protected Secrets to remain
+decryptable. Secrets created before the shared key-ring configuration may need to be rotated or recreated.
 
 Useful local URLs:
 

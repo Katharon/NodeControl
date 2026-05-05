@@ -309,3 +309,21 @@ Reason:
 - The API remains a metadata and authorization boundary; it does not execute commands or perform operational checks.
 - The MVP does not need a parallel diagnostics subsystem or schema expansion for the current level of detail.
 - Diagnostics must not expose Secret values or private-key material beyond the existing redacted log model.
+
+## DEC-025: Share ASP.NET Data Protection between API and Worker
+
+Status: Accepted
+
+Secret values are protected through ASP.NET Data Protection in the API and later unprotected by the Worker during
+execution preparation. API and Worker therefore use the same explicit Data Protection application name and persistent
+key ring path from shared Infrastructure configuration.
+
+Reason:
+
+- A Secret written by the API must be decryptable by the Worker across process boundaries and restarts.
+- The fix belongs at shared Infrastructure configuration, not in ad-hoc fallback decrypt logic.
+- Local development should be reproducible, so both processes use `.nodecontrol/data-protection-keys` from the
+  repository root.
+- Production-style deployments must persist and share `/var/lib/nodecontrol/data-protection-keys` between API and
+  Worker.
+- Secrets created under an older isolated key ring may need rotation or recreation.
