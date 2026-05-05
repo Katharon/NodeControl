@@ -636,13 +636,18 @@ public sealed class JobRunExecutionTests
     public async Task JobRunExecutionService_sets_failed_when_runner_returns_non_zero_exit_code()
     {
         using var fixture = ExecutionFixture.Create();
-        var service = fixture.CreateExecutionService(new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(2, false, false, "playbook failed")));
+        var service = fixture.CreateExecutionService(new FakeAnsibleRunner(
+            _ => new AnsiblePlaybookRunResult(2, false, false, "playbook failed"),
+            StdoutLines: ["PLAY RECAP *********************************************************************", "web-01 : ok=1 changed=0 unreachable=0 failed=1"]));
 
         await service.ExecuteAsync(fixture.JobRun);
 
         Assert.Equal(JobRunStatus.Failed, fixture.JobRun.Status);
         Assert.Equal(2, fixture.JobRun.ExitCode);
-        Assert.Equal("playbook failed", fixture.JobRun.ErrorMessage);
+        Assert.StartsWith("Ansible playbook execution failed", fixture.JobRun.ErrorMessage);
+        Assert.Contains(fixture.Db.JobRunLogEntries, entry =>
+            entry.Stream == JobRunLogStream.System
+            && entry.Message.StartsWith("Diagnostic: Ansible playbook execution failed", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -654,7 +659,7 @@ public sealed class JobRunExecutionTests
         await service.ExecuteAsync(fixture.JobRun);
 
         Assert.Equal(JobRunStatus.TimedOut, fixture.JobRun.Status);
-        Assert.Equal("timeout", fixture.JobRun.ErrorMessage);
+        Assert.StartsWith("Execution timed out", fixture.JobRun.ErrorMessage);
     }
 
     [Fact]
@@ -668,7 +673,25 @@ public sealed class JobRunExecutionTests
         await service.ExecuteAsync(fixture.JobRun);
 
         Assert.Equal(JobRunStatus.Failed, fixture.JobRun.Status);
-        Assert.Equal("setup failed", fixture.JobRun.ErrorMessage);
+        Assert.StartsWith("Workspace generation failed", fixture.JobRun.ErrorMessage);
+    }
+
+    [Theory]
+    [InlineData("ssh: connect to host web-01 port 22: Connection refused", JobRunFailureCategory.HostUnreachable)]
+    [InlineData("Permission denied (publickey).", JobRunFailureCategory.SshAuthenticationFailed)]
+    [InlineData("Host key verification failed.", JobRunFailureCategory.HostKeyVerificationFailed)]
+    [InlineData("kex_exchange_identification: Connection closed by UNKNOWN port 65535", JobRunFailureCategory.JumpHostConnectionFailed)]
+    [InlineData("Control node SSH private key secret is unavailable for execution.", JobRunFailureCategory.MissingSecretOrSshKey)]
+    [InlineData("ansible-playbook could not be started: No such file or directory", JobRunFailureCategory.AnsibleProcessStartFailed)]
+    public void JobRunFailureDiagnostics_classifies_common_execution_failures(
+        string message,
+        JobRunFailureCategory expectedCategory)
+    {
+        var diagnostic = JobRunFailureDiagnostics.Classify(JobRunFailurePhase.Dispatch, message);
+
+        Assert.Equal(expectedCategory, diagnostic.Category);
+        Assert.False(string.IsNullOrWhiteSpace(diagnostic.Title));
+        Assert.False(string.IsNullOrWhiteSpace(diagnostic.Summary));
     }
 
     [Fact]

@@ -20,7 +20,7 @@ development infrastructure, dev/demo scripts, and a demo-ready product surface.
 Implemented product areas include customer and membership management, static roles/permissions, Control Hosts,
 Hosts, inventory groups, playbooks, variable sets, actions, runs, schedules, persisted run logs, audit logs,
 templates, secrets metadata and Worker-side reference resolution, user overview, Hostzustand checks, a run wizard, and a
-Run Center. Runs snapshot the selected Control Host and the Worker prepares control-host-scoped workspaces with a
+Run Center with concise Worker-side diagnostics for common execution failures. Runs snapshot the selected Control Host and the Worker prepares control-host-scoped workspaces with a
 dispatch manifest before invoking either the local Ansible adapter for configured local/dev Control Hosts or the
 Worker-side SSH remote dispatch path for configured non-local Control Hosts. Git repository sources are managed as customer-scoped metadata and can be used by the frontend for one-time
 imports into the existing managed artifact models.
@@ -139,7 +139,9 @@ Examples:
 The API must not execute Ansible directly.
 
 The API also must not perform SSH checks, TCP checks, shell execution, or process starts as product behavior.
-It creates and reads records, validates input, authorizes requests, and leaves execution work to the Worker.
+It creates and reads records, validates input, authorizes requests, and leaves execution work to the Worker. Run failure
+diagnostics are exposed through normal run and log read models; the API does not perform operational diagnosis by
+executing commands.
 
 ### NodeControl.Worker
 
@@ -153,6 +155,7 @@ Examples:
 - Create execution workspaces
 - Run `ansible-playbook`
 - Capture logs
+- Classify common execution failures from captured Worker output
 - Update job run status
 - Process queued HostConnectionCheck records with TCP connect attempts
 

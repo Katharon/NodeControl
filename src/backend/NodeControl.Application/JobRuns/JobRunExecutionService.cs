@@ -47,6 +47,8 @@ public sealed class JobRunExecutionService(
         await dbContext.SaveChangesAsync(cancellationToken);
         await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Info, "JobRun processing started.", cancellationToken);
 
+        var recentLogs = new RecentLogBuffer();
+
         try
         {
             await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Info, "Loading execution inputs.", cancellationToken);
@@ -54,11 +56,20 @@ public sealed class JobRunExecutionService(
             if (!executionContext.Succeeded)
             {
                 await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, executionContext.ErrorMessage!, cancellationToken);
-                jobRun.MarkFailed(null, executionContext.ErrorMessage!, clock.UtcNow);
+                await ApplyFailureDiagnosticAsync(
+                    jobRun,
+                    JobRunFailurePhase.ExecutionInput,
+                    executionContext.ErrorMessage!,
+                    null,
+                    recentLogs,
+                    null,
+                    markTimedOut: false,
+                    cancellationToken);
                 await dbContext.SaveChangesAsync(cancellationToken);
                 return;
             }
 
+            var sensitiveValues = SensitiveValues(executionContext).ToArray();
             await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Info, "Creating execution workspace.", cancellationToken);
             var buildResult = await workspaceBuilder.BuildAsync(
                 jobRun,
@@ -77,7 +88,15 @@ public sealed class JobRunExecutionService(
             {
                 var errorMessage = buildResult.ErrorMessage ?? "Execution workspace could not be created.";
                 await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken);
-                jobRun.MarkFailed(null, errorMessage, clock.UtcNow);
+                await ApplyFailureDiagnosticAsync(
+                    jobRun,
+                    JobRunFailurePhase.Workspace,
+                    errorMessage,
+                    null,
+                    recentLogs,
+                    sensitiveValues,
+                    markTimedOut: false,
+                    cancellationToken);
                 await dbContext.SaveChangesAsync(cancellationToken);
                 return;
             }
@@ -91,8 +110,16 @@ public sealed class JobRunExecutionService(
             if (!credentialMaterialization.Succeeded)
             {
                 var errorMessage = credentialMaterialization.ErrorMessage ?? "Managed host SSH credentials could not be materialized.";
-                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken);
-                jobRun.MarkFailed(null, errorMessage, clock.UtcNow);
+                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken, sensitiveValues);
+                await ApplyFailureDiagnosticAsync(
+                    jobRun,
+                    JobRunFailurePhase.CredentialMaterialization,
+                    errorMessage,
+                    null,
+                    recentLogs,
+                    sensitiveValues,
+                    markTimedOut: false,
+                    cancellationToken);
                 await dbContext.SaveChangesAsync(cancellationToken);
                 return;
             }
@@ -114,9 +141,9 @@ public sealed class JobRunExecutionService(
                     workspace,
                     TimeSpan.FromSeconds(executionContext.Job!.DefaultTimeoutSeconds),
                     new ControlNodeCredentialMaterial(executionContext.ControlNodeSshPrivateKey),
-                    (line, token) => AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Info, line, token, SensitiveValues(executionContext)),
-                    (line, token) => AppendLogAsync(jobRun, JobRunLogStream.StdOut, JobRunLogLevel.Info, line, token, SensitiveValues(executionContext)),
-                    (line, token) => AppendLogAsync(jobRun, JobRunLogStream.StdErr, JobRunLogLevel.Error, line, token, SensitiveValues(executionContext)),
+                    (line, token) => AppendBufferedLogAsync(jobRun, recentLogs, JobRunLogStream.System, JobRunLogLevel.Info, line, token, sensitiveValues),
+                    (line, token) => AppendBufferedLogAsync(jobRun, recentLogs, JobRunLogStream.StdOut, JobRunLogLevel.Info, line, token, sensitiveValues),
+                    (line, token) => AppendBufferedLogAsync(jobRun, recentLogs, JobRunLogStream.StdErr, JobRunLogLevel.Error, line, token, sensitiveValues),
                     token => dbContext.IsJobRunCancellationRequestedAsync(jobRun.Id, token)),
                 cancellationToken);
 
@@ -125,14 +152,27 @@ public sealed class JobRunExecutionService(
                 var errorMessage = runResult.ErrorMessage ?? "JobRun was cancelled.";
                 await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Warning, "Cancellation observed by worker.", cancellationToken);
                 await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Warning, "Control-node execution terminated because cancellation was requested.", cancellationToken);
-                jobRun.MarkCancelled(runResult.ExitCode, RedactForStorage(errorMessage, SensitiveValues(executionContext)), clock.UtcNow);
+                var diagnostic = JobRunFailureDiagnostics.Classify(
+                    JobRunFailurePhase.Cancellation,
+                    RedactForStorage(errorMessage, sensitiveValues),
+                    runResult.ExitCode,
+                    recentLogs.Snapshot());
+                jobRun.MarkCancelled(runResult.ExitCode, diagnostic.ToErrorMessage(), clock.UtcNow);
                 await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Warning, "JobRun cancelled.", cancellationToken);
             }
             else if (runResult.TimedOut)
             {
                 var errorMessage = runResult.ErrorMessage ?? "Control-node execution timed out.";
-                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken, SensitiveValues(executionContext));
-                jobRun.MarkTimedOut(runResult.ExitCode, RedactForStorage(errorMessage, SensitiveValues(executionContext)), clock.UtcNow);
+                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken, sensitiveValues);
+                await ApplyFailureDiagnosticAsync(
+                    jobRun,
+                    JobRunFailurePhase.Timeout,
+                    errorMessage,
+                    runResult.ExitCode,
+                    recentLogs,
+                    sensitiveValues,
+                    markTimedOut: true,
+                    cancellationToken);
             }
             else if (runResult.ExitCode == 0)
             {
@@ -143,8 +183,16 @@ public sealed class JobRunExecutionService(
             {
                 var errorMessage = runResult.ErrorMessage
                     ?? $"Control-node execution exited with code {runResult.ExitCode?.ToString() ?? "unknown"}.";
-                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken, SensitiveValues(executionContext));
-                jobRun.MarkFailed(runResult.ExitCode, RedactForStorage(errorMessage, SensitiveValues(executionContext)), clock.UtcNow);
+                await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, errorMessage, cancellationToken, sensitiveValues);
+                await ApplyFailureDiagnosticAsync(
+                    jobRun,
+                    DetermineRunFailurePhase(runResult, recentLogs),
+                    errorMessage,
+                    runResult.ExitCode,
+                    recentLogs,
+                    sensitiveValues,
+                    markTimedOut: false,
+                    cancellationToken);
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -156,8 +204,65 @@ public sealed class JobRunExecutionService(
         catch (Exception exception)
         {
             await AppendLogAsync(jobRun, JobRunLogStream.System, JobRunLogLevel.Error, exception.Message, CancellationToken.None);
-            jobRun.MarkFailed(null, $"Execution setup failed: {exception.Message}", clock.UtcNow);
+            await ApplyFailureDiagnosticAsync(
+                jobRun,
+                JobRunFailurePhase.Unhandled,
+                $"Execution setup failed: {exception.Message}",
+                null,
+                recentLogs,
+                null,
+                markTimedOut: false,
+                CancellationToken.None);
             await dbContext.SaveChangesAsync(CancellationToken.None);
+        }
+    }
+
+    private async Task AppendBufferedLogAsync(
+        JobRun jobRun,
+        RecentLogBuffer recentLogs,
+        JobRunLogStream stream,
+        JobRunLogLevel level,
+        string message,
+        CancellationToken cancellationToken,
+        IEnumerable<string>? secretValues)
+    {
+        recentLogs.Add(RedactForStorage(message, secretValues));
+        await AppendLogAsync(jobRun, stream, level, message, cancellationToken, secretValues);
+    }
+
+    private async Task ApplyFailureDiagnosticAsync(
+        JobRun jobRun,
+        JobRunFailurePhase phase,
+        string errorMessage,
+        int? exitCode,
+        RecentLogBuffer recentLogs,
+        IEnumerable<string>? secretValues,
+        bool markTimedOut,
+        CancellationToken cancellationToken)
+    {
+        var safeErrorMessage = RedactForStorage(errorMessage, secretValues);
+        var diagnostic = JobRunFailureDiagnostics.Classify(
+            phase,
+            safeErrorMessage,
+            exitCode,
+            recentLogs.Snapshot());
+
+        await AppendLogAsync(
+            jobRun,
+            JobRunLogStream.System,
+            JobRunLogLevel.Error,
+            diagnostic.ToLogMessage(),
+            cancellationToken,
+            secretValues);
+
+        var storedMessage = RedactForStorage(diagnostic.ToErrorMessage(), secretValues);
+        if (markTimedOut)
+        {
+            jobRun.MarkTimedOut(exitCode, storedMessage, clock.UtcNow);
+        }
+        else
+        {
+            jobRun.MarkFailed(exitCode, storedMessage, clock.UtcNow);
         }
     }
 
@@ -573,6 +678,30 @@ public sealed class JobRunExecutionService(
         }
     }
 
+    private static JobRunFailurePhase DetermineRunFailurePhase(
+        ControlNodeDispatchResult runResult,
+        RecentLogBuffer recentLogs)
+    {
+        var text = string.Join('\n', recentLogs.Snapshot().Prepend(runResult.ErrorMessage ?? string.Empty))
+            .ToLowerInvariant();
+
+        if (text.Contains("ansible-playbook could not be started", StringComparison.Ordinal))
+        {
+            return JobRunFailurePhase.ProcessStart;
+        }
+
+        if (text.Contains("starting ansible-playbook on remote control node", StringComparison.Ordinal)
+            || text.Contains("play recap", StringComparison.Ordinal)
+            || text.Contains("task [", StringComparison.Ordinal)
+            || text.Contains("fatal:", StringComparison.Ordinal)
+            || runResult.ErrorMessage is null && runResult.ExitCode is not null)
+        {
+            return JobRunFailurePhase.PlaybookExecution;
+        }
+
+        return JobRunFailurePhase.Dispatch;
+    }
+
     private static string NormalizePrivateKey(string privateKey)
     {
         return privateKey.EndsWith('\n') ? privateKey : privateKey + "\n";
@@ -687,6 +816,31 @@ public sealed class JobRunExecutionService(
         public static CredentialMaterializationResult Failed(string errorMessage)
         {
             return new CredentialMaterializationResult(false, errorMessage);
+        }
+    }
+
+    private sealed class RecentLogBuffer
+    {
+        private const int MaxLines = 80;
+        private readonly Queue<string> lines = new();
+
+        public void Add(string line)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                return;
+            }
+
+            lines.Enqueue(line);
+            while (lines.Count > MaxLines)
+            {
+                lines.Dequeue();
+            }
+        }
+
+        public IReadOnlyList<string> Snapshot()
+        {
+            return lines.ToArray();
         }
     }
 }

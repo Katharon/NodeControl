@@ -16,10 +16,11 @@ import {
 } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { getJobRunLogs, type JobRunLogEntry, type JobRunLogStream, type JobRunStatus } from "@/lib/api/jobRuns";
+import { getJobRunLogs, type JobRunFailureDiagnostic, type JobRunLogEntry, type JobRunLogStream, type JobRunStatus } from "@/lib/api/jobRuns";
 
 type JobRunLogsPanelProps = {
   customerId: string;
+  failureDiagnostic?: JobRunFailureDiagnostic | null;
   jobRunId: string;
   status: JobRunStatus;
 };
@@ -27,7 +28,7 @@ type JobRunLogsPanelProps = {
 const activeStatuses: JobRunStatus[] = ["Queued", "Running", "Cancelling"];
 type StreamFilter = "All" | JobRunLogStream;
 
-export function JobRunLogsPanel({ customerId, jobRunId, status }: JobRunLogsPanelProps) {
+export function JobRunLogsPanel({ customerId, failureDiagnostic, jobRunId, status }: JobRunLogsPanelProps) {
   const [streamFilter, setStreamFilter] = useState<StreamFilter>("All");
   const isActive = activeStatuses.includes(status);
   const logsQuery = useQuery({
@@ -68,6 +69,18 @@ export function JobRunLogsPanel({ customerId, jobRunId, status }: JobRunLogsPane
             </Button>
           </Stack>
         </Stack>
+
+        {failureDiagnostic ? (
+          <Alert severity={status === "Cancelled" ? "warning" : "error"}>
+            <Typography sx={{ fontWeight: 800 }}>{failureDiagnostic.title}</Typography>
+            <Typography>{failureDiagnostic.summary}</Typography>
+            {failureDiagnostic.nextStep ? (
+              <Typography color="text.secondary" variant="body2">
+                {failureDiagnostic.nextStep}
+              </Typography>
+            ) : null}
+          </Alert>
+        ) : null}
 
         <Stack direction={{ xs: "column", md: "row" }} sx={{ alignItems: { md: "center" }, justifyContent: "space-between", gap: 1.5 }}>
           <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>

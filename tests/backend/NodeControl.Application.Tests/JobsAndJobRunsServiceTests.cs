@@ -593,7 +593,27 @@ public sealed class JobsAndJobRunsServiceTests
         Assert.Null(failedResult.Error);
         Assert.Null(cancellingResult.Error);
         Assert.Equal("Authorization: Bearer [REDACTED] token=[REDACTED]", failedResult.Value!.ErrorMessage);
+        Assert.DoesNotContain("abcdefghijklmnop", failedResult.Value.FailureDiagnostic!.Summary);
         Assert.Equal("password=[REDACTED]", cancellingResult.Value!.CancellationReason);
+    }
+
+    [Fact]
+    public async Task JobRunService_returns_failure_diagnostic_for_failed_run()
+    {
+        var fixture = TestFixture.Create(CustomerRole.Owner);
+        var failedRun = fixture.AddQueuedJobRun();
+        failedRun.MarkRunning(TestTime);
+        failedRun.MarkFailed(255, "SSH authentication failed: Permission denied (publickey).", TestTime);
+
+        var result = await fixture.CreateJobRunService().GetAsync(
+            fixture.CurrentUser,
+            fixture.Customer.Id,
+            failedRun.Id);
+
+        Assert.Null(result.Error);
+        Assert.NotNull(result.Value!.FailureDiagnostic);
+        Assert.Equal("SshAuthenticationFailed", result.Value.FailureDiagnostic!.Category);
+        Assert.Equal("SSH authentication failed", result.Value.FailureDiagnostic.Title);
     }
 
     [Fact]

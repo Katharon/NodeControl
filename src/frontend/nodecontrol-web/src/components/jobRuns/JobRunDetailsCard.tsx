@@ -187,7 +187,21 @@ export function JobRunDetailsCard({ customerId, jobRunId }: JobRunDetailsCardPro
             ]}
           />
 
-          {jobRun.errorMessage ? <Alert severity="error">{jobRun.errorMessage}</Alert> : null}
+          {jobRun.failureDiagnostic ? (
+            <Alert severity={jobRun.status === "Cancelled" ? "warning" : "error"}>
+              <Stack sx={{ gap: 0.5 }}>
+                <Typography sx={{ fontWeight: 800 }}>{jobRun.failureDiagnostic.title}</Typography>
+                <Typography>{jobRun.failureDiagnostic.summary}</Typography>
+                {jobRun.failureDiagnostic.nextStep ? (
+                  <Typography color="text.secondary" variant="body2">
+                    {jobRun.failureDiagnostic.nextStep}
+                  </Typography>
+                ) : null}
+              </Stack>
+            </Alert>
+          ) : jobRun.errorMessage ? (
+            <Alert severity="error">{jobRun.errorMessage}</Alert>
+          ) : null}
 
           <Stack direction={{ xs: "column", sm: "row" }} sx={{ gap: 1 }}>
             <Button
@@ -288,7 +302,12 @@ export function JobRunDetailsCard({ customerId, jobRunId }: JobRunDetailsCardPro
         </Paper>
       </Stack>
 
-      <JobRunLogsPanel customerId={customerId} jobRunId={jobRunId} status={jobRun.status} />
+      <JobRunLogsPanel
+        customerId={customerId}
+        failureDiagnostic={jobRun.failureDiagnostic}
+        jobRunId={jobRunId}
+        status={jobRun.status}
+      />
 
       <Paper sx={{ p: { xs: 2, md: 3 } }}>
         <Stack sx={{ gap: 2 }}>

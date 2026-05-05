@@ -5,6 +5,13 @@ export type JobRunTriggerType = "Manual" | "Scheduled" | "System" | "Retry";
 export type JobRunLogStream = "System" | "StdOut" | "StdErr";
 export type JobRunLogLevel = "Info" | "Warning" | "Error";
 
+export type JobRunFailureDiagnostic = {
+  category: string;
+  title: string;
+  summary: string;
+  nextStep: string | null;
+};
+
 export type JobRun = {
   id: string;
   customerId: string;
@@ -21,6 +28,7 @@ export type JobRun = {
   finishedAt: string | null;
   exitCode: number | null;
   errorMessage: string | null;
+  failureDiagnostic: JobRunFailureDiagnostic | null;
   workspacePath: string | null;
   stdoutLogPath: string | null;
   stderrLogPath: string | null;

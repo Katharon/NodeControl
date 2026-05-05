@@ -105,7 +105,18 @@ export function JobRunList({ customerId }: JobRunListProps) {
                   <JobRunStatusChip status={jobRun.status} />
                 </TableCell>
                 <TableCell>
-                  {jobRun.errorMessage ?? `Retry ${jobRun.retryAttempt} · exit ${jobRun.exitCode ?? "n/a"}`}
+                  {jobRun.failureDiagnostic ? (
+                    <Stack sx={{ gap: 0.25 }}>
+                      <Typography sx={{ fontWeight: 700 }} variant="body2">
+                        {jobRun.failureDiagnostic.title}
+                      </Typography>
+                      <Typography color="text.secondary" variant="caption">
+                        {jobRun.failureDiagnostic.summary}
+                      </Typography>
+                    </Stack>
+                  ) : (
+                    `Retry ${jobRun.retryAttempt} · exit ${jobRun.exitCode ?? "n/a"}`
+                  )}
                 </TableCell>
                 <TableCell align="right">
                   <Stack direction="row" sx={{ alignItems: "center", justifyContent: "flex-end", gap: 1 }}>

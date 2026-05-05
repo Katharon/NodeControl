@@ -378,6 +378,7 @@ public sealed class JobRunService(
             jobRun.FinishedAt,
             jobRun.ExitCode,
             JobRunLogRedactor.Redact(jobRun.ErrorMessage),
+            JobRunFailureDiagnostics.FromStoredErrorMessage(JobRunLogRedactor.Redact(jobRun.ErrorMessage)),
             jobRun.WorkspacePath,
             jobRun.StdoutLogPath,
             jobRun.StderrLogPath,

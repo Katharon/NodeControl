@@ -169,6 +169,10 @@ The Worker writes persisted System, StdOut, and StdErr JobRun log entries while 
 is processed. The API exposes these entries read-only for authorized customer users; it does not execute or
 resume JobRuns.
 
+When a run fails, the Worker also classifies common failure patterns from the captured execution result and recent
+Worker output. The persisted `JobRun.ErrorMessage` contains a concise product-oriented diagnosis, and a System log
+entry records the same diagnostic while stdout/stderr remain available as raw captured Ansible or SSH output.
+
 ## JobRun Statuses
 
 Initial statuses:
@@ -319,9 +323,16 @@ MVP captures:
 
 - stdout
 - stderr
+- system log entries
 - exit code
 - final status
 - duration
+
+NodeControl does perform a small deterministic failure classification for operational diagnosis. Current classes include
+host unreachable, SSH authentication failed, host key / known_hosts failure, missing Secret or SSH key material,
+jump-host path failure, inventory or workspace generation failure, Control Host dispatch failure, ansible-playbook
+process start failure, timeout, cancellation, and playbook/task failure after Ansible started. This classification is
+Worker-side only and does not change the raw log capture model.
 
 Stdout and stderr are also stored as ordered log entries for display. NodeControl still treats these as text
 lines rather than parsing Ansible task semantics.

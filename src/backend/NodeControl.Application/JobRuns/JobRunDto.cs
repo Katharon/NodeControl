@@ -18,6 +18,7 @@ public sealed record JobRunDto(
     DateTimeOffset? FinishedAt,
     int? ExitCode,
     string? ErrorMessage,
+    JobRunFailureDiagnosticDto? FailureDiagnostic,
     string? WorkspacePath,
     string? StdoutLogPath,
     string? StderrLogPath,

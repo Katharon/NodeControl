@@ -43,6 +43,7 @@ customer-scoped automation control plane with a complete local demo loop. Curren
 - Scheduled Runs / cron jobs through Worker polling
 - Job run history
 - Job logs
+- Worker-side execution diagnostics for common SSH, dispatch, workspace, and Ansible failure classes
 - Run-bound Control Hosts with Worker-side dispatch preparation, local/dev execution fallback, and SSH remote dispatch
 - Audit logs
 - Hostzustand / TCP reachability checks processed by the Worker

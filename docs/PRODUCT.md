@@ -109,6 +109,7 @@ The implemented dev/demo MVP is a customer-scoped automation control plane. It c
 - Scheduled jobs
 - Job run history
 - Job logs
+- Worker-side execution diagnostics for common SSH, jump-host, dispatch, workspace, and playbook failures
 - Run-bound Control Hosts with Worker-side dispatch preparation, local/dev execution fallback, and SSH remote dispatch
 - Managed Host SSH execution metadata for generated inventory, including optional Secret-backed private keys and a one-hop Jump Host reference
 - Audit logs

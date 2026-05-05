@@ -294,3 +294,18 @@ Reason:
 - It keeps customer scoping and Secret-backed SSH key handling in the existing Managed Host model.
 - It preserves direct-host and localhost/dev execution paths.
 - It keeps SSH command/process behavior in the Worker execution boundary.
+
+## DEC-024: Surface execution diagnostics through the existing Run model
+
+Status: Accepted
+
+Failed Runs expose a small Worker-side diagnostic classification derived from execution setup errors, dispatch
+results, and recent captured stdout/stderr/system output. The diagnosis is stored as the run error summary and is also
+written as a System log entry. Raw stdout/stderr/system logs remain available.
+
+Reason:
+
+- Operators need faster diagnosis for common SSH, host key, jump-host, workspace, dispatch, and playbook failures.
+- The API remains a metadata and authorization boundary; it does not execute commands or perform operational checks.
+- The MVP does not need a parallel diagnostics subsystem or schema expansion for the current level of detail.
+- Diagnostics must not expose Secret values or private-key material beyond the existing redacted log model.
