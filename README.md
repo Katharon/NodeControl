@@ -309,30 +309,45 @@ nodecontrol/
 
 NodeControl is implemented through small vertical slices. The current repository includes backend, Worker, frontend, tests, EF Core migrations, Docker-based local infrastructure, and dev/demo bootstrap scripts.
 
-## Demo Playbook
-
-```yaml
----
-- name: Write message to home folder
-  hosts: all
-  tasks:
-    - name: Write message file
-      ansible.builtin.copy:
-        dest: "{{ ansible_env.HOME }}/{{ file_name | default('nodecontrol-message.txt') }}"
-        content: |
-          {{ message_title | default('Hallo vom Ansible Playbook!') }}
-          {{ message_body | default('Diese Nachricht wurde auf das Zielsystem geschrieben.') }}
-          Host: {{ inventory_hostname }}
-        mode: "{{ file_mode | default('0644') }}"
-```
-
 ## Demo Variables
 
 ```yaml
 file_name: nodecontrol-message.txt
+target_dir: "{{ ansible_env.HOME }}"
 message_title: "Hallo vom NodeControl Playbook!"
 message_body: |
   Diese Nachricht wurde auf das Zielsystem geschrieben.
-  Sie kommt aus einem Variablensatz in NodeControl.
+  Sie kommt aus einem Template und einem Variablensatz.
 file_mode: "0644"
+extra_note: "Demo-Lauf aus NodeControl"
+```
+
+## Demo Template
+
+```jinja
+{{ message_title }}
+
+{{ message_body }}
+
+Host: {{ inventory_hostname }}
+Zeitpunkt: {% if ansible_date_time is defined %}{{ ansible_date_time.iso8601 }}{% else %}unbekannt{% endif %}
+
+{% if extra_note is defined and extra_note %}
+Hinweis: {{ extra_note }}
+{% endif %}
+```
+
+## Demo Playbook
+
+```yaml
+---
+- name: Write templated message to home folder
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Render message file from template
+      ansible.builtin.template:
+        src: templates/message-file.j2
+        dest: "{{ target_dir | default(ansible_env.HOME) }}/{{ file_name | default('nodecontrol-message.txt') }}"
+        mode: "{{ file_mode | default('0644') }}"
 ```
