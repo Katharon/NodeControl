@@ -351,3 +351,7 @@ Hinweis: {{ extra_note }}
         dest: "{{ target_dir | default(ansible_env.HOME) }}/{{ file_name | default('nodecontrol-message.txt') }}"
         mode: "{{ file_mode | default('0644') }}"
 ```
+
+## Template Mapping - Workspace Path
+
+templates/message-file.j2
