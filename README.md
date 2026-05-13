@@ -318,9 +318,21 @@ NodeControl is implemented through small vertical slices. The current repository
   tasks:
     - name: Write message file
       ansible.builtin.copy:
-        dest: "{{ ansible_env.HOME }}/nodecontrol-message.txt"
+        dest: "{{ ansible_env.HOME }}/{{ file_name | default('nodecontrol-message.txt') }}"
         content: |
-          Hallo vom Ansible Playbook!
-          Diese Nachricht wurde auf das Zielsystem geschrieben.
-        mode: "0644"
+          {{ message_title | default('Hallo vom Ansible Playbook!') }}
+          {{ message_body | default('Diese Nachricht wurde auf das Zielsystem geschrieben.') }}
+          Host: {{ inventory_hostname }}
+        mode: "{{ file_mode | default('0644') }}"
+```
+
+## Demo Variables
+
+```yaml
+file_name: nodecontrol-message.txt
+message_title: "Hallo vom NodeControl Playbook!"
+message_body: |
+  Diese Nachricht wurde auf das Zielsystem geschrieben.
+  Sie kommt aus einem Variablensatz in NodeControl.
+file_mode: "0644"
 ```
