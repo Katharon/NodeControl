@@ -405,20 +405,14 @@ public sealed class JobRunExecutionService(
             return ControlNodeCredentialResolutionResult.Ok(null);
         }
 
-        var secret = await dbContext.FindSecretAsync(customerId, controlNode.SshPrivateKeySecretId.Value, cancellationToken);
-        if (secret?.Status != SecretStatus.Active || secret.CustomerId != customerId || secret.Kind != SecretKind.SshPrivateKey)
-        {
-            return ControlNodeCredentialResolutionResult.Failed("Control node SSH private key secret is unavailable for execution.");
-        }
-
-        try
-        {
-            return ControlNodeCredentialResolutionResult.Ok(secretProtector.Unprotect(secret.ProtectedValue));
-        }
-        catch (Exception)
-        {
-            return ControlNodeCredentialResolutionResult.Failed("Control node SSH private key secret could not be resolved for execution.");
-        }
+        var resolution = await ResolveSshPrivateKeySecretAsync(
+            customerId,
+            controlNode.SshPrivateKeySecretId.Value,
+            $"Control host '{controlNode.Name}'",
+            cancellationToken);
+        return resolution.Succeeded
+            ? ControlNodeCredentialResolutionResult.Ok(resolution.PrivateKey)
+            : ControlNodeCredentialResolutionResult.Failed(resolution.ErrorMessage!);
     }
 
     private async Task<JumpHostResolutionResult> ResolveJumpHostsAsync(
@@ -483,23 +477,18 @@ public sealed class JobRunExecutionService(
             var secretId = managedNode.SshPrivateKeySecretId!.Value;
             if (!valuesBySecretId.TryGetValue(secretId, out var privateKey))
             {
-                var secret = await dbContext.FindSecretAsync(customerId, secretId, cancellationToken);
-                if (secret?.Status != SecretStatus.Active || secret.CustomerId != customerId || secret.Kind != SecretKind.SshPrivateKey)
+                var resolution = await ResolveSshPrivateKeySecretAsync(
+                    customerId,
+                    secretId,
+                    $"Managed host '{managedNode.Name}'",
+                    cancellationToken);
+                if (!resolution.Succeeded)
                 {
                     return ManagedNodeCredentialResolutionResult.Failed(
-                        $"Managed host '{managedNode.Name}' SSH private key secret is unavailable for execution.");
+                        resolution.ErrorMessage!);
                 }
 
-                try
-                {
-                    privateKey = secretProtector.Unprotect(secret.ProtectedValue);
-                }
-                catch (Exception)
-                {
-                    return ManagedNodeCredentialResolutionResult.Failed(
-                        $"Managed host '{managedNode.Name}' SSH private key secret could not be resolved for execution.");
-                }
-
+                privateKey = resolution.PrivateKey!;
                 valuesBySecretId[secretId] = privateKey;
             }
 
@@ -507,6 +496,52 @@ public sealed class JobRunExecutionService(
         }
 
         return ManagedNodeCredentialResolutionResult.Ok(valuesByNodeId);
+    }
+
+    private async Task<SshPrivateKeySecretResolutionResult> ResolveSshPrivateKeySecretAsync(
+        Guid customerId,
+        Guid secretId,
+        string ownerDescription,
+        CancellationToken cancellationToken)
+    {
+        var secret = await dbContext.FindSecretAsync(customerId, secretId, cancellationToken);
+        if (secret is null)
+        {
+            var secretWithSameId = await dbContext.FindSecretByIdAsync(secretId, cancellationToken);
+            return secretWithSameId is null
+                ? SshPrivateKeySecretResolutionResult.Failed(
+                    $"{ownerDescription} SSH private key Secret '{secretId:D}' was not found.")
+                : SshPrivateKeySecretResolutionResult.Failed(
+                    $"{ownerDescription} SSH private key Secret '{secretId:D}' belongs to a different customer.");
+        }
+
+        if (secret.Status != SecretStatus.Active)
+        {
+            return SshPrivateKeySecretResolutionResult.Failed(
+                $"{ownerDescription} SSH private key Secret '{secretId:D}' is {secret.Status}.");
+        }
+
+        if (secret.Kind != SecretKind.SshPrivateKey)
+        {
+            return SshPrivateKeySecretResolutionResult.Failed(
+                $"{ownerDescription} SSH private key Secret '{secretId:D}' is {secret.Kind}; expected SshPrivateKey.");
+        }
+
+        if (string.IsNullOrWhiteSpace(secret.ProtectedValue))
+        {
+            return SshPrivateKeySecretResolutionResult.Failed(
+                $"{ownerDescription} SSH private key Secret '{secretId:D}' has no protected value.");
+        }
+
+        try
+        {
+            return SshPrivateKeySecretResolutionResult.Ok(secretProtector.Unprotect(secret.ProtectedValue));
+        }
+        catch (Exception)
+        {
+            return SshPrivateKeySecretResolutionResult.Failed(
+                $"{ownerDescription} SSH private key Secret '{secretId:D}' could not be unprotected. Rotate or recreate it with the current shared Data Protection key ring.");
+        }
     }
 
     private static async Task<CredentialMaterializationResult> MaterializeManagedNodeCredentialsAsync(
@@ -801,6 +836,22 @@ public sealed class JobRunExecutionService(
         public static ManagedNodeCredentialResolutionResult Failed(string errorMessage)
         {
             return new ManagedNodeCredentialResolutionResult(false, null, errorMessage);
+        }
+    }
+
+    private sealed record SshPrivateKeySecretResolutionResult(
+        bool Succeeded,
+        string? PrivateKey,
+        string? ErrorMessage)
+    {
+        public static SshPrivateKeySecretResolutionResult Ok(string privateKey)
+        {
+            return new SshPrivateKeySecretResolutionResult(true, privateKey, null);
+        }
+
+        public static SshPrivateKeySecretResolutionResult Failed(string errorMessage)
+        {
+            return new SshPrivateKeySecretResolutionResult(false, null, errorMessage);
         }
     }
 

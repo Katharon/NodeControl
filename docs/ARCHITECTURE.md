@@ -264,7 +264,9 @@ resolved values from persisted run logs.
 Secret protection uses ASP.NET Data Protection from shared Infrastructure. API and Worker use the same
 `NodeControl:DataProtection:ApplicationName` and persistent `NodeControl:DataProtection:KeyRingPath`, so Secrets
 protected while handling API requests can be unprotected later by the Worker. Development uses
-`.nodecontrol/data-protection-keys`; production-style configuration uses `/var/lib/nodecontrol/data-protection-keys`.
+`.nodecontrol/data-protection-keys` from the repository root; production-style configuration uses
+`/var/lib/nodecontrol/data-protection-keys`. Relative key-ring paths are anchored at the repository root when the source
+tree can be detected, which keeps API and Worker launches consistent across scripts and IDE working directories.
 Secrets created under an older isolated key ring may need rotation or recreation.
 
 ### Job

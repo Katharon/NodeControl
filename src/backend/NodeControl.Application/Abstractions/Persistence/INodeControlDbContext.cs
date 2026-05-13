@@ -233,6 +233,11 @@ public interface INodeControlDbContext
         throw new NotSupportedException();
     }
 
+    Task<Secret?> FindSecretByIdAsync(Guid secretId, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
     Task<Secret?> FindSecretBySlugAsync(Guid customerId, string slug, CancellationToken cancellationToken)
     {
         throw new NotSupportedException();

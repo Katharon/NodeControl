@@ -647,6 +647,75 @@ public sealed class JobRunExecutionTests
     }
 
     [Fact]
+    public async Task JobRunExecutionService_reports_cross_customer_control_host_ssh_key_reference()
+    {
+        using var fixture = ExecutionFixture.Create(controlNodeHostname: "control.example.test");
+        var otherCustomer = Customer.Create("Other", "other", null, TestTime);
+        var keySecret = Secret.Create(
+            otherCustomer.Id,
+            "Other key",
+            "other-key",
+            null,
+            SecretKind.SshPrivateKey,
+            "protected:other-private-key",
+            TestTime);
+        fixture.Db.AddCustomer(otherCustomer);
+        fixture.Db.AddSecret(keySecret);
+        fixture.ControlNode.Update(
+            fixture.ControlNode.Name,
+            fixture.ControlNode.Hostname,
+            fixture.ControlNode.SshPort,
+            "ansible",
+            keySecret.Id,
+            "/var/lib/nodecontrol/remote-runs",
+            fixture.ControlNode.Description,
+            TestTime.AddMinutes(1));
+        var service = fixture.CreateExecutionService(new CapturingControlNodeDispatcher(new ControlNodeDispatchResult(0, false, false, null)));
+
+        await service.ExecuteAsync(fixture.JobRun);
+
+        Assert.Equal(JobRunStatus.Failed, fixture.JobRun.Status);
+        Assert.Contains("belongs to a different customer", fixture.JobRun.ErrorMessage);
+        Assert.Contains(fixture.Db.JobRunLogEntries, entry => entry.Message.Contains($"Secret '{keySecret.Id:D}' belongs to a different customer.", StringComparison.Ordinal));
+        Assert.DoesNotContain("other-private-key", fixture.JobRun.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task JobRunExecutionService_reports_control_host_ssh_key_unprotect_failure()
+    {
+        using var fixture = ExecutionFixture.Create(controlNodeHostname: "control.example.test");
+        var keySecret = Secret.Create(
+            fixture.Customer.Id,
+            "Control key",
+            "control-key",
+            null,
+            SecretKind.SshPrivateKey,
+            "bad-protected-payload",
+            TestTime);
+        fixture.Db.AddSecret(keySecret);
+        fixture.ControlNode.Update(
+            fixture.ControlNode.Name,
+            fixture.ControlNode.Hostname,
+            fixture.ControlNode.SshPort,
+            "ansible",
+            keySecret.Id,
+            "/var/lib/nodecontrol/remote-runs",
+            fixture.ControlNode.Description,
+            TestTime.AddMinutes(1));
+        var service = fixture.CreateExecutionService(
+            new CapturingControlNodeDispatcher(new ControlNodeDispatchResult(0, false, false, null)),
+            secretProtector: new ThrowingSecretProtector());
+
+        await service.ExecuteAsync(fixture.JobRun);
+
+        Assert.Equal(JobRunStatus.Failed, fixture.JobRun.Status);
+        Assert.Contains("could not be decrypted", fixture.JobRun.ErrorMessage);
+        Assert.Contains("Rotate or recreate", fixture.JobRun.ErrorMessage);
+        Assert.Contains(fixture.Db.JobRunLogEntries, entry => entry.Message.Contains($"Secret '{keySecret.Id:D}' could not be unprotected.", StringComparison.Ordinal));
+        Assert.DoesNotContain("bad-protected-payload", fixture.JobRun.ErrorMessage);
+    }
+
+    [Fact]
     public async Task JobRunExecutionService_resolves_managed_node_ssh_key_only_during_worker_materialization_and_redacts_it()
     {
         using var fixture = ExecutionFixture.Create();
@@ -691,6 +760,73 @@ public sealed class JobRunExecutionTests
         Assert.Equal(JobRunStatus.Failed, fixture.JobRun.Status);
         Assert.DoesNotContain("managed-node-private-key", fixture.JobRun.ErrorMessage);
         Assert.DoesNotContain(fixture.Db.JobRunLogEntries, entry => entry.Message.Contains("managed-node-private-key", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task JobRunExecutionService_reports_managed_host_ssh_key_wrong_kind()
+    {
+        using var fixture = ExecutionFixture.Create();
+        var keySecret = Secret.Create(
+            fixture.Customer.Id,
+            "Host token",
+            "host-token",
+            null,
+            SecretKind.ApiToken,
+            "protected:token",
+            TestTime);
+        fixture.Db.AddSecret(keySecret);
+        fixture.ManagedNode.Update(
+            fixture.ManagedNode.Name,
+            fixture.ManagedNode.Hostname,
+            fixture.ManagedNode.SshPort,
+            "deploy",
+            keySecret.Id,
+            fixture.ManagedNode.OperatingSystem,
+            fixture.ManagedNode.Environment,
+            fixture.ManagedNode.Description,
+            TestTime.AddMinutes(1));
+        var service = fixture.CreateExecutionService(new CapturingControlNodeDispatcher(new ControlNodeDispatchResult(0, false, false, null)));
+
+        await service.ExecuteAsync(fixture.JobRun);
+
+        Assert.Equal(JobRunStatus.Failed, fixture.JobRun.Status);
+        Assert.Contains("wrong kind", fixture.JobRun.ErrorMessage);
+        Assert.Contains(fixture.Db.JobRunLogEntries, entry => entry.Message.Contains($"Secret '{keySecret.Id:D}' is ApiToken; expected SshPrivateKey.", StringComparison.Ordinal));
+        Assert.DoesNotContain("token", fixture.JobRun.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task JobRunExecutionService_reports_managed_host_ssh_key_inactive()
+    {
+        using var fixture = ExecutionFixture.Create();
+        var keySecret = Secret.Create(
+            fixture.Customer.Id,
+            "Host key",
+            "host-key",
+            null,
+            SecretKind.SshPrivateKey,
+            "protected:managed-node-private-key",
+            TestTime);
+        keySecret.Archive(TestTime.AddMinutes(1));
+        fixture.Db.AddSecret(keySecret);
+        fixture.ManagedNode.Update(
+            fixture.ManagedNode.Name,
+            fixture.ManagedNode.Hostname,
+            fixture.ManagedNode.SshPort,
+            "deploy",
+            keySecret.Id,
+            fixture.ManagedNode.OperatingSystem,
+            fixture.ManagedNode.Environment,
+            fixture.ManagedNode.Description,
+            TestTime.AddMinutes(2));
+        var service = fixture.CreateExecutionService(new CapturingControlNodeDispatcher(new ControlNodeDispatchResult(0, false, false, null)));
+
+        await service.ExecuteAsync(fixture.JobRun);
+
+        Assert.Equal(JobRunStatus.Failed, fixture.JobRun.Status);
+        Assert.Contains("inactive", fixture.JobRun.ErrorMessage);
+        Assert.Contains(fixture.Db.JobRunLogEntries, entry => entry.Message.Contains($"Secret '{keySecret.Id:D}' is Archived.", StringComparison.Ordinal));
+        Assert.DoesNotContain("managed-node-private-key", fixture.JobRun.ErrorMessage);
     }
 
     [Fact]
@@ -1303,6 +1439,24 @@ public sealed class JobRunExecutionTests
         }
     }
 
+    private sealed class ThrowingSecretProtector : ISecretProtector
+    {
+        public string Protect(string plaintext)
+        {
+            return $"protected:{plaintext}";
+        }
+
+        public string Unprotect(string protectedValue)
+        {
+            if (protectedValue.StartsWith("protected:", StringComparison.Ordinal))
+            {
+                return protectedValue["protected:".Length..];
+            }
+
+            throw new InvalidOperationException("Invalid protected payload.");
+        }
+    }
+
     private sealed class TestClock : IClock
     {
         public DateTimeOffset UtcNow { get; set; } = TestTime;
@@ -1508,14 +1662,15 @@ public sealed class JobRunExecutionTests
 
         public JobRunExecutionService CreateExecutionService(
             IControlNodeDispatcher dispatcher,
-            IJobRunWorkspaceBuilder? workspaceBuilder = null)
+            IJobRunWorkspaceBuilder? workspaceBuilder = null,
+            ISecretProtector? secretProtector = null)
         {
             return new JobRunExecutionService(
                 Db,
                 workspaceBuilder ?? CreateWorkspaceBuilder(),
                 dispatcher,
                 new SecretReferenceParser(),
-                new FakeSecretProtector(),
+                secretProtector ?? new FakeSecretProtector(),
                 new TestClock());
         }
 

@@ -93,6 +93,29 @@ public static class DependencyInjection
             ? new NodeControlDataProtectionOptions().KeyRingPath
             : keyRingPath.Trim();
 
-        return Path.GetFullPath(path);
+        if (Path.IsPathRooted(path))
+        {
+            return Path.GetFullPath(path);
+        }
+
+        var repositoryRoot = TryFindRepositoryRoot(Directory.GetCurrentDirectory())
+            ?? TryFindRepositoryRoot(AppContext.BaseDirectory);
+        return Path.GetFullPath(Path.Combine(repositoryRoot ?? Directory.GetCurrentDirectory(), path));
+    }
+
+    private static string? TryFindRepositoryRoot(string startDirectory)
+    {
+        var directory = new DirectoryInfo(Path.GetFullPath(startDirectory));
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "src", "backend", "NodeControl.slnx")))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        return null;
     }
 }

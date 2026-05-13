@@ -567,6 +567,15 @@ public sealed class NodeControlDbContext(DbContextOptions<NodeControlDbContext> 
             cancellationToken);
     }
 
+    public async Task<Secret?> FindSecretByIdAsync(
+        Guid secretId,
+        CancellationToken cancellationToken)
+    {
+        return await Secrets.FirstOrDefaultAsync(
+            secret => secret.Id == secretId,
+            cancellationToken);
+    }
+
     public async Task<Secret?> FindSecretBySlugAsync(
         Guid customerId,
         string slug,

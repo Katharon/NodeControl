@@ -388,6 +388,11 @@ public sealed class NodeControlTestDbContext : INodeControlDbContext
             secret.CustomerId == customerId && secret.Id == secretId));
     }
 
+    public Task<Secret?> FindSecretByIdAsync(Guid secretId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(Secrets.FirstOrDefault(secret => secret.Id == secretId));
+    }
+
     public Task<Secret?> FindSecretBySlugAsync(Guid customerId, string slug, CancellationToken cancellationToken)
     {
         return Task.FromResult(Secrets.FirstOrDefault(secret =>

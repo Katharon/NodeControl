@@ -300,8 +300,14 @@ API and Worker share one ASP.NET Data Protection configuration for these protect
 - Production-style configuration uses `/var/lib/nodecontrol/data-protection-keys` and should mount/persist that path
   for both API and Worker.
 
-Secrets protected before this shared key-ring setup may not be decryptable by the Worker. Rotate or recreate those
-Secrets so they are protected with the shared key ring.
+Relative key-ring paths are resolved from the repository root when NodeControl is launched from the source tree, so
+API and Worker keep using the same development key ring even when an IDE starts them from different project working
+directories.
+
+Secrets protected before this shared key-ring setup, or protected with a different key ring, may not be decryptable by
+the Worker. Rotate or recreate those Secrets so they are protected with the shared key ring. SSH private-key Secret
+resolution failures distinguish missing, cross-customer, inactive, wrong-kind, missing-value, and unprotect failures
+without logging secret plaintext or private key material.
 
 Safe `secret://secret-slug` references are supported for Templates and VariableSets. Reference validation checks
 same-customer active metadata without decrypting. During JobRun execution, only the Worker decrypts active referenced

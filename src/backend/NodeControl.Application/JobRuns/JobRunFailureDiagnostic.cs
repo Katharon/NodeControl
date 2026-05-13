@@ -77,6 +77,60 @@ public static class JobRunFailureDiagnostics
 
         if (ContainsAny(text, "ssh key or secret is unavailable", "secret reference", "ssh private key secret", "private key material is unavailable", "identity file", "not accessible", "invalid format", "error in libcrypto", "unprotected private key file"))
         {
+            if (ContainsAny(text, "belongs to a different customer"))
+            {
+                return new JobRunFailureDiagnostic(
+                    JobRunFailureCategory.MissingSecretOrSshKey,
+                    "SSH key Secret belongs to a different customer",
+                    "A referenced SSH private-key Secret exists, but it is outside the Run's customer scope.",
+                    "Select an active SSH private-key Secret from the same customer.");
+            }
+
+            if (ContainsAny(text, "expected sshprivatekey"))
+            {
+                return new JobRunFailureDiagnostic(
+                    JobRunFailureCategory.MissingSecretOrSshKey,
+                    "SSH key Secret has the wrong kind",
+                    "A referenced Secret is not an SSH private-key Secret.",
+                    "Change the reference to an active SshPrivateKey Secret or rotate/recreate the Secret with the correct kind.");
+            }
+
+            if (ContainsAny(text, " is archived", " is inactive"))
+            {
+                return new JobRunFailureDiagnostic(
+                    JobRunFailureCategory.MissingSecretOrSshKey,
+                    "SSH key Secret is inactive",
+                    "A referenced SSH private-key Secret is not active.",
+                    "Select an active SSH private-key Secret or rotate/recreate the archived one.");
+            }
+
+            if (ContainsAny(text, "could not be unprotected"))
+            {
+                return new JobRunFailureDiagnostic(
+                    JobRunFailureCategory.MissingSecretOrSshKey,
+                    "SSH key Secret could not be decrypted",
+                    "A referenced SSH private-key Secret could not be unprotected with the current Data Protection key ring.",
+                    "Rotate or recreate the Secret after confirming API and Worker use the same Data Protection key ring.");
+            }
+
+            if (ContainsAny(text, "has no protected value"))
+            {
+                return new JobRunFailureDiagnostic(
+                    JobRunFailureCategory.MissingSecretOrSshKey,
+                    "SSH key Secret has no value",
+                    "A referenced SSH private-key Secret has no protected value stored.",
+                    "Rotate or recreate the Secret with the SSH private key value.");
+            }
+
+            if (ContainsAny(text, "was not found"))
+            {
+                return new JobRunFailureDiagnostic(
+                    JobRunFailureCategory.MissingSecretOrSshKey,
+                    "SSH key Secret was not found",
+                    "A referenced SSH private-key Secret no longer exists.",
+                    "Select an active SSH private-key Secret that still exists for this customer.");
+            }
+
             return new JobRunFailureDiagnostic(
                 JobRunFailureCategory.MissingSecretOrSshKey,
                 "SSH key or Secret is unavailable",
