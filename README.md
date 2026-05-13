@@ -308,3 +308,19 @@ nodecontrol/
 ## Current Status
 
 NodeControl is implemented through small vertical slices. The current repository includes backend, Worker, frontend, tests, EF Core migrations, Docker-based local infrastructure, and dev/demo bootstrap scripts.
+
+## Demo Playbook
+
+```yaml
+---
+- name: Write message to home folder
+  hosts: all
+  tasks:
+    - name: Write message file
+      ansible.builtin.copy:
+        dest: "{{ ansible_env.HOME }}/nodecontrol-message.txt"
+        content: |
+          Hallo vom Ansible Playbook!
+          Diese Nachricht wurde auf das Zielsystem geschrieben.
+        mode: "0644"
+```
