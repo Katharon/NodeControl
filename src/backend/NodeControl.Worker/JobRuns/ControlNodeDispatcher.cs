@@ -111,6 +111,7 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
         var tempDirectory = BuildTemporaryDispatchDirectory(request.JobRun.Id);
         var keyPath = Path.Combine(tempDirectory, "id_control_node");
         var remoteRunPath = request.Workspace.ControlHostWorkspacePath;
+        var remoteRunParentPath = GetRemoteDirectoryName(remoteRunPath);
         var remoteStagingPath = BuildRemoteStagingPath(remoteRunPath);
         var stagingPrepared = false;
         var promoted = false;
@@ -126,7 +127,20 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
                 $"Staging execution workspace to remote control node path {remoteRunPath}.",
                 cancellationToken);
 
-            var prepareResult = await RunSshCommandAsync(
+            var parentPrepareResult = await RunSshCommandAsync(
+                request,
+                keyPath,
+                BuildRemotePrepareParentCommand(remoteRunParentPath),
+                request.Timeout,
+                request.OnSystemLine,
+                request.OnSystemLine,
+                cancellationToken);
+            if (parentPrepareResult.ExitCode != 0 || parentPrepareResult.TimedOut || parentPrepareResult.Cancelled)
+            {
+                return ToDispatchResult(parentPrepareResult, "Remote parent mkdir failed for the control-node run workspace.");
+            }
+
+            var stagingPrepareResult = await RunSshCommandAsync(
                 request,
                 keyPath,
                 BuildRemotePrepareStagingCommand(remoteStagingPath),
@@ -134,9 +148,9 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
                 request.OnSystemLine,
                 request.OnSystemLine,
                 cancellationToken);
-            if (prepareResult.ExitCode != 0 || prepareResult.TimedOut || prepareResult.Cancelled)
+            if (stagingPrepareResult.ExitCode != 0 || stagingPrepareResult.TimedOut || stagingPrepareResult.Cancelled)
             {
-                return ToDispatchResult(prepareResult, "Remote staging workspace could not be prepared.");
+                return ToDispatchResult(stagingPrepareResult, "Remote staging directory create failed for the control-node run workspace.");
             }
 
             stagingPrepared = true;
@@ -150,7 +164,7 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
                 cancellationToken);
             if (stageResult.ExitCode != 0 || stageResult.TimedOut || stageResult.Cancelled)
             {
-                return ToDispatchResult(stageResult, "Execution workspace could not be staged to the remote control node.");
+                return ToDispatchResult(stageResult, "Remote upload failed after path preparation; check JobRun logs for scp target canonicalization or permission errors.");
             }
 
             var promoteResult = await RunSshCommandAsync(
@@ -335,12 +349,12 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
         return $"{request.ControlNode.SshUsername}@{request.ControlNode.Hostname}";
     }
 
-    private static string BuildRemoteScpTarget(ControlNodeDispatchRequest request, string remoteRunPath)
+    private static string BuildRemoteScpTarget(ControlNodeDispatchRequest request, string remoteDirectoryPath)
     {
         var host = request.ControlNode.Hostname.Contains(':', StringComparison.Ordinal)
             ? $"[{request.ControlNode.Hostname}]"
             : request.ControlNode.Hostname;
-        return $"{request.ControlNode.SshUsername}@{host}:{QuoteForRemoteShell(remoteRunPath)}";
+        return $"{request.ControlNode.SshUsername}@{host}:{EnsureTrailingSlash(remoteDirectoryPath)}";
     }
 
     private string BuildRemoteAnsibleCommand(string remoteRunPath, string playbookFileName, string variableFileName)
@@ -394,9 +408,18 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
             QuoteForRemoteShell(remoteStagingPath),
             "&&",
             "mkdir",
-            "-p",
             "--",
             QuoteForRemoteShell(remoteStagingPath));
+    }
+
+    private static string BuildRemotePrepareParentCommand(string remoteParentPath)
+    {
+        return string.Join(
+            " ",
+            "mkdir",
+            "-p",
+            "--",
+            QuoteForRemoteShell(remoteParentPath));
     }
 
     private static string BuildRemotePromoteStagingCommand(string remoteStagingPath, string remoteRunPath)
@@ -429,6 +452,13 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
         var trimmed = remotePath.TrimEnd('/');
         var separatorIndex = trimmed.LastIndexOf('/');
         return separatorIndex <= 0 ? "." : trimmed[..separatorIndex];
+    }
+
+    private static string EnsureTrailingSlash(string remoteDirectoryPath)
+    {
+        return remoteDirectoryPath.EndsWith("/", StringComparison.Ordinal)
+            ? remoteDirectoryPath
+            : $"{remoteDirectoryPath}/";
     }
 
     private static string BuildTemporaryDispatchDirectory(Guid jobRunId)

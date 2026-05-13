@@ -133,6 +133,9 @@ The current remote-dispatch MVP has an explicit Worker-side dispatch boundary:
 - Remote staging uses a unique temporary path beside the final run directory, then promotes that staged tree to the
   final path after a successful copy. If staging fails before promotion, the Worker makes a best-effort attempt to
   remove the temporary remote staging directory.
+- Before upload, the Worker explicitly creates the remote run parent directory and the temporary staging directory.
+  `scp` uploads the prepared workspace contents into that existing staging directory with directory-target semantics;
+  it does not rely on `scp` to create deep remote paths implicitly.
 - The final remote run path is scoped as
   `{remoteWorkspaceRoot}/{customerId}/control-nodes/{controlNodeId}/runs/{jobRunId}` and is retained after execution
   for operational diagnosis.

@@ -1143,18 +1143,21 @@ public sealed class JobRunExecutionTests
         var remoteRunPath = BuildExpectedRemoteRunPath(fixture);
         Assert.Equal(0, result.ExitCode);
         Assert.Empty(runner.Requests);
-        Assert.Equal(new[] { "ssh", "scp", "ssh", "ssh", "ssh" }, remoteRunner.Invocations.Select(invocation => invocation.FileName).ToArray());
-        Assert.Contains(".staging-", remoteRunner.Invocations[0].Arguments[^1]);
-        Assert.Contains("mkdir -p", remoteRunner.Invocations[0].Arguments[^1]);
+        Assert.Equal(new[] { "ssh", "ssh", "scp", "ssh", "ssh", "ssh" }, remoteRunner.Invocations.Select(invocation => invocation.FileName).ToArray());
+        Assert.Contains($"mkdir -p -- '{GetRemoteDirectoryName(remoteRunPath)}'", remoteRunner.Invocations[0].Arguments[^1]);
         Assert.Contains(".staging-", remoteRunner.Invocations[1].Arguments[^1]);
-        Assert.Contains($"rm -rf -- '{remoteRunPath}'", remoteRunner.Invocations[2].Arguments[^1]);
-        Assert.Contains("mv --", remoteRunner.Invocations[2].Arguments[^1]);
-        Assert.Contains($"'{remoteRunPath}'", remoteRunner.Invocations[2].Arguments[^1]);
-        Assert.Contains($"cd '{remoteRunPath}'", remoteRunner.Invocations[3].Arguments[^1]);
-        Assert.Contains("command -v 'ansible-playbook'", remoteRunner.Invocations[3].Arguments[^1]);
-        Assert.Contains("ansible-playbook is not installed or is not executable on the control host.", remoteRunner.Invocations[3].Arguments[^1]);
-        Assert.Contains("exec 'ansible-playbook'", remoteRunner.Invocations[3].Arguments[^1]);
-        Assert.Contains($"{remoteRunPath}/.nodecontrol/managed-host-keys", remoteRunner.Invocations[4].Arguments[^1]);
+        Assert.Contains("mkdir --", remoteRunner.Invocations[1].Arguments[^1]);
+        Assert.Contains(".staging-", remoteRunner.Invocations[2].Arguments[^1]);
+        Assert.EndsWith("/", remoteRunner.Invocations[2].Arguments[^1]);
+        Assert.DoesNotContain("'", remoteRunner.Invocations[2].Arguments[^1]);
+        Assert.Contains($"rm -rf -- '{remoteRunPath}'", remoteRunner.Invocations[3].Arguments[^1]);
+        Assert.Contains("mv --", remoteRunner.Invocations[3].Arguments[^1]);
+        Assert.Contains($"'{remoteRunPath}'", remoteRunner.Invocations[3].Arguments[^1]);
+        Assert.Contains($"cd '{remoteRunPath}'", remoteRunner.Invocations[4].Arguments[^1]);
+        Assert.Contains("command -v 'ansible-playbook'", remoteRunner.Invocations[4].Arguments[^1]);
+        Assert.Contains("ansible-playbook is not installed or is not executable on the control host.", remoteRunner.Invocations[4].Arguments[^1]);
+        Assert.Contains("exec 'ansible-playbook'", remoteRunner.Invocations[4].Arguments[^1]);
+        Assert.Contains($"{remoteRunPath}/.nodecontrol/managed-host-keys", remoteRunner.Invocations[5].Arguments[^1]);
         AssertNoTemporaryKeyDirectory(fixture.JobRun.Id);
     }
 
@@ -1166,6 +1169,7 @@ public sealed class JobRunExecutionTests
         var workspace = await BuildWorkspaceAsync(fixture);
         var runner = new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null));
         var remoteRunner = new FakeRemoteCommandRunner(
+            new RemoteCommandResult(0, false, false, null),
             new RemoteCommandResult(0, false, false, null),
             new RemoteCommandResult(1, false, false, "scp failed"));
         var dispatcher = new ControlNodeDispatcher(runner, Options.Create(new ExecutionOptions()), remoteRunner);
@@ -1179,12 +1183,64 @@ public sealed class JobRunExecutionTests
 
         Assert.Equal(1, result.ExitCode);
         Assert.Equal("scp failed", result.ErrorMessage);
-        Assert.Equal(new[] { "ssh", "scp", "ssh" }, remoteRunner.Invocations.Select(invocation => invocation.FileName).ToArray());
+        Assert.Equal(new[] { "ssh", "ssh", "scp", "ssh" }, remoteRunner.Invocations.Select(invocation => invocation.FileName).ToArray());
         Assert.Contains("rm -rf --", remoteRunner.Invocations[^1].Arguments[^1]);
         Assert.Contains(".staging-", remoteRunner.Invocations[^1].Arguments[^1]);
         Assert.DoesNotContain(remoteRunner.Invocations, invocation =>
             invocation.FileName == "ssh"
             && invocation.Arguments[^1].Contains("exec 'ansible-playbook'", StringComparison.Ordinal));
+        AssertNoTemporaryKeyDirectory(fixture.JobRun.Id);
+    }
+
+    [Fact]
+    public async Task ControlNodeDispatcher_reports_remote_parent_prepare_failure_before_upload()
+    {
+        using var fixture = ExecutionFixture.Create(controlNodeHostname: "control.example.test");
+        ConfigureRemoteControlNode(fixture);
+        var workspace = await BuildWorkspaceAsync(fixture);
+        var runner = new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null));
+        var remoteRunner = new FakeRemoteCommandRunner(new RemoteCommandResult(1, false, false, null));
+        var dispatcher = new ControlNodeDispatcher(runner, Options.Create(new ExecutionOptions()), remoteRunner);
+
+        var result = await dispatcher.DispatchAsync(new ControlNodeDispatchRequest(
+            fixture.JobRun,
+            fixture.ControlNode,
+            workspace,
+            TimeSpan.FromSeconds(30),
+            new ControlNodeCredentialMaterial("-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----")));
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Equal("Remote parent mkdir failed for the control-node run workspace.", result.ErrorMessage);
+        Assert.Equal(new[] { "ssh" }, remoteRunner.Invocations.Select(invocation => invocation.FileName).ToArray());
+        Assert.Contains("mkdir -p --", remoteRunner.Invocations[0].Arguments[^1]);
+        Assert.Empty(runner.Requests);
+        AssertNoTemporaryKeyDirectory(fixture.JobRun.Id);
+    }
+
+    [Fact]
+    public async Task ControlNodeDispatcher_reports_remote_staging_create_failure_before_upload()
+    {
+        using var fixture = ExecutionFixture.Create(controlNodeHostname: "control.example.test");
+        ConfigureRemoteControlNode(fixture);
+        var workspace = await BuildWorkspaceAsync(fixture);
+        var runner = new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null));
+        var remoteRunner = new FakeRemoteCommandRunner(
+            new RemoteCommandResult(0, false, false, null),
+            new RemoteCommandResult(1, false, false, null));
+        var dispatcher = new ControlNodeDispatcher(runner, Options.Create(new ExecutionOptions()), remoteRunner);
+
+        var result = await dispatcher.DispatchAsync(new ControlNodeDispatchRequest(
+            fixture.JobRun,
+            fixture.ControlNode,
+            workspace,
+            TimeSpan.FromSeconds(30),
+            new ControlNodeCredentialMaterial("-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----")));
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Equal("Remote staging directory create failed for the control-node run workspace.", result.ErrorMessage);
+        Assert.Equal(new[] { "ssh", "ssh" }, remoteRunner.Invocations.Select(invocation => invocation.FileName).ToArray());
+        Assert.Contains(".staging-", remoteRunner.Invocations[1].Arguments[^1]);
+        Assert.Empty(runner.Requests);
         AssertNoTemporaryKeyDirectory(fixture.JobRun.Id);
     }
 
@@ -1267,6 +1323,13 @@ public sealed class JobRunExecutionTests
             fixture.ControlNode.Id.ToString("D"),
             "runs",
             fixture.JobRun.Id.ToString("D"));
+    }
+
+    private static string GetRemoteDirectoryName(string remotePath)
+    {
+        var trimmed = remotePath.TrimEnd('/');
+        var separatorIndex = trimmed.LastIndexOf('/');
+        return separatorIndex <= 0 ? "." : trimmed[..separatorIndex];
     }
 
     private static void AssertNoTemporaryKeyDirectory(Guid jobRunId)
