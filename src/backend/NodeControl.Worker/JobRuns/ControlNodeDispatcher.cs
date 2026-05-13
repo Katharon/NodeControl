@@ -110,7 +110,7 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
 
         var tempDirectory = BuildTemporaryDispatchDirectory(request.JobRun.Id);
         var keyPath = Path.Combine(tempDirectory, "id_control_node");
-        var remoteRunPath = BuildRemoteRunPath(request.ControlNode.RemoteWorkspaceRoot, request);
+        var remoteRunPath = request.Workspace.ControlHostWorkspacePath;
         var remoteStagingPath = BuildRemoteStagingPath(remoteRunPath);
         var stagingPrepared = false;
         var promoted = false;
@@ -354,6 +354,22 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
             "cd",
             QuoteForRemoteShell(remoteRunPath),
             "&&",
+            "{",
+            "command",
+            "-v",
+            QuoteForRemoteShell(executable),
+            ">/dev/null",
+            "2>&1",
+            "||",
+            "{",
+            "echo",
+            QuoteForRemoteShell("ansible-playbook is not installed or is not executable on the control host."),
+            ">&2;",
+            "exit",
+            "127;",
+            "};",
+            "}",
+            "&&",
             "exec",
             QuoteForRemoteShell(executable),
             "-i",
@@ -361,18 +377,6 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
             QuoteForRemoteShell(playbookFileName),
             "-e",
             QuoteForRemoteShell($"@{variableFileName}"));
-    }
-
-    private static string BuildRemoteRunPath(string remoteWorkspaceRoot, ControlNodeDispatchRequest request)
-    {
-        return string.Join(
-            '/',
-            remoteWorkspaceRoot.TrimEnd('/'),
-            request.JobRun.CustomerId.ToString("D"),
-            "control-nodes",
-            request.ControlNode.Id.ToString("D"),
-            "runs",
-            request.JobRun.Id.ToString("D"));
     }
 
     private static string BuildRemoteStagingPath(string remoteRunPath)

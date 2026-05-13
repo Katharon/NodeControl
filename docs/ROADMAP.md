@@ -79,7 +79,8 @@ The explicit current/supporting/Post-MVP boundary is maintained in `docs/MVP_BOU
 ## Current Architecture Boundaries
 
 - The API never executes Ansible, SSH, TCP checks, shell commands, or process starts.
-- The Worker is the only process that runs `ansible-playbook`, stages SSH remote dispatch, or performs Hostzustand TCP checks.
+- The Worker is the only NodeControl process that orchestrates `ansible-playbook`, stages SSH remote dispatch, or
+  performs Hostzustand TCP checks. For remote Control Hosts, `ansible-playbook` runs on the selected Control Host.
 - Manual and scheduled Runs use the same queued JobRun execution path.
 - Schedules use a database-backed Worker poller. Quartz.NET is not part of the current implementation.
 - Templates can be materialized as configured Worker run workspace files.

@@ -22,7 +22,9 @@ Hosts, inventory groups, playbooks, variable sets, actions, runs, schedules, per
 templates, secrets metadata and Worker-side reference resolution, user overview, Hostzustand checks, a run wizard, and a
 Run Center with concise Worker-side diagnostics for common execution failures. Runs snapshot the selected Control Host and the Worker prepares control-host-scoped workspaces with a
 dispatch manifest before invoking either the local Ansible adapter for configured local/dev Control Hosts or the
-Worker-side SSH remote dispatch path for configured non-local Control Hosts. Git repository sources are managed as customer-scoped metadata and can be used by the frontend for one-time
+Worker-side SSH remote dispatch path for configured non-local Control Hosts. For remote Control Hosts, the Worker stages
+the complete run workspace there and starts `ansible-playbook` on that Control Host; generated Managed Host and Jump Host
+key paths are rendered against the remote Control-Host run directory. Git repository sources are managed as customer-scoped metadata and can be used by the frontend for one-time
 imports into the existing managed artifact models.
 
 The production deployment story is not complete. `deploy/` contains dev/demo notes only, while local bootstrap
@@ -153,7 +155,7 @@ Examples:
 - Execute JobRuns
 - Poll due schedules and enqueue scheduled JobRuns
 - Create execution workspaces
-- Run `ansible-playbook`
+- Run local/dev `ansible-playbook` or start remote Control-Host `ansible-playbook`
 - Capture logs
 - Classify common execution failures from captured Worker output
 - Update job run status

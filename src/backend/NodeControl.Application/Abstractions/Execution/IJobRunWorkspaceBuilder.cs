@@ -29,6 +29,7 @@ public sealed record JobRunTemplateArtifact(
 
 public sealed record JobRunWorkspace(
     string WorkspacePath,
+    string ControlHostWorkspacePath,
     string InventoryPath,
     string VariablePath,
     string VariableFileName,

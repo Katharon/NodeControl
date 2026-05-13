@@ -71,5 +71,7 @@ successfully into demo hosts.
 
 - The script talks to the running API at `NODECONTROL_API_URL` and defaults to `http://localhost:5257`.
 - The default Development API uses Fake Auth, so the script runs as Dev Admin.
-- If `ansible-playbook` is not available to the Worker, queued Runs fail honestly and the Run logs show the error.
+- If `ansible-playbook` is not available on the selected execution host, queued Runs fail honestly and the Run logs
+  show the error. For local/dev Control Hosts that execution host is the Worker machine; for remote Control Hosts it is
+  the Control Host.
 - The seed script is idempotent for active demo records: running it again updates the same named/sluggified resources.

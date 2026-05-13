@@ -4,7 +4,10 @@ namespace NodeControl.Application.InventoryGroups;
 
 internal static class ManagedNodeInventoryVariables
 {
-    public static IReadOnlyDictionary<string, object> Build(ManagedNode managedNode, ManagedNode? jumpHost = null)
+    public static IReadOnlyDictionary<string, object> Build(
+        ManagedNode managedNode,
+        ManagedNode? jumpHost = null,
+        string? controlHostWorkspacePath = null)
     {
         var variables = new Dictionary<string, object>
         {
@@ -24,10 +27,10 @@ internal static class ManagedNodeInventoryVariables
 
         if (managedNode.SshPrivateKeySecretId is not null)
         {
-            variables["ansible_ssh_private_key_file"] = GetPrivateKeyRelativePath(managedNode);
+            variables["ansible_ssh_private_key_file"] = GetPrivateKeyPath(managedNode, controlHostWorkspacePath);
         }
 
-        var sshCommonArgs = BuildSshCommonArgs(managedNode, jumpHost);
+        var sshCommonArgs = BuildSshCommonArgs(managedNode, jumpHost, controlHostWorkspacePath);
         if (!string.IsNullOrWhiteSpace(sshCommonArgs))
         {
             variables["ansible_ssh_common_args"] = sshCommonArgs;
@@ -38,6 +41,19 @@ internal static class ManagedNodeInventoryVariables
 
     public static string GetPrivateKeyRelativePath(ManagedNode managedNode)
     {
+        return BuildPrivateKeyRelativePath(managedNode);
+    }
+
+    private static string GetPrivateKeyPath(ManagedNode managedNode, string? controlHostWorkspacePath)
+    {
+        var relativePath = BuildPrivateKeyRelativePath(managedNode);
+        return string.IsNullOrWhiteSpace(controlHostWorkspacePath)
+            ? relativePath
+            : $"{controlHostWorkspacePath.TrimEnd('/')}/{relativePath}";
+    }
+
+    private static string BuildPrivateKeyRelativePath(ManagedNode managedNode)
+    {
         return string.Join(
             '/',
             ".nodecontrol",
@@ -45,7 +61,10 @@ internal static class ManagedNodeInventoryVariables
             $"{managedNode.Id:D}.key");
     }
 
-    private static string? BuildSshCommonArgs(ManagedNode managedNode, ManagedNode? jumpHost)
+    private static string? BuildSshCommonArgs(
+        ManagedNode managedNode,
+        ManagedNode? jumpHost,
+        string? controlHostWorkspacePath)
     {
         var options = new List<string>();
         if (managedNode.SshPrivateKeySecretId is not null)
@@ -55,13 +74,13 @@ internal static class ManagedNodeInventoryVariables
 
         if (jumpHost is not null)
         {
-            options.Add($"-o ProxyCommand=\"{BuildProxyCommand(jumpHost)}\"");
+            options.Add($"-o ProxyCommand=\"{BuildProxyCommand(jumpHost, controlHostWorkspacePath)}\"");
         }
 
         return options.Count == 0 ? null : string.Join(' ', options);
     }
 
-    private static string BuildProxyCommand(ManagedNode jumpHost)
+    private static string BuildProxyCommand(ManagedNode jumpHost, string? controlHostWorkspacePath)
     {
         var commandParts = new List<string>
         {
@@ -76,7 +95,7 @@ internal static class ManagedNodeInventoryVariables
         if (jumpHost.SshPrivateKeySecretId is not null)
         {
             commandParts.Add("-i");
-            commandParts.Add(ShellQuote(GetPrivateKeyRelativePath(jumpHost)));
+            commandParts.Add(ShellQuote(GetPrivateKeyPath(jumpHost, controlHostWorkspacePath)));
             commandParts.Add("-o");
             commandParts.Add("IdentitiesOnly=yes");
         }

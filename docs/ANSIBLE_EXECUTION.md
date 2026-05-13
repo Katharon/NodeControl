@@ -128,12 +128,17 @@ The current remote-dispatch MVP has an explicit Worker-side dispatch boundary:
 - The Worker materializes the SSH private key into a temporary file, stages the prepared workspace to the remote
   Control Node with `scp`, starts `ansible-playbook` there with `ssh`, captures stdout/stderr into the existing JobRun
   log model, and removes the temporary key file after dispatch.
+- For remote Control Nodes, the workspace is authored with a Control-Host workspace path. Managed Host and Jump Host
+  private-key inventory variables point at files under the remote run directory, not at Worker-local filesystem paths.
 - Remote staging uses a unique temporary path beside the final run directory, then promotes that staged tree to the
   final path after a successful copy. If staging fails before promotion, the Worker makes a best-effort attempt to
   remove the temporary remote staging directory.
 - The final remote run path is scoped as
   `{remoteWorkspaceRoot}/{customerId}/control-nodes/{controlNodeId}/runs/{jobRunId}` and is retained after execution
   for operational diagnosis.
+- Before remote execution starts, the Worker asks the Control Host shell to resolve the configured
+  `RemoteAnsiblePlaybookPath`; if `ansible-playbook` is unavailable there, the run fails through the normal dispatch
+  diagnostics and log path instead of falling back to Worker-local Ansible.
 
 ## Execution Command
 
@@ -145,9 +150,13 @@ ansible-playbook -i inventory.yml playbook/site.yml -e @vars.yml
 
 The exact implementation belongs to Infrastructure/Worker.
 
-The Worker runs `ansible-playbook` from `NodeControl.Worker` only, using `ProcessStartInfo.ArgumentList`
-with `UseShellExecute = false`. The executable path is configured with
+For local/dev Control Hosts, the Worker runs `ansible-playbook` from `NodeControl.Worker` using
+`ProcessStartInfo.ArgumentList` with `UseShellExecute = false`. The executable path is configured with
 `NodeControl:Execution:AnsiblePlaybookPath` and defaults to `ansible-playbook`.
+
+For remote Control Hosts, the Worker starts `ansible-playbook` over SSH on the selected Control Host. The remote
+executable path is configured with `NodeControl:Execution:RemoteAnsiblePlaybookPath` and defaults to
+`ansible-playbook`.
 
 ## MVP Captured Data
 
@@ -229,10 +238,12 @@ local showcase path working without pretending to authenticate over SSH.
 
 For real SSH targets, Managed Nodes can provide an SSH port, optional SSH username, and optional SSH private key
 Secret reference. If a Managed Node references an SSH private key Secret, only the Worker decrypts that key and
-writes a temporary per-host key file under `.nodecontrol/managed-host-keys/` in the run workspace. Inventory points
-Ansible at that file with `ansible_ssh_private_key_file` and adds `ansible_ssh_common_args: -o IdentitiesOnly=yes`
-so Ansible prefers the materialized host key. The dispatcher removes those key files after local execution and after
-remote execution best-effort, while leaving the non-sensitive run workspace structure available for diagnosis.
+writes a temporary per-host key file under `.nodecontrol/managed-host-keys/` in the run workspace. For local/dev
+Control Hosts, inventory points Ansible at that relative file path. For remote Control Hosts, inventory points Ansible
+at the corresponding absolute path under the remote Control-Host run directory. In both cases
+`ansible_ssh_common_args: -o IdentitiesOnly=yes` is added so Ansible prefers the materialized host key. The dispatcher
+removes those key files after local execution and after remote execution best-effort, while leaving the non-sensitive
+run workspace structure available for diagnosis.
 
 For one-hop Jump Host execution, the target Managed Node references another active Managed Node from the same customer.
 The Application layer rejects self-references, cross-customer references, and nested jump chains. During Worker-side

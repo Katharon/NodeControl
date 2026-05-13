@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using YamlDotNet.Serialization;
 using NodeControl.Application.Abstractions.Execution;
@@ -97,6 +98,8 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
             return JobRunWorkspaceBuildResult.Failed("Execution workspace path is invalid.");
         }
 
+        var useRemoteControlHostWorkspace = ShouldUseRemoteControlHostWorkspace(controlNode);
+        var controlHostWorkspacePath = BuildControlHostWorkspacePath(controlNode, jobRun, workspacePath, useRemoteControlHostWorkspace);
         var playbookDirectory = Path.Combine(workspacePath, "playbook");
         var dispatchDirectory = Path.Combine(workspacePath, ".nodecontrol");
         var inventoryPath = Path.Combine(workspacePath, "inventory.yml");
@@ -123,7 +126,14 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
         Directory.CreateDirectory(playbookDirectory);
         Directory.CreateDirectory(dispatchDirectory);
 
-        await File.WriteAllTextAsync(inventoryPath, BuildInventoryYaml(inventoryGroup, managedNodes, jumpHostsByNodeId), cancellationToken);
+        await File.WriteAllTextAsync(
+            inventoryPath,
+            BuildInventoryYaml(
+                inventoryGroup,
+                managedNodes,
+                jumpHostsByNodeId,
+                useRemoteControlHostWorkspace ? controlHostWorkspacePath : null),
+            cancellationToken);
         await File.WriteAllTextAsync(
             variablePath,
             variableSet is null ? "{}" : ResolveSecretReferences(variableSet.Content, secretValuesBySlug),
@@ -155,11 +165,12 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
         await File.WriteAllTextAsync(stderrLogPath, string.Empty, cancellationToken);
         await File.WriteAllTextAsync(
             dispatchManifestPath,
-            BuildDispatchManifest(jobRun, job, controlNode, inventoryPath, variablePath, playbookPath),
+            BuildDispatchManifest(jobRun, job, controlNode, workspacePath, controlHostWorkspacePath, inventoryPath, variablePath, playbookPath),
             cancellationToken);
 
         return JobRunWorkspaceBuildResult.Ok(new JobRunWorkspace(
             workspacePath,
+            controlHostWorkspacePath,
             inventoryPath,
             variablePath,
             variableFileName,
@@ -327,13 +338,14 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
     private string BuildInventoryYaml(
         InventoryGroup inventoryGroup,
         IReadOnlyList<ManagedNode> managedNodes,
-        IReadOnlyDictionary<Guid, ManagedNode> jumpHostsByNodeId)
+        IReadOnlyDictionary<Guid, ManagedNode> jumpHostsByNodeId,
+        string? controlHostWorkspacePath)
     {
         var hosts = managedNodes
             .OrderBy(managedNode => managedNode.Name, StringComparer.Ordinal)
             .ToDictionary(
                 managedNode => managedNode.Name,
-                managedNode => (object)BuildInventoryHostVariables(managedNode, jumpHostsByNodeId),
+                managedNode => (object)BuildInventoryHostVariables(managedNode, jumpHostsByNodeId, controlHostWorkspacePath),
                 StringComparer.Ordinal);
 
         var inventory = new Dictionary<string, object>
@@ -357,6 +369,8 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
         JobRun jobRun,
         Job job,
         ControlNode controlNode,
+        string localWorkspacePath,
+        string controlHostWorkspacePath,
         string inventoryPath,
         string variablePath,
         string playbookPath)
@@ -374,6 +388,11 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
                     hostname = controlNode.Hostname,
                     sshPort = controlNode.SshPort
                 },
+                workspace = new
+                {
+                    localPath = localWorkspacePath,
+                    controlHostPath = controlHostWorkspacePath
+                },
                 artifacts = new
                 {
                     inventoryPath,
@@ -386,15 +405,55 @@ public sealed class JobRunWorkspaceBuilder(string runWorkspaceRoot) : IJobRunWor
 
     private static Dictionary<string, object> BuildInventoryHostVariables(
         ManagedNode managedNode,
-        IReadOnlyDictionary<Guid, ManagedNode> jumpHostsByNodeId)
+        IReadOnlyDictionary<Guid, ManagedNode> jumpHostsByNodeId,
+        string? controlHostWorkspacePath)
     {
         var jumpHost = managedNode.JumpHostManagedNodeId is null
             ? null
             : jumpHostsByNodeId.GetValueOrDefault(managedNode.Id);
 
         return ManagedNodeInventoryVariables
-            .Build(managedNode, jumpHost)
+            .Build(managedNode, jumpHost, controlHostWorkspacePath)
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+    }
+
+    private static string BuildControlHostWorkspacePath(
+        ControlNode controlNode,
+        JobRun jobRun,
+        string localWorkspacePath,
+        bool useRemoteControlHostWorkspace)
+    {
+        if (!useRemoteControlHostWorkspace)
+        {
+            return localWorkspacePath;
+        }
+
+        return string.Join(
+            '/',
+            controlNode.RemoteWorkspaceRoot!.TrimEnd('/'),
+            jobRun.CustomerId.ToString("D"),
+            "control-nodes",
+            controlNode.Id.ToString("D"),
+            "runs",
+            jobRun.Id.ToString("D"));
+    }
+
+    private static bool ShouldUseRemoteControlHostWorkspace(ControlNode controlNode)
+    {
+        return !string.IsNullOrWhiteSpace(controlNode.RemoteWorkspaceRoot)
+            && !IsLocalControlHost(controlNode.Hostname);
+    }
+
+    private static bool IsLocalControlHost(string hostname)
+    {
+        if (string.IsNullOrWhiteSpace(hostname))
+        {
+            return false;
+        }
+
+        var normalized = hostname.Trim().ToLowerInvariant();
+        return normalized is "localhost" or "127.0.0.1" or "::1"
+            || IPAddress.TryParse(normalized, out var address) && IPAddress.IsLoopback(address);
     }
 
     private static bool IsWithinDirectory(string rootPath, string path)

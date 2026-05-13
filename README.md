@@ -116,11 +116,11 @@ NodeControl Database
   v
 NodeControl Worker
   |
-  | ansible-playbook
+  | local/dev ansible-playbook or SSH remote dispatch
   v
-Control Node
+Control Host
   |
-  | SSH
+  | ansible-playbook + SSH inventory
   v
 Managed Nodes
 ```

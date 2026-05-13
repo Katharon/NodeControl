@@ -254,7 +254,10 @@ NodeControl stores minimal SSH dispatch configuration on Control Nodes: username
 private key Secret reference. For non-local Control Nodes, the Worker materializes that key into a temporary file,
 uses `scp` to stage the already-prepared run workspace, and uses `ssh` to start `ansible-playbook` remotely. Remote
 dispatch stages into a unique `.staging-*` directory beside the final run path, promotes the staged tree after a
-successful copy, and cleans up temporary local SSH material plus best-effort remote staging leftovers.
+successful copy, and cleans up temporary local SSH material plus best-effort remote staging leftovers. Remote run
+workspaces are rendered with Control-Host-valid execution paths: Managed Host and Jump Host private-key inventory
+variables point at the promoted remote run directory, and the remote command checks for `ansible-playbook` on the
+Control Host before execution.
 
 Reason:
 

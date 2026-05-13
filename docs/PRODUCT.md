@@ -144,9 +144,11 @@ Current implementation boundaries are intentionally explicit:
 
 - NodeControl is still a control plane around Ansible, not an AWX clone.
 - The API queues work and enforces authorization; it never executes Ansible, SSH, TCP checks, shell commands, or process starts.
-- The Worker executes queued Runs, polls schedules, processes Hostzustand checks, creates workspaces, and captures logs.
+- The Worker executes queued Run orchestration, polls schedules, processes Hostzustand checks, creates workspaces, and
+  captures logs. For remote Control Hosts, the actual `ansible-playbook` process runs on the selected Control Host.
 - Runs are bound to the selected Control Host when queued; local/dev execution remains available for configured local
-  Control Hosts, while non-local Control Hosts can use a minimal Worker-side SSH dispatch configuration.
+  Control Hosts, while non-local Control Hosts use Worker-side SSH dispatch to stage the run workspace and start Ansible
+  there.
 - Continuous Git-backed playbook execution, Git sync, Ansible Collections management, cloud-provider inventory,
   notifications, approval workflow, external secret providers, and production deployment packaging remain Post-MVP.
 - `deploy/` is local dev/demo guidance only at this point.

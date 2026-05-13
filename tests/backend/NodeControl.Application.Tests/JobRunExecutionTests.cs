@@ -182,6 +182,77 @@ public sealed class JobRunExecutionTests
     }
 
     [Fact]
+    public async Task JobRunWorkspaceBuilder_uses_control_host_key_paths_for_remote_control_node()
+    {
+        using var fixture = ExecutionFixture.Create(controlNodeHostname: "control.example.test");
+        ConfigureRemoteControlNode(fixture);
+        var secretId = Guid.NewGuid();
+        fixture.ManagedNode.Update(
+            fixture.ManagedNode.Name,
+            fixture.ManagedNode.Hostname,
+            2222,
+            "deploy",
+            secretId,
+            fixture.ManagedNode.OperatingSystem,
+            fixture.ManagedNode.Environment,
+            fixture.ManagedNode.Description,
+            TestTime.AddMinutes(1));
+
+        var result = await fixture.CreateWorkspaceBuilder().BuildAsync(
+            fixture.JobRun,
+            fixture.Job,
+            fixture.ControlNode,
+            fixture.InventoryGroup,
+            [fixture.ManagedNode],
+            new Dictionary<Guid, ManagedNode>(),
+            fixture.Playbook,
+            fixture.VariableSet,
+            [],
+            EmptySecrets);
+
+        var remoteRunPath = BuildExpectedRemoteRunPath(fixture);
+        var inventory = await File.ReadAllTextAsync(result.Workspace!.InventoryPath);
+        Assert.Equal(remoteRunPath, result.Workspace.ControlHostWorkspacePath);
+        Assert.Contains($"{remoteRunPath}/.nodecontrol/managed-host-keys/{fixture.ManagedNode.Id:D}.key", inventory);
+        Assert.DoesNotContain($"ansible_ssh_private_key_file: .nodecontrol/managed-host-keys/{fixture.ManagedNode.Id:D}.key", inventory);
+    }
+
+    [Fact]
+    public async Task JobRunWorkspaceBuilder_keeps_localhost_dev_key_paths_relative()
+    {
+        using var fixture = ExecutionFixture.Create(controlNodeHostname: "localhost");
+        ConfigureRemoteControlNode(fixture);
+        var secretId = Guid.NewGuid();
+        fixture.ManagedNode.Update(
+            fixture.ManagedNode.Name,
+            fixture.ManagedNode.Hostname,
+            fixture.ManagedNode.SshPort,
+            "deploy",
+            secretId,
+            fixture.ManagedNode.OperatingSystem,
+            fixture.ManagedNode.Environment,
+            fixture.ManagedNode.Description,
+            TestTime.AddMinutes(1));
+
+        var result = await fixture.CreateWorkspaceBuilder().BuildAsync(
+            fixture.JobRun,
+            fixture.Job,
+            fixture.ControlNode,
+            fixture.InventoryGroup,
+            [fixture.ManagedNode],
+            new Dictionary<Guid, ManagedNode>(),
+            fixture.Playbook,
+            fixture.VariableSet,
+            [],
+            EmptySecrets);
+
+        var inventory = await File.ReadAllTextAsync(result.Workspace!.InventoryPath);
+        Assert.Equal(result.Workspace.WorkspacePath, result.Workspace.ControlHostWorkspacePath);
+        Assert.Contains($".nodecontrol/managed-host-keys/{fixture.ManagedNode.Id:D}.key", inventory);
+        Assert.DoesNotContain("/var/lib/nodecontrol/remote-runs", inventory);
+    }
+
+    [Fact]
     public async Task JobRunWorkspaceBuilder_writes_jump_host_proxy_command_to_inventory()
     {
         using var fixture = ExecutionFixture.Create();
@@ -226,6 +297,54 @@ public sealed class JobRunExecutionTests
         Assert.Contains("ansible_user: deploy", inventory);
         Assert.Contains("-o ProxyCommand=\"ssh -W %h:%p -q -p 2222 -i", inventory);
         Assert.Contains($".nodecontrol/managed-host-keys/{jumpHost.Id:D}.key", inventory);
+        Assert.Contains("jump@bastion.example.test", inventory);
+    }
+
+    [Fact]
+    public async Task JobRunWorkspaceBuilder_uses_control_host_jump_key_paths_for_remote_control_node()
+    {
+        using var fixture = ExecutionFixture.Create(controlNodeHostname: "control.example.test");
+        ConfigureRemoteControlNode(fixture);
+        var jumpKeySecretId = Guid.NewGuid();
+        var jumpHost = ManagedNode.Create(
+            fixture.Customer.Id,
+            "bastion_01",
+            "bastion.example.test",
+            2222,
+            "jump",
+            jumpKeySecretId,
+            null,
+            null,
+            null,
+            TestTime);
+        fixture.Db.AddManagedNode(jumpHost);
+        fixture.ManagedNode.Update(
+            fixture.ManagedNode.Name,
+            fixture.ManagedNode.Hostname,
+            fixture.ManagedNode.SshPort,
+            "deploy",
+            null,
+            fixture.ManagedNode.OperatingSystem,
+            fixture.ManagedNode.Environment,
+            fixture.ManagedNode.Description,
+            TestTime.AddMinutes(1),
+            jumpHost.Id);
+
+        var result = await fixture.CreateWorkspaceBuilder().BuildAsync(
+            fixture.JobRun,
+            fixture.Job,
+            fixture.ControlNode,
+            fixture.InventoryGroup,
+            [fixture.ManagedNode],
+            new Dictionary<Guid, ManagedNode> { [fixture.ManagedNode.Id] = jumpHost },
+            fixture.Playbook,
+            fixture.VariableSet,
+            [],
+            EmptySecrets);
+
+        var remoteRunPath = BuildExpectedRemoteRunPath(fixture);
+        var inventory = await File.ReadAllTextAsync(result.Workspace!.InventoryPath);
+        Assert.Contains($"-i '{remoteRunPath}/.nodecontrol/managed-host-keys/{jumpHost.Id:D}.key'", inventory);
         Assert.Contains("jump@bastion.example.test", inventory);
     }
 
@@ -335,6 +454,7 @@ public sealed class JobRunExecutionTests
         Assert.Contains(fixture.JobRun.Id.ToString("D"), manifest);
         Assert.Contains(fixture.ControlNode.Id.ToString("D"), manifest);
         Assert.Contains(fixture.ControlNode.Hostname, manifest);
+        Assert.Contains(result.Workspace.ControlHostWorkspacePath, manifest);
     }
 
     [Fact]
@@ -895,6 +1015,8 @@ public sealed class JobRunExecutionTests
         Assert.Contains("mv --", remoteRunner.Invocations[2].Arguments[^1]);
         Assert.Contains($"'{remoteRunPath}'", remoteRunner.Invocations[2].Arguments[^1]);
         Assert.Contains($"cd '{remoteRunPath}'", remoteRunner.Invocations[3].Arguments[^1]);
+        Assert.Contains("command -v 'ansible-playbook'", remoteRunner.Invocations[3].Arguments[^1]);
+        Assert.Contains("ansible-playbook is not installed or is not executable on the control host.", remoteRunner.Invocations[3].Arguments[^1]);
         Assert.Contains("exec 'ansible-playbook'", remoteRunner.Invocations[3].Arguments[^1]);
         Assert.Contains($"{remoteRunPath}/.nodecontrol/managed-host-keys", remoteRunner.Invocations[4].Arguments[^1]);
         AssertNoTemporaryKeyDirectory(fixture.JobRun.Id);

@@ -69,8 +69,8 @@ OIDC development, but it is not required for the default demo path.
   Development uses `.nodecontrol/data-protection-keys`; production-style configuration uses
   `/var/lib/nodecontrol/data-protection-keys`. API and Worker must use the same `ApplicationName` and key ring path.
 - The API exposes HTTP endpoints, validates input, performs authorization, and queues work.
-- The Worker processes queued Runs, due schedules, Hostzustand checks, run workspaces, local/SSH remote Ansible
-  execution, logs, and status transitions.
+- The Worker processes queued Runs, due schedules, Hostzustand checks, run workspaces, local Ansible execution,
+  SSH remote Control-Host dispatch, logs, and status transitions.
 - The frontend provides the demo/product UI.
 
 The API must never execute Ansible, SSH, TCP checks, shell commands, or process starts as product behavior.
