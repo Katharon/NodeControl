@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -451,10 +452,12 @@ public sealed class JobRunExecutionTests
 
         Assert.True(result.Succeeded);
         var manifest = await File.ReadAllTextAsync(result.Workspace!.DispatchManifestPath);
-        Assert.Contains(fixture.JobRun.Id.ToString("D"), manifest);
-        Assert.Contains(fixture.ControlNode.Id.ToString("D"), manifest);
-        Assert.Contains(fixture.ControlNode.Hostname, manifest);
-        Assert.Contains(result.Workspace.ControlHostWorkspacePath, manifest);
+        using var manifestDocument = JsonDocument.Parse(manifest);
+        var root = manifestDocument.RootElement;
+        Assert.Equal(fixture.JobRun.Id, root.GetProperty("jobRunId").GetGuid());
+        Assert.Equal(fixture.ControlNode.Id, root.GetProperty("controlNode").GetProperty("id").GetGuid());
+        Assert.Equal(fixture.ControlNode.Hostname, root.GetProperty("controlNode").GetProperty("hostname").GetString());
+        Assert.Equal(result.Workspace.ControlHostWorkspacePath, root.GetProperty("workspace").GetProperty("controlHostPath").GetString());
     }
 
     [Fact]
@@ -935,6 +938,7 @@ public sealed class JobRunExecutionTests
     [Theory]
     [InlineData("ssh: connect to host web-01 port 22: Connection refused", JobRunFailureCategory.HostUnreachable)]
     [InlineData("Permission denied (publickey).", JobRunFailureCategory.SshAuthenticationFailed)]
+    [InlineData("UNPROTECTED PRIVATE KEY FILE", JobRunFailureCategory.SshPrivateKeyFilePermissionsTooOpen)]
     [InlineData("Host key verification failed.", JobRunFailureCategory.HostKeyVerificationFailed)]
     [InlineData("kex_exchange_identification: Connection closed by UNKNOWN port 65535", JobRunFailureCategory.JumpHostConnectionFailed)]
     [InlineData("Control node SSH private key secret is unavailable for execution.", JobRunFailureCategory.MissingSecretOrSshKey)]
@@ -948,6 +952,19 @@ public sealed class JobRunExecutionTests
         Assert.Equal(expectedCategory, diagnostic.Category);
         Assert.False(string.IsNullOrWhiteSpace(diagnostic.Title));
         Assert.False(string.IsNullOrWhiteSpace(diagnostic.Summary));
+    }
+
+    [Theory]
+    [InlineData("@@@@@@@@@ WARNING: UNPROTECTED PRIVATE KEY FILE! @@@@@@@@@")]
+    [InlineData("Load key \"/var/lib/nodecontrol/.nodecontrol/managed-host-keys/id.key\": bad permissions")]
+    [InlineData("Permissions 0664 for '/var/lib/nodecontrol/.nodecontrol/managed-host-keys/id.key' are too open.")]
+    public void JobRunFailureDiagnostics_classifies_open_private_key_permissions(string message)
+    {
+        var diagnostic = JobRunFailureDiagnostics.Classify(JobRunFailurePhase.PlaybookExecution, message);
+
+        Assert.Equal(JobRunFailureCategory.SshPrivateKeyFilePermissionsTooOpen, diagnostic.Category);
+        Assert.Equal("SSH private key file permissions are too open", diagnostic.Title);
+        Assert.Equal("Ensure materialized private key files on the remote Control Host are chmod 600 and key directories are chmod 700.", diagnostic.NextStep);
     }
 
     [Fact]
@@ -1132,18 +1149,24 @@ public sealed class JobRunExecutionTests
         var runner = new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null));
         var remoteRunner = new FakeRemoteCommandRunner();
         var dispatcher = new ControlNodeDispatcher(runner, Options.Create(new ExecutionOptions()), remoteRunner);
+        var systemLines = new List<string>();
 
         var result = await dispatcher.DispatchAsync(new ControlNodeDispatchRequest(
             fixture.JobRun,
             fixture.ControlNode,
             workspace,
             TimeSpan.FromSeconds(30),
-            new ControlNodeCredentialMaterial("-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----")));
+            new ControlNodeCredentialMaterial("-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----"),
+            (line, _) =>
+            {
+                systemLines.Add(line);
+                return Task.CompletedTask;
+            }));
 
         var remoteRunPath = BuildExpectedRemoteRunPath(fixture);
         Assert.Equal(0, result.ExitCode);
         Assert.Empty(runner.Requests);
-        Assert.Equal(new[] { "ssh", "ssh", "scp", "ssh", "ssh", "ssh" }, remoteRunner.Invocations.Select(invocation => invocation.FileName).ToArray());
+        Assert.Equal(new[] { "ssh", "ssh", "scp", "ssh", "ssh", "ssh", "ssh" }, remoteRunner.Invocations.Select(invocation => invocation.FileName).ToArray());
         Assert.Contains($"mkdir -p -- '{GetRemoteDirectoryName(remoteRunPath)}'", remoteRunner.Invocations[0].Arguments[^1]);
         Assert.Contains(".staging-", remoteRunner.Invocations[1].Arguments[^1]);
         Assert.Contains("mkdir --", remoteRunner.Invocations[1].Arguments[^1]);
@@ -1153,11 +1176,61 @@ public sealed class JobRunExecutionTests
         Assert.Contains($"rm -rf -- '{remoteRunPath}'", remoteRunner.Invocations[3].Arguments[^1]);
         Assert.Contains("mv --", remoteRunner.Invocations[3].Arguments[^1]);
         Assert.Contains($"'{remoteRunPath}'", remoteRunner.Invocations[3].Arguments[^1]);
-        Assert.Contains($"cd '{remoteRunPath}'", remoteRunner.Invocations[4].Arguments[^1]);
-        Assert.Contains("command -v 'ansible-playbook'", remoteRunner.Invocations[4].Arguments[^1]);
-        Assert.Contains("ansible-playbook is not installed or is not executable on the control host.", remoteRunner.Invocations[4].Arguments[^1]);
-        Assert.Contains("exec 'ansible-playbook'", remoteRunner.Invocations[4].Arguments[^1]);
-        Assert.Contains($"{remoteRunPath}/.nodecontrol/managed-host-keys", remoteRunner.Invocations[5].Arguments[^1]);
+        Assert.Contains($"chmod 700 '{remoteRunPath}/.nodecontrol'", remoteRunner.Invocations[4].Arguments[^1]);
+        Assert.Contains($"chmod 700 '{remoteRunPath}/.nodecontrol/managed-host-keys'", remoteRunner.Invocations[4].Arguments[^1]);
+        Assert.Contains($"find '{remoteRunPath}/.nodecontrol/managed-host-keys' -type f -name '*.key' -exec chmod 600", remoteRunner.Invocations[4].Arguments[^1]);
+        Assert.Contains($"cd '{remoteRunPath}'", remoteRunner.Invocations[5].Arguments[^1]);
+        Assert.Contains("command -v 'ansible-playbook'", remoteRunner.Invocations[5].Arguments[^1]);
+        Assert.Contains("ansible-playbook is not installed or is not executable on the control host.", remoteRunner.Invocations[5].Arguments[^1]);
+        Assert.Contains("exec 'ansible-playbook'", remoteRunner.Invocations[5].Arguments[^1]);
+        Assert.Contains($"{remoteRunPath}/.nodecontrol/managed-host-keys", remoteRunner.Invocations[6].Arguments[^1]);
+        Assert.Contains("Hardening remote SSH key permissions.", systemLines);
+        Assert.Contains("Remote SSH key permissions hardened.", systemLines);
+        Assert.True(
+            remoteRunner.Invocations.FindIndex(invocation => invocation.FileName == "scp")
+            < remoteRunner.Invocations.FindIndex(invocation => invocation.Arguments[^1].Contains("-exec chmod 600", StringComparison.Ordinal)));
+        Assert.True(
+            remoteRunner.Invocations.FindIndex(invocation => invocation.Arguments[^1].Contains("-exec chmod 600", StringComparison.Ordinal))
+            < remoteRunner.Invocations.FindIndex(invocation => invocation.Arguments[^1].Contains("exec 'ansible-playbook'", StringComparison.Ordinal)));
+        AssertNoTemporaryKeyDirectory(fixture.JobRun.Id);
+    }
+
+    [Fact]
+    public async Task ControlNodeDispatcher_reports_remote_key_permission_hardening_failure_before_ansible()
+    {
+        using var fixture = ExecutionFixture.Create(controlNodeHostname: "control.example.test");
+        ConfigureRemoteControlNode(fixture);
+        var workspace = await BuildWorkspaceAsync(fixture);
+        var runner = new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null));
+        var remoteRunner = new FakeRemoteCommandRunner(
+            new RemoteCommandResult(0, false, false, null),
+            new RemoteCommandResult(0, false, false, null),
+            new RemoteCommandResult(0, false, false, null),
+            new RemoteCommandResult(0, false, false, null),
+            new RemoteCommandResult(1, false, false, null));
+        var dispatcher = new ControlNodeDispatcher(runner, Options.Create(new ExecutionOptions()), remoteRunner);
+        var systemLines = new List<string>();
+
+        var result = await dispatcher.DispatchAsync(new ControlNodeDispatchRequest(
+            fixture.JobRun,
+            fixture.ControlNode,
+            workspace,
+            TimeSpan.FromSeconds(30),
+            new ControlNodeCredentialMaterial("-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----"),
+            (line, _) =>
+            {
+                systemLines.Add(line);
+                return Task.CompletedTask;
+            }));
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Equal("Remote SSH key permission hardening failed for the control-node run workspace.", result.ErrorMessage);
+        Assert.Equal(new[] { "ssh", "ssh", "scp", "ssh", "ssh", "ssh" }, remoteRunner.Invocations.Select(invocation => invocation.FileName).ToArray());
+        Assert.Contains("-exec chmod 600", remoteRunner.Invocations[4].Arguments[^1]);
+        Assert.Contains("Remote SSH key permission hardening failed.", systemLines);
+        Assert.DoesNotContain(remoteRunner.Invocations, invocation =>
+            invocation.FileName == "ssh"
+            && invocation.Arguments[^1].Contains("exec 'ansible-playbook'", StringComparison.Ordinal));
         AssertNoTemporaryKeyDirectory(fixture.JobRun.Id);
     }
 

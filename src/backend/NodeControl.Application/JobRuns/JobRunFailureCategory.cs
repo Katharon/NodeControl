@@ -5,6 +5,7 @@ public enum JobRunFailureCategory
     Unknown = 0,
     HostUnreachable,
     SshAuthenticationFailed,
+    SshPrivateKeyFilePermissionsTooOpen,
     HostKeyVerificationFailed,
     MissingSecretOrSshKey,
     JumpHostConnectionFailed,

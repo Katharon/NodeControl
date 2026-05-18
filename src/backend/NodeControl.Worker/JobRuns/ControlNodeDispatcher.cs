@@ -181,6 +181,22 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
             }
 
             promoted = true;
+            await EmitSystemAsync(request, "Hardening remote SSH key permissions.", cancellationToken);
+            var hardenResult = await RunSshCommandAsync(
+                request,
+                keyPath,
+                BuildRemoteHardenManagedHostKeyPermissionsCommand(remoteRunPath),
+                request.Timeout,
+                request.OnSystemLine,
+                request.OnSystemLine,
+                cancellationToken);
+            if (hardenResult.ExitCode != 0 || hardenResult.TimedOut || hardenResult.Cancelled)
+            {
+                await EmitSystemAsync(request, "Remote SSH key permission hardening failed.", cancellationToken);
+                return ToDispatchResult(hardenResult, "Remote SSH key permission hardening failed for the control-node run workspace.");
+            }
+
+            await EmitSystemAsync(request, "Remote SSH key permissions hardened.", cancellationToken);
             await EmitSystemAsync(request, "Starting ansible-playbook on remote control node.", cancellationToken);
             var ansibleResult = await RunSshCommandAsync(
                 request,
@@ -440,6 +456,49 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
             "--",
             QuoteForRemoteShell(remoteStagingPath),
             QuoteForRemoteShell(remoteRunPath));
+    }
+
+    private static string BuildRemoteHardenManagedHostKeyPermissionsCommand(string remoteRunPath)
+    {
+        var nodeControlPath = $"{remoteRunPath}/.nodecontrol";
+        var keyDirectoryPath = $"{nodeControlPath}/managed-host-keys";
+
+        return string.Join(
+            " ",
+            "if",
+            "[",
+            "-d",
+            QuoteForRemoteShell(keyDirectoryPath),
+            "];",
+            "then",
+            "chmod",
+            "700",
+            QuoteForRemoteShell(nodeControlPath),
+            "&&",
+            "chmod",
+            "700",
+            QuoteForRemoteShell(keyDirectoryPath),
+            "&&",
+            "find",
+            QuoteForRemoteShell(keyDirectoryPath),
+            "-type",
+            "f",
+            "-name",
+            QuoteForRemoteShell("*.key"),
+            "-exec",
+            "chmod",
+            "600",
+            "{}",
+            "\\;",
+            ";",
+            "else",
+            "chmod",
+            "700",
+            QuoteForRemoteShell(nodeControlPath),
+            "2>/dev/null",
+            "||",
+            "true;",
+            "fi");
     }
 
     private static string BuildRemoteCleanupCommand(string remoteStagingPath)

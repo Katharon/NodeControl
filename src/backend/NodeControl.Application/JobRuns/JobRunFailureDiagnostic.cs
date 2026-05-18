@@ -57,6 +57,15 @@ public static class JobRunFailureDiagnostics
                 "Verify the host fingerprint and update the known_hosts state used by the Worker or control host.");
         }
 
+        if (ContainsAny(text, "unprotected private key file", "bad permissions", "are too open"))
+        {
+            return new JobRunFailureDiagnostic(
+                JobRunFailureCategory.SshPrivateKeyFilePermissionsTooOpen,
+                "SSH private key file permissions are too open",
+                "SSH refused to use a materialized private-key file because its permissions allow broader access than OpenSSH permits.",
+                "Ensure materialized private key files on the remote Control Host are chmod 600 and key directories are chmod 700.");
+        }
+
         if (ContainsAny(text, "proxycommand", "jump host connection failed", "jump host", "bastion", "stdio forwarding failed", "channel 0: open failed", "unknown port 65535"))
         {
             return new JobRunFailureDiagnostic(
@@ -75,7 +84,7 @@ public static class JobRunFailureDiagnostics
                 "Check the configured SSH user and private-key Secret for the control host, managed host, or jump host.");
         }
 
-        if (ContainsAny(text, "ssh key or secret is unavailable", "secret reference", "ssh private key secret", "private key material is unavailable", "identity file", "not accessible", "invalid format", "error in libcrypto", "unprotected private key file"))
+        if (ContainsAny(text, "ssh key or secret is unavailable", "secret reference", "ssh private key secret", "private key material is unavailable", "identity file", "not accessible", "invalid format", "error in libcrypto"))
         {
             if (ContainsAny(text, "belongs to a different customer"))
             {
