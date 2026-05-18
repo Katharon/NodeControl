@@ -1,4 +1,7 @@
 using System.Text.Json;
+using System.Runtime.Versioning;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -1148,7 +1151,11 @@ public sealed class JobRunExecutionTests
         var workspace = await BuildWorkspaceAsync(fixture);
         var runner = new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null));
         var remoteRunner = new FakeRemoteCommandRunner();
-        var dispatcher = new ControlNodeDispatcher(runner, Options.Create(new ExecutionOptions()), remoteRunner);
+        var dispatcher = new ControlNodeDispatcher(
+            runner,
+            Options.Create(new ExecutionOptions()),
+            remoteRunner,
+            new FakeSshPrivateKeyFilePermissionHardener(SshPrivateKeyFilePermissionResult.Ok()));
         var systemLines = new List<string>();
 
         var result = await dispatcher.DispatchAsync(new ControlNodeDispatchRequest(
@@ -1208,7 +1215,11 @@ public sealed class JobRunExecutionTests
             new RemoteCommandResult(0, false, false, null),
             new RemoteCommandResult(0, false, false, null),
             new RemoteCommandResult(1, false, false, null));
-        var dispatcher = new ControlNodeDispatcher(runner, Options.Create(new ExecutionOptions()), remoteRunner);
+        var dispatcher = new ControlNodeDispatcher(
+            runner,
+            Options.Create(new ExecutionOptions()),
+            remoteRunner,
+            new FakeSshPrivateKeyFilePermissionHardener(SshPrivateKeyFilePermissionResult.Ok()));
         var systemLines = new List<string>();
 
         var result = await dispatcher.DispatchAsync(new ControlNodeDispatchRequest(
@@ -1235,6 +1246,80 @@ public sealed class JobRunExecutionTests
     }
 
     [Fact]
+    public async Task ControlNodeDispatcher_reports_temporary_key_permission_hardening_failure_before_ssh()
+    {
+        using var fixture = ExecutionFixture.Create(controlNodeHostname: "control.example.test");
+        ConfigureRemoteControlNode(fixture);
+        var workspace = await BuildWorkspaceAsync(fixture);
+        var runner = new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null));
+        var remoteRunner = new FakeRemoteCommandRunner();
+        var dispatcher = new ControlNodeDispatcher(
+            runner,
+            Options.Create(new ExecutionOptions()),
+            remoteRunner,
+            new FakeSshPrivateKeyFilePermissionHardener(
+                SshPrivateKeyFilePermissionResult.Failed("ACL update was denied.")));
+        var systemLines = new List<string>();
+
+        var result = await dispatcher.DispatchAsync(new ControlNodeDispatchRequest(
+            fixture.JobRun,
+            fixture.ControlNode,
+            workspace,
+            TimeSpan.FromSeconds(30),
+            new ControlNodeCredentialMaterial("-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----"),
+            (line, _) =>
+            {
+                systemLines.Add(line);
+                return Task.CompletedTask;
+            }));
+
+        Assert.Null(result.ExitCode);
+        Assert.Equal("Temporary SSH private key permission hardening failed: ACL update was denied.", result.ErrorMessage);
+        Assert.Contains("Temporary SSH private key permission hardening failed: ACL update was denied.", systemLines);
+        Assert.Empty(remoteRunner.Invocations);
+        Assert.Empty(runner.Requests);
+        AssertNoTemporaryKeyDirectory(fixture.JobRun.Id);
+    }
+
+    [Fact]
+    public void SshPrivateKeyFilePermissionHardener_hardens_current_platform_private_key_file()
+    {
+        var tempDirectory = Path.Combine(Path.GetTempPath(), "nodecontrol-tests", Guid.NewGuid().ToString("N"));
+        var keyPath = Path.Combine(tempDirectory, "id_control_node");
+        Directory.CreateDirectory(tempDirectory);
+
+        try
+        {
+            File.WriteAllText(keyPath, "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n");
+
+            var result = new SshPrivateKeyFilePermissionHardener().Harden(keyPath);
+
+            Assert.True(result.Succeeded, result.ErrorMessage);
+            if (OperatingSystem.IsWindows())
+            {
+                AssertWindowsPrivateKeyAclIsRestricted(keyPath);
+            }
+            else if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD())
+            {
+                Assert.Equal(
+                    UnixFileMode.UserRead | UnixFileMode.UserWrite,
+                    File.GetUnixFileMode(keyPath));
+            }
+
+            File.WriteAllText(keyPath, string.Empty);
+            File.Delete(keyPath);
+            Assert.False(File.Exists(keyPath));
+        }
+        finally
+        {
+            if (Directory.Exists(tempDirectory))
+            {
+                Directory.Delete(tempDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ControlNodeDispatcher_cleans_remote_staging_directory_when_staging_fails()
     {
         using var fixture = ExecutionFixture.Create(controlNodeHostname: "control.example.test");
@@ -1245,7 +1330,11 @@ public sealed class JobRunExecutionTests
             new RemoteCommandResult(0, false, false, null),
             new RemoteCommandResult(0, false, false, null),
             new RemoteCommandResult(1, false, false, "scp failed"));
-        var dispatcher = new ControlNodeDispatcher(runner, Options.Create(new ExecutionOptions()), remoteRunner);
+        var dispatcher = new ControlNodeDispatcher(
+            runner,
+            Options.Create(new ExecutionOptions()),
+            remoteRunner,
+            new FakeSshPrivateKeyFilePermissionHardener(SshPrivateKeyFilePermissionResult.Ok()));
 
         var result = await dispatcher.DispatchAsync(new ControlNodeDispatchRequest(
             fixture.JobRun,
@@ -1273,7 +1362,11 @@ public sealed class JobRunExecutionTests
         var workspace = await BuildWorkspaceAsync(fixture);
         var runner = new FakeAnsibleRunner(_ => new AnsiblePlaybookRunResult(0, false, false, null));
         var remoteRunner = new FakeRemoteCommandRunner(new RemoteCommandResult(1, false, false, null));
-        var dispatcher = new ControlNodeDispatcher(runner, Options.Create(new ExecutionOptions()), remoteRunner);
+        var dispatcher = new ControlNodeDispatcher(
+            runner,
+            Options.Create(new ExecutionOptions()),
+            remoteRunner,
+            new FakeSshPrivateKeyFilePermissionHardener(SshPrivateKeyFilePermissionResult.Ok()));
 
         var result = await dispatcher.DispatchAsync(new ControlNodeDispatchRequest(
             fixture.JobRun,
@@ -1300,7 +1393,11 @@ public sealed class JobRunExecutionTests
         var remoteRunner = new FakeRemoteCommandRunner(
             new RemoteCommandResult(0, false, false, null),
             new RemoteCommandResult(1, false, false, null));
-        var dispatcher = new ControlNodeDispatcher(runner, Options.Create(new ExecutionOptions()), remoteRunner);
+        var dispatcher = new ControlNodeDispatcher(
+            runner,
+            Options.Create(new ExecutionOptions()),
+            remoteRunner,
+            new FakeSshPrivateKeyFilePermissionHardener(SshPrivateKeyFilePermissionResult.Ok()));
 
         var result = await dispatcher.DispatchAsync(new ControlNodeDispatchRequest(
             fixture.JobRun,
@@ -1416,6 +1513,38 @@ public sealed class JobRunExecutionTests
         Assert.Empty(Directory.GetDirectories(tempRoot, $"{jobRunId:D}-*"));
     }
 
+    [SupportedOSPlatform("windows")]
+    private static void AssertWindowsPrivateKeyAclIsRestricted(string keyPath)
+    {
+        var currentUser = WindowsIdentity.GetCurrent().User!;
+        var allowedSids = new HashSet<string>(StringComparer.Ordinal)
+        {
+            currentUser.Value,
+            new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null).Value,
+            new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null).Value
+        };
+
+        var security = new FileInfo(keyPath).GetAccessControl(AccessControlSections.Access);
+        Assert.True(security.AreAccessRulesProtected);
+
+        var rules = security
+            .GetAccessRules(includeExplicit: true, includeInherited: true, typeof(SecurityIdentifier))
+            .Cast<FileSystemAccessRule>()
+            .ToArray();
+
+        Assert.NotEmpty(rules);
+        Assert.All(rules, rule => Assert.False(rule.IsInherited));
+        Assert.All(rules, rule =>
+            Assert.Contains(((SecurityIdentifier)rule.IdentityReference).Value, allowedSids));
+        Assert.Contains(
+            rules,
+            rule => rule.AccessControlType == AccessControlType.Allow
+                && Equals(rule.IdentityReference, currentUser)
+                && rule.FileSystemRights.HasFlag(FileSystemRights.Read)
+                && rule.FileSystemRights.HasFlag(FileSystemRights.Write)
+                && rule.FileSystemRights.HasFlag(FileSystemRights.Delete));
+    }
+
     private sealed class FakeAnsibleRunner(
         Func<AnsiblePlaybookRunRequest, AnsiblePlaybookRunResult> handler,
         string[]? StdoutLines = null,
@@ -1474,6 +1603,15 @@ public sealed class JobRunExecutionTests
     private sealed record RemoteCommandInvocation(
         string FileName,
         string[] Arguments);
+
+    private sealed class FakeSshPrivateKeyFilePermissionHardener(SshPrivateKeyFilePermissionResult result)
+        : ISshPrivateKeyFilePermissionHardener
+    {
+        public SshPrivateKeyFilePermissionResult Harden(string keyPath)
+        {
+            return result;
+        }
+    }
 
     private sealed class CancellingAnsibleRunner(JobRun jobRun, Guid userId) : IAnsiblePlaybookRunner
     {

@@ -22,6 +22,7 @@ public static class DependencyInjection
         services.AddNodeControlInfrastructure(configuration);
         services.AddScoped<IAnsiblePlaybookRunner, AnsiblePlaybookRunner>();
         services.AddScoped<IRemoteCommandRunner, RemoteCommandRunner>();
+        services.AddScoped<ISshPrivateKeyFilePermissionHardener, SshPrivateKeyFilePermissionHardener>();
         services.AddScoped<IControlNodeDispatcher, ControlNodeDispatcher>();
         services.AddScoped<IHostConnectivityChecker, TcpHostConnectivityChecker>();
         services.AddSingleton<SecretReferenceParser>();

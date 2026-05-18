@@ -10,21 +10,32 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
     private readonly IAnsiblePlaybookRunner ansibleRunner;
     private readonly IOptions<ExecutionOptions> options;
     private readonly IRemoteCommandRunner remoteCommandRunner;
+    private readonly ISshPrivateKeyFilePermissionHardener sshKeyPermissionHardener;
+
+    public ControlNodeDispatcher(
+        IAnsiblePlaybookRunner ansibleRunner,
+        IOptions<ExecutionOptions> options,
+        IRemoteCommandRunner remoteCommandRunner,
+        ISshPrivateKeyFilePermissionHardener sshKeyPermissionHardener)
+    {
+        this.ansibleRunner = ansibleRunner;
+        this.options = options;
+        this.remoteCommandRunner = remoteCommandRunner;
+        this.sshKeyPermissionHardener = sshKeyPermissionHardener;
+    }
 
     public ControlNodeDispatcher(
         IAnsiblePlaybookRunner ansibleRunner,
         IOptions<ExecutionOptions> options,
         IRemoteCommandRunner remoteCommandRunner)
+        : this(ansibleRunner, options, remoteCommandRunner, new SshPrivateKeyFilePermissionHardener())
     {
-        this.ansibleRunner = ansibleRunner;
-        this.options = options;
-        this.remoteCommandRunner = remoteCommandRunner;
     }
 
     public ControlNodeDispatcher(
         IAnsiblePlaybookRunner ansibleRunner,
         IOptions<ExecutionOptions> options)
-        : this(ansibleRunner, options, new RemoteCommandRunner())
+        : this(ansibleRunner, options, new RemoteCommandRunner(), new SshPrivateKeyFilePermissionHardener())
     {
     }
 
@@ -120,7 +131,15 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
         {
             Directory.CreateDirectory(tempDirectory);
             await File.WriteAllTextAsync(keyPath, NormalizePrivateKey(request.CredentialMaterial.SshPrivateKey), cancellationToken);
-            TrySetPrivateKeyPermissions(keyPath);
+            var keyPermissionResult = sshKeyPermissionHardener.Harden(keyPath);
+            if (!keyPermissionResult.Succeeded)
+            {
+                var errorMessage = string.IsNullOrWhiteSpace(keyPermissionResult.ErrorMessage)
+                    ? "Temporary SSH private key permission hardening failed."
+                    : $"Temporary SSH private key permission hardening failed: {keyPermissionResult.ErrorMessage}";
+                await EmitSystemAsync(request, errorMessage, cancellationToken);
+                return new ControlNodeDispatchResult(null, false, false, errorMessage);
+            }
 
             await EmitSystemAsync(
                 request,
@@ -541,23 +560,6 @@ public sealed class ControlNodeDispatcher : IControlNodeDispatcher
     private static string NormalizePrivateKey(string privateKey)
     {
         return privateKey.EndsWith('\n') ? privateKey : privateKey + "\n";
-    }
-
-    private static void TrySetPrivateKeyPermissions(string keyPath)
-    {
-        try
-        {
-            if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD())
-            {
-                File.SetUnixFileMode(keyPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-            }
-        }
-        catch (PlatformNotSupportedException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
-        }
     }
 
     private static void TryDeleteDirectory(string directory)

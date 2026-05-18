@@ -57,7 +57,7 @@ public static class JobRunFailureDiagnostics
                 "Verify the host fingerprint and update the known_hosts state used by the Worker or control host.");
         }
 
-        if (ContainsAny(text, "unprotected private key file", "bad permissions", "are too open"))
+        if (ContainsAny(text, "unprotected private key file", "bad permissions", "are too open", "private key permission hardening failed"))
         {
             return new JobRunFailureDiagnostic(
                 JobRunFailureCategory.SshPrivateKeyFilePermissionsTooOpen,
