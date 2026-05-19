@@ -127,6 +127,16 @@ Managed Nodes
 
 External identity providers are integrated through OIDC. Keycloak may be used as a local development/demo provider, but it is not a required product dependency.
 
+### Security and Execution Boundary
+
+NodeControl separates configuration from operational execution.
+
+The API is responsible for authentication, authorization, validation, persistence, and queueing Runs. It does not execute Ansible, SSH commands, shell commands, TCP checks, or system processes.
+
+Operational execution is handled by `NodeControl.Worker`. The Worker processes queued Runs, creates workspaces, resolves protected Secrets, stages files on the selected Control Host, starts `ansible-playbook`, collects logs, and updates Run status.
+
+Secrets are stored as protected values. Secret values are not returned by the API and are only resolved by the Worker during execution preparation.
+
 ## Technology Direction
 
 Backend:
@@ -154,20 +164,112 @@ Deployment:
 - Docker Compose for local dev/demo infrastructure
 - Production packaging is Post-MVP; Kubernetes/Helm are not part of the MVP
 
+## Automation Concept
+
+NodeControl models automation through Actions, Runs, Schedules, Inventories, Playbooks, Variables, Templates, and Secrets.
+
+An Action defines what should be executed. A Run is one concrete execution of an Action. A Schedule can queue Runs automatically through a cron expression. Inventories define the Managed Hosts targeted by Ansible. Playbooks define the automation logic. Variable Sets and Templates provide reusable execution inputs.
+
+For remote execution, the intended flow is:
+
+```text
+NodeControl Worker -> Control Host -> Managed Hosts
+```
+
+The Worker connects to the selected Control Host, stages the run workspace there, and starts ansible-playbook on that Control Host. The Control Host then connects to the Managed Hosts from the inventory.
+
 ## Local Dev/Demo Quick Start
 
 Prerequisites:
 
+NodeControl needs a few tools that are not stored inside the repository. Install them before running the project locally.
+
+Required on the development machine:
+
+- Git
 - .NET SDK 10
 - Node.js and npm
-- Docker with Compose support
-- Local .NET tools restored from `.config/dotnet-tools.json`
+- Docker
+- Docker Compose support
+- OpenSSH client
+- Bash-compatible shell
+
+Required for real Ansible execution:
+
+- Ansible on the system where `ansible-playbook` is executed:
+  - on the local Worker machine for local/dev fallback execution
+  - on the selected Control Host for remote Control Host execution
+- OpenSSH server on Control Hosts and Managed Hosts
+- Python 3 on Control Hosts and Managed Hosts
+- SSH key-based access from the NodeControl Worker machine to the Control Host
+- SSH key-based access from the Control Host to the Managed Hosts
+
+On Debian/Ubuntu-based systems, install the common dependencies with:
+
+```bash
+sudo apt update
+sudo apt install git openssh-client openssh-server python3 ansible docker.io docker-compose-plugin nodejs npm
+```
+
+If the .NET SDK is available through your configured package sources, install it with:
+
+```bash
+sudo apt install dotnet-sdk-10.0
+```
+
+If `dotnet` is still not found afterwards, install the .NET SDK through the official Microsoft package feed for your distribution and then verify it with:
+
+```bash
+dotnet --info
+```
+
+Enable and start Docker on Linux:
+
+```bash
+sudo systemctl enable --now docker
+```
+
+If your user should run Docker without `sudo`, add the user to the Docker group and log out/in again:
+
+```bash
+sudo usermod -aG docker "$USER"
+```
+
+First-time project restore:
+
+```bash
+cd src/backend
+dotnet restore NodeControl.slnx
+cd ../..
+```
+
+Alternatively, from the repository root:
+
+```bash
+dotnet restore src/backend/NodeControl.slnx
+```
 
 Restore the local .NET tools:
 
 ```bash
 dotnet tool restore
 ```
+
+Install the frontend dependencies:
+
+```bash
+cd src/frontend/nodecontrol-web
+npm install
+cd ../../..
+```
+
+Important backend solution note:
+
+```text
+src/backend/NodeControl.slnx
+```
+
+The backend intentionally uses `NodeControl.slnx`. There is no `.sln` file.
 
 Start the local PostgreSQL and Keycloak development services:
 
